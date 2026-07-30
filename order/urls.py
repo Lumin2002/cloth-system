@@ -40,6 +40,8 @@ urlpatterns = [
     path('inventory/delete-all/', views.inventory_delete_all, name='inventory_delete_all'),
     # 库存日志
     path('inventory/logs/', views.InventoryLogListView.as_view(), name='inventory_log_list'),
+    path('inventory/logs/export/', views.inventory_log_export, name='inventory_log_export'),
+    path('inventory/logs/delete-all/', views.inventory_log_delete_all, name='inventory_log_delete_all'),
 
     # 布种编号
     path("cloth-catalog/", views.ClothCatalogListView.as_view(), name="cloth_catalog_list"),

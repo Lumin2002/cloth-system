@@ -750,6 +750,45 @@ class InventoryLogListView(LoginRequiredMixin, ListView):
         return ctx
 
 # ---------------------------------------------------------------------------
+# 库存日志导出 / 清空
+# ---------------------------------------------------------------------------
+
+
+@login_required
+def inventory_log_export(request):
+    """导出全部库存日志到 Excel"""
+    qs = InventoryLog.objects.select_related('item').order_by('-created_at')
+    rows = [{
+        '操作时间': log.created_at.strftime('%Y-%m-%d %H:%M'),
+        '布料名称': log.item.cloth_name if log.item else '',
+        '唯一标识': log.item.unique_id if log.item else '',
+        '客户': log.item.customer if log.item else '',
+        '变动类型': log.get_log_type_display(),
+        '变动数量': float(log.quantity),
+        '操作人': log.created_by or '系统',
+        '备注': log.remark or '',
+    } for log in qs]
+    df = pd.DataFrame(rows)
+    filename = f"inventory_logs_{now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    with pd.ExcelWriter(response, engine="openpyxl") as writer:
+        df.to_excel(writer, sheet_name="库存日志", index=False)
+    return response
+
+
+@admin_required
+@login_required
+@require_POST
+def inventory_log_delete_all(request):
+    """清空全部库存日志"""
+    count = InventoryLog.objects.all().delete()[0]
+    messages.success(request, f"已清空全部 {count} 条库存日志")
+    return redirect("inventory_log_list")
+
+# ---------------------------------------------------------------------------
 # 面料目录
 # ---------------------------------------------------------------------------
 
