@@ -687,6 +687,7 @@ class InventoryUpdateView(LoginRequiredMixin, UpdateView):
     form_class = InventoryItemForm
     template_name = "order/inventory_form.html"
     success_url = "/inventory/"
+    context_object_name = "item"
 
 
 @login_required

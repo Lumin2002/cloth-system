@@ -241,7 +241,7 @@
                                 <th>颜色</th>
                                 <th>成份</th>
                                 <th>规格</th>
-                                <th>幅宽"</th>
+                                <th>幅宽</th>
                                 <th>克重</th>
                                 <th>客户</th>
                                 <th>存放位置</th>
@@ -271,7 +271,7 @@
                                 <td class="small text-nowrap">{{ item.weight|default:"-" }}</td>
                                 <td class="small text-nowrap">{{ item.customer|default:"-" }}</td>
                                 <td class="small text-nowrap">{{ item.position|default:"-" }}</td>
-                                <td class="text-end fw-bold text-nowrap
+                                <td class="fw-bold text-nowrap
                                     {% if item.quantity == 0 %}text-secondary
                                     {% elif item.quantity < 50 %}text-warning
                                     {% else %}text-success{% endif %}">

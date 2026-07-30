@@ -72,12 +72,12 @@
       </div>
     </div>
   </div>
-</div>
     {% if page_obj and page_obj.paginator.count > 0 %}
     <div class="card card-flat mt-3 mb-3">
         <div class="card-body py-2">
             {% include 'order/_pagination.html' with page_obj=page_obj %}
         </div>
     </div>
+</div>
     {% endif %}
 {% endblock %}
