@@ -669,6 +669,55 @@ class InventoryLogListView(LoginRequiredMixin, ListView):
     template_name = "order/inventory_log_list.html"
     context_object_name = "items"
     paginate_by = 50
+    per_page_options = (20, 50, 100, 200)
+
+    def get_paginate_by(self, queryset):
+        raw = self.request.GET.get('per_page', '')
+        try:
+            size = int(raw)
+            if size in self.per_page_options:
+                return size
+        except (TypeError, ValueError):
+            pass
+        return self.paginate_by
+
+    def get_queryset(self):
+        qs = InventoryLog.objects.select_related('item').all()
+        p = self.request.GET
+
+        search = p.get('search', '').strip()
+        if search:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(item__cloth_name__icontains=search) |
+                Q(item__customer__icontains=search) |
+                Q(created_by__icontains=search) |
+                Q(remark__icontains=search)
+            )
+
+        log_type = p.get('log_type', '').strip()
+        if log_type:
+            qs = qs.filter(log_type=log_type)
+
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        total_qs = InventoryLog.objects
+
+        ctx['total_count'] = total_qs.count()
+        ctx['in_count'] = total_qs.filter(log_type='in').count()
+        ctx['out_count'] = total_qs.filter(log_type='out').count()
+        ctx['adjust_count'] = total_qs.filter(log_type='adjust').count()
+        ctx['log_type_choices'] = InventoryLog.LOG_TYPE_CHOICES
+        ctx['per_page_options'] = self.per_page_options
+        ctx['per_page'] = self.request.GET.get('per_page', self.paginate_by)
+        ctx['active_filters'] = bool(
+            self.request.GET.get('search') or
+            self.request.GET.get('log_type')
+        )
+        ctx['logs'] = ctx.get('items') or ctx.get('object_list') or []
+        return ctx
 
 # ---------------------------------------------------------------------------
 # 面料目录
