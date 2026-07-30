@@ -1,27 +1,12 @@
-{% extends "order/supplier_base.html" %}
-{% block title %}我的订单 - 供应商面板{% if page_obj and page_obj.paginator.count > 0 %}
-    {% include 'order/_pagination.html' with page_obj=page_obj %}
-    {% endif %}
-
-<script>
-document.addEventListener("click", function(e) {
-    var row = e.target.closest(".order-row");
-    if (!row) return;
-    var target = document.querySelector(row.dataset.target);
-    if (!target) return;
-    var icon = row.querySelector(".bi-chevron-down, .bi-chevron-up");
-    if (target.style.display === "none") {
-        target.style.display = "";
-        if (icon) { icon.className = icon.className.replace("bi-chevron-down", "bi-chevron-up"); }
-    } else {
-        target.style.display = "none";
-        if (icon) { icon.className = icon.className.replace("bi-chevron-up", "bi-chevron-down"); }
-    }
-});
-</script>
-
-{% endblock %}
+﻿{% extends "order/supplier_base.html" %}
+{% block title %}我的订单 - 供应商面板{% endblock %}
 {% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item active" aria-current="page">我的订单</li>
+    </ol>
+</nav>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>我的订单</h4>
 </div>
@@ -179,8 +164,12 @@ document.addEventListener("click", function(e) {
     </div>
 </div>
 {% if page_obj and page_obj.paginator.count > 0 %}
-    {% include 'order/_pagination.html' with page_obj=page_obj %}
-    {% endif %}
+<div class="card card-flat mt-3 mb-3">
+    <div class="card-body py-2">
+        {% include 'order/_pagination.html' with page_obj=page_obj %}
+    </div>
+</div>
+{% endif %}
 
 <script>
 document.addEventListener("click", function(e) {
@@ -198,5 +187,4 @@ document.addEventListener("click", function(e) {
     }
 });
 </script>
-
 {% endblock %}
