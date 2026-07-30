@@ -151,6 +151,7 @@ def run_inventory_import_in_background(task_id: str, file_bytes: bytes) -> None:
     import io
     import pandas as pd
     from django.db import close_old_connections
+    from django.db import transaction
     from django.contrib.auth.models import User
     from .inventory_excel import COLUMN_MAP, _clean
     from .models import InventoryItem, InventoryLog
@@ -172,9 +173,11 @@ def run_inventory_import_in_background(task_id: str, file_bytes: bytes) -> None:
         total = len(df)
         update_inventory_task(task_id, percent=10, message=f'共 {total} 行，开始导入…', total=total)
 
-        imported = updated = skipped = errors = 0
+        # ── 第一遍：解析所有行，建立序列号→数据的映射 ──
+        rows_data = []       # list of (serial_no, kwargs_dict, quantity)
+        seen_serials = set()
+        skipped = errors = 0
         error_messages = []
-        BATCH = 200
 
         for idx, row in df.iterrows():
             row_num = idx + 2
@@ -197,66 +200,109 @@ def run_inventory_import_in_background(task_id: str, file_bytes: bytes) -> None:
                     skipped += 1
                     continue
 
-                obj = InventoryItem.objects.filter(serial_no=serial).first()
-                if obj:
-                    old_qty = obj.quantity
-                    for k, v in kwargs.items():
-                        setattr(obj, k, v)
-                    obj.save()
-
-                    diff = quantity - old_qty
-                    if diff != 0:
-                        log_type = 'in' if diff > 0 else 'out'
-                        InventoryLog.objects.create(
-                            item=obj,
-                            log_type=log_type,
-                            quantity=abs(diff),
-                            remark=f"Excel导入更新 | 原数量:{old_qty} → 新数量:{quantity}",
-                            created_by=username
-                        )
-                    else:
-                        InventoryLog.objects.create(
-                            item=obj,
-                            log_type='adjust',
-                            quantity=0,
-                            remark="Excel导入调整资料，数量无变动",
-                            created_by=username
-                        )
-                    updated += 1
-
-                else:
-                    new_item = InventoryItem.objects.create(**kwargs)
-                    if new_item.quantity > 0:
-                        InventoryLog.objects.create(
-                            item=new_item,
-                            log_type='in',
-                            quantity=new_item.quantity,
-                            remark="Excel导入新增库存",
-                            created_by=username
-                        )
-                    imported += 1
+                rows_data.append((serial, kwargs, quantity, row_num))
+                seen_serials.add(serial)
 
             except Exception as exc:
                 errors += 1
                 error_messages.append(f'第 {row_num} 行：{exc}')
 
-            current = idx + 1
-            if current % BATCH == 0 or current == total:
-                pct = 10 + int(current / total * 88)
-                update_inventory_task(
-                    task_id,
-                    percent=pct,
-                    message=f'已处理 {current} / {total} 行…',
-                    current=current,
-                    total=total,
-                )
+        # ── 第二遍：批量查询已存在的库存 ──
+        update_inventory_task(task_id, percent=12, message='正在匹配已有库存…')
+        existing_map = {
+            item.serial_no: item
+            for item in InventoryItem.objects.filter(serial_no__in=list(seen_serials))
+        }
+
+        # ── 第三遍：分批写入 ──
+        DB_BATCH = 200
+        to_create = []          # 新增的 InventoryItem
+        to_update_items = []    # (obj, old_qty, kwargs) 待更新
+
+        for serial, kwargs, qty, row_num in rows_data:
+            existing = existing_map.get(serial)
+            if existing:
+                old_qty = existing.quantity
+                for k, v in kwargs.items():
+                    setattr(existing, k, v)
+                to_update_items.append((existing, old_qty, qty))
+            else:
+                item = InventoryItem(**kwargs)
+                to_create.append(item)
+
+        total_rows = len(rows_data)
+        done = 0
+
+        # ── 分批创建新库存 ──
+        imported = 0
+        if to_create:
+            created_items = InventoryItem.objects.bulk_create(to_create)
+            imported = len(created_items)
+            done += imported
+            # 批量创建新增库存的日志
+            qty_map = {kwargs['serial_no']: kwargs.get('quantity', 0) for _, kwargs, qty, _ in rows_data if kwargs.get('serial_no')}
+            new_logs = []
+            for item in created_items:
+                qty = qty_map.get(item.serial_no, 0)
+                if qty > 0:
+                    new_logs.append(
+                        InventoryLog(
+                            item=item,
+                            log_type='in',
+                            quantity=qty,
+                            remark="Excel导入新增库存",
+                            created_by=username,
+                        )
+                    )
+            if new_logs:
+                InventoryLog.objects.bulk_create(new_logs)
+            pct = 12 + int(done / total_rows * 60)
+            update_inventory_task(task_id, percent=pct, message=f'新增 {imported} 条库存…', current=done, total=total_rows)
+
+        # ── 分批更新已有库存 ──
+        update_fields = [f.name for f in InventoryItem._meta.get_fields() if hasattr(f, 'column') and f.name != 'id']
+        for i in range(0, len(to_update_items), DB_BATCH):
+            batch = to_update_items[i:i + DB_BATCH]
+            items = []
+            logs_batch = []
+            for obj, old_qty, qty in batch:
+                items.append(obj)
+                diff = qty - old_qty
+                if diff != 0:
+                    logs_batch.append(
+                        InventoryLog(
+                            item=obj,
+                            log_type='in' if diff > 0 else 'out',
+                            quantity=abs(diff),
+                            remark=f"Excel导入更新 | 原数量:{old_qty} → 新数量:{qty}",
+                            created_by=username,
+                        )
+                    )
+                else:
+                    logs_batch.append(
+                        InventoryLog(
+                            item=obj,
+                            log_type='adjust',
+                            quantity=0,
+                            remark="Excel导入调整资料，数量无变动",
+                            created_by=username,
+                        )
+                    )
+            with transaction.atomic():
+                InventoryItem.objects.bulk_update(items, update_fields)
+                InventoryLog.objects.bulk_create(logs_batch)
+            done += len(batch)
+            pct = 12 + int(done / total_rows * 60)
+            update_inventory_task(task_id, percent=pct, message=f'更新 {done}/{total_rows} 条…', current=done, total=total_rows)
+
+        updated = len(to_update_items)
 
         update_inventory_task(
             task_id,
             status='done',
             percent=100,
             message='导入完成',
-            current=total,
+            current=total_rows,
             result={
                 'imported': imported,
                 'updated': updated,
