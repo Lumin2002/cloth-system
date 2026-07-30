@@ -304,14 +304,21 @@ class ClothOrder(ClothCatalogMixin, ProgressStageMixin, models.Model):
     def computed_total_amount(self):
         """从出货记录实时计算总金额，不依赖 total_amount 字段"""
         cost = float(self.finished_product_cost_price or 0)
-        qty = float(self.total_shipment_from_shipments() or 0)
+        # 如果 queryset 已注解 _ship_qty，直接使用，避免额外查询
+        if hasattr(self, "_ship_qty") and self._ship_qty is not None:
+            qty = float(self._ship_qty)
+        else:
+            qty = float(self.total_shipment_from_shipments() or 0)
         return round(cost * qty, 2)
 
     @property
     def computed_finished_product_total_amount(self):
         """从出货记录实时计算成品出货对账总金额"""
         price = float(self.price or 0)
-        qty = float(self.total_shipment_from_shipments() or 0)
+        if hasattr(self, "_ship_qty") and self._ship_qty is not None:
+            qty = float(self._ship_qty)
+        else:
+            qty = float(self.total_shipment_from_shipments() or 0)
         return round(price * qty, 2)
 
 # ---------------------------------------------------------------------------

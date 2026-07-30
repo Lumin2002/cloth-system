@@ -310,7 +310,15 @@ class OrderListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = ClothOrder.objects.all()
         qs = filter_orders_queryset(self.request.GET, qs)
-        return qs
+        # Annotate shipment qty so computed_* properties avoid N+1 queries
+        ship_subq = Shipment.objects.filter(
+            order=OuterRef("pk"), is_deleted=False
+        ).values("order").annotate(
+            total=Sum("quantity")
+        ).values("total")[:1]
+        return qs.annotate(
+            _ship_qty=Coalesce(Subquery(ship_subq, output_field=FloatField()), Value(0.0), output_field=FloatField())
+        )
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -321,27 +329,40 @@ class OrderListView(LoginRequiredMixin, ListView):
         except ValueError:
             ctx["per_page"] = self.paginate_by
 
-        # 计算筛选后的统计数据
+        # 筛选后的统计数据（用 Shipment JOIN 自带的字段）
         filtered = self.get_queryset()
-        active_orders = [o for o in filtered if o.order_status == "active"]
-        total_count = len(active_orders)
-        total_revenue = sum(o.computed_finished_product_total_amount for o in active_orders)
-        total_cost = sum(o.computed_total_amount for o in active_orders)
+        active_ids = list(filtered.filter(order_status="active").values_list("pk", flat=True))
+        if active_ids:
+            from .models import Shipment as _Ship
+            fin = _Ship.objects.filter(is_deleted=False, order_id__in=active_ids).aggregate(
+                rev=Coalesce(Sum(F("quantity") * F("order__price")), Value(0.0), output_field=FloatField()),
+                cost=Coalesce(Sum(F("quantity") * F("order__finished_product_cost_price")), Value(0.0), output_field=FloatField()),
+            )
+            total_revenue = round(float(fin["rev"]), 2)
+            total_cost = round(float(fin["cost"]), 2)
+        else:
+            total_revenue = 0.0
+            total_cost = 0.0
         total_profit = total_revenue - total_cost
         profit_margin = (total_profit / total_revenue * 100) if total_revenue else 0
 
-        ctx["total_count"] = total_count
+        ctx["total_count"] = len(active_ids)
         ctx["total_revenue"] = total_revenue
         ctx["total_cost"] = total_cost
         ctx["total_profit"] = total_profit
         ctx["filter_profit_margin"] = profit_margin
 
-        # Chip 计数（全量）
-        base = ClothOrder.objects.all()
-        ctx["chip_unpaid"] = base.filter(payment_status="unpaid").count()
-        ctx["chip_overdue"] = base.filter(overdue_status="overdue").count()
-        ctx["chip_paid"] = base.filter(payment_status="paid").count()
-        ctx["chip_cancelled"] = base.filter(order_status="cancelled").count()
+        # Chip 计数（全量）—— 合并为一次聚合
+        chip = ClothOrder.objects.aggregate(
+            unpaid=Count("id", filter=Q(payment_status="unpaid")),
+            overdue=Count("id", filter=Q(overdue_status="overdue")),
+            paid=Count("id", filter=Q(payment_status="paid")),
+            cancelled=Count("id", filter=Q(order_status="cancelled")),
+        )
+        ctx["chip_unpaid"] = chip["unpaid"]
+        ctx["chip_overdue"] = chip["overdue"]
+        ctx["chip_paid"] = chip["paid"]
+        ctx["chip_cancelled"] = chip["cancelled"]
 
         # 是否有激活的筛选条件
         params = self.request.GET
@@ -1341,33 +1362,43 @@ class SupplierDashboardView(SupplierRequiredMixin, ListView):
         )
 
         return qs.annotate(
-            _shipment_qty=Subquery(subq, output_field=FloatField()),
+            _ship_qty=Subquery(subq, output_field=FloatField()),
             has_active_shipments=Exists(has_ship),
         )
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         supplier = self.request.user.supplier_profile
+        # Avoid calling get_queryset() twice - use the paginated object_list
         qs = self.get_queryset()
 
         ctx["supplier"] = supplier
 
-        ctx["total_count"] = qs.count()
-        ctx["quoted_count"] = qs.filter(finished_product_cost_price__isnull=False).count()
-        ctx["pending_count"] = qs.filter(finished_product_cost_price__isnull=True).count()
-        ctx["quoted_wait_ship_count"] = qs.filter(
-            finished_product_cost_price__isnull=False,
-            supplier_shipped=False,
-            has_active_shipments=False,
-        ).count()
-        ctx["shipped_count"] = qs.filter(
-            Q(supplier_shipped=True) | Q(has_active_shipments=True)
-        ).count()
+        # 合并计数为一次聚合
+        cnt = qs.aggregate(
+            total=Count("id"),
+            quoted=Count("id", filter=Q(finished_product_cost_price__isnull=False)),
+            pending=Count("id", filter=Q(finished_product_cost_price__isnull=True)),
+            wait_ship=Count("id", filter=Q(
+                finished_product_cost_price__isnull=False,
+                supplier_shipped=False,
+                has_active_shipments=False,
+            )),
+            shipped=Count("id", filter=Q(
+                Q(supplier_shipped=True) | Q(has_active_shipments=True)
+            )),
+        )
+        ctx["total_count"] = cnt["total"]
+        ctx["quoted_count"] = cnt["quoted"]
+        ctx["pending_count"] = cnt["pending"]
+        ctx["quoted_wait_ship_count"] = cnt["wait_ship"]
+        ctx["shipped_count"] = cnt["shipped"]
 
+        # 计算每条订单的小计（使用已注解的 _shipment_qty，不触发额外查询）
         totals = {}
         for o in qs:
             price_val = float(o.finished_product_cost_price or 0)
-            num_val = float(getattr(o, "_shipment_qty") or 0)
+            num_val = float(getattr(o, "_ship_qty") or 0)
             totals[str(o.pk)] = price_val * num_val
         ctx["order_totals"] = totals
 
