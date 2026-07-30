@@ -1,4 +1,4 @@
-﻿from django import forms
+from django import forms
 from django.utils.safestring import mark_safe
 from .constants import DEFAULT_STAGES_MAP
 from django.core.exceptions import ValidationError
@@ -294,6 +294,7 @@ class InventoryItemForm(forms.ModelForm):
         self.fields["grey_fabric_date"].widget = forms.DateInput(attrs=DATE_INPUT, format="%Y-%m-%d")
         self.fields["finished_price"].widget = text
         self.fields["quantity"].widget = number_min0
+        self.fields["remark"].widget = textarea
 
         # 进度阶段处理（移到__init__内部，修复之前代码错位bug）
         if "progress_stages" in self.fields:
