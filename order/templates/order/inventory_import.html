@@ -1,0 +1,305 @@
+{% extends 'order/base.html' %}
+
+{% block title %}导入库存 - 服装订单管理系统{% endblock %}
+
+{% block content %}
+<div class="container-fluid main-container import-page">
+    <nav aria-label="breadcrumb" class="mb-3"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="{% url 'dashboard' %}">仪表板</a></li><li class="breadcrumb-item"><a href="{% url 'inventory_list' %}">库存列表</a></li><li class="breadcrumb-item active" aria-current="page">导入库存</li></ol></nav>
+
+    <div class="page-hero mb-4">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h2 class="fw-bold mb-1">
+                    <i class="bi bi-file-earmark-arrow-up text-primary me-2"></i>导入库存
+                </h2>
+                <p class="text-muted mb-0">上传库存 .xlsx 文件，按<strong>序号</strong>匹配：存在则更新，不存在则新增</p>
+            </div>
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                    <a href="{% url 'inventory_export' %}" class="btn btn-outline-success btn-sm">
+                        <i class="bi bi-download me-1"></i> 导出现有数据备份
+                    </a>
+                    <a href="{% url 'inventory_list' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-arrow-left me-1"></i> 返回列表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-xl-10 col-lg-11">
+
+            <div class="row g-4">
+                <!-- 上传区 -->
+                <div class="col-lg-7">
+                    <div class="card card-flat h-100">
+                        <div class="card-body">
+                            <div id="upload-zone" class="upload-zone">
+                                <input type="file" id="excel_file" accept=".xlsx" class="d-none">
+                                <div class="upload-zone-inner text-center py-5 px-3">
+                                    <i class="bi bi-cloud-arrow-up display-4 text-primary mb-3"></i>
+                                    <h5 class="fw-bold">点击或拖拽文件到此处</h5>
+                                    <p class="text-muted small mb-3">仅支持 .xlsx · 与现有库存表格式一致</p>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="btn-pick-file">
+                                        选择文件
+                                    </button>
+                                    <p class="text-muted small mt-3 mb-0" id="file-name">未选择文件</p>
+                                </div>
+                            </div>
+
+                            <div class="d-grid gap-2 mt-4">
+                                <button type="button" class="btn btn-primary btn-sm" id="btn-start-import" disabled>
+                                    <i class="bi bi-play-fill me-1"></i>开始导入
+                                </button>
+                                <a href="{% url 'inventory_list' %}" class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-arrow-left me-1"></i>返回库存列表
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 说明 -->
+                <div class="col-lg-5">
+                    <div class="card card-flat mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="bi bi-info-circle me-2 text-primary"></i>导入规则
+                            </h6>
+                        </div>
+                        <ul class="list-group list-group-flush small">
+                            <li class="list-group-item">按<strong>序号</strong>匹配：存在则更新，不存在则新增</li>
+                            <li class="list-group-item">列名需与库存 Excel 保持一致</li>
+                            <li class="list-group-item">支持字段：布种/加工别、颜色、成份、规格、幅宽、克重、客户、存放位置、库存数量等</li>
+                            <li class="list-group-item">缺少某列时该字段保持空白，不影响其他字段</li>
+                            <li class="list-group-item text-muted">数据量较大时导入需数秒，请勿关闭本页</li>
+                        </ul>
+                    </div>
+                    <div class="card card-flat bg-light">
+                        <div class="card-body small text-muted">
+                            <p class="fw-bold mb-1">提示</p>
+                            <p class="mb-0 mt-2">与「当前库存_xxxxxxxx.xlsx」格式完全兼容，直接上传即可。导入完成后可查看结果摘要。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 进度 -->
+            <div class="card card-flat mt-4 d-none" id="progress-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold mb-0" id="progress-title">正在导入…</h6>
+                        <span class="badge bg-primary" id="progress-percent">0%</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 1.25rem;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated"
+                             id="progress-bar" role="progressbar" style="width: 0%">0%</div>
+                    </div>
+                    <p class="text-muted small mb-0" id="progress-message">准备中…</p>
+                    <p class="text-muted small mb-0" id="progress-detail"></p>
+                </div>
+            </div>
+
+            <!-- 结果 -->
+            <div class="card card-flat mt-4 d-none" id="result-card">
+                <div class="card-body">
+                    <h6 class="fw-bold text-success mb-3" id="result-title">
+                        <i class="bi bi-check-circle me-2"></i>导入完成
+                    </h6>
+                    <div class="row g-2 mb-3" id="result-stats"></div>
+                    <div id="result-errors" class="d-none">
+                        <p class="small fw-bold text-danger mb-2">部分行导入失败：</p>
+                        <ul class="small text-danger mb-0" id="error-list"></ul>
+                    </div>
+                    <div class="d-flex gap-2 mt-3">
+                        <a href="{% url 'inventory_list' %}" class="btn btn-primary btn-sm">查看库存列表</a>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-import-again">继续导入</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+.import-page .breadcrumb { font-size: .875rem; }
+.upload-zone {
+    border: 2px dashed #ced4da;
+    border-radius: 12px;
+    background: #f8f9fa;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+}
+.upload-zone:hover, .upload-zone.dragover {
+    border-color: #4361ee;
+    background: #eef1ff;
+}
+.upload-zone.has-file {
+    border-color: #198754;
+    background: #f0fff4;
+}
+</style>
+
+<script>
+(function () {
+    const uploadZone = document.getElementById('upload-zone');
+    const fileInput = document.getElementById('excel_file');
+    const fileNameEl = document.getElementById('file-name');
+    const btnPick = document.getElementById('btn-pick-file');
+    const btnStart = document.getElementById('btn-start-import');
+    const progressCard = document.getElementById('progress-card');
+    const progressBar = document.getElementById('progress-bar');
+    const progressPercent = document.getElementById('progress-percent');
+    const progressMessage = document.getElementById('progress-message');
+    const progressDetail = document.getElementById('progress-detail');
+    const progressTitle = document.getElementById('progress-title');
+    const resultCard = document.getElementById('result-card');
+    const resultStats = document.getElementById('result-stats');
+    const resultErrors = document.getElementById('result-errors');
+    const errorList = document.getElementById('error-list');
+    const resultTitle = document.getElementById('result-title');
+    const btnAgain = document.getElementById('btn-import-again');
+
+    let selectedFile = null;
+    let pollTimer = null;
+
+    function getCookie(name) {
+        const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return m ? m.pop() : '';
+    }
+
+    function setFile(file) {
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith('.xlsx')) {
+            alert('请选择 .xlsx 格式的 Excel 文件');
+            return;
+        }
+        selectedFile = file;
+        fileNameEl.textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
+        uploadZone.classList.add('has-file');
+        btnStart.disabled = false;
+    }
+
+    uploadZone.addEventListener('click', () => fileInput.click());
+    btnPick.addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files[0]) setFile(fileInput.files[0]);
+    });
+
+    ['dragenter', 'dragover'].forEach(evt => {
+        uploadZone.addEventListener(evt, (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(evt => {
+        uploadZone.addEventListener(evt, (e) => { e.preventDefault(); uploadZone.classList.remove('dragover'); });
+    });
+    uploadZone.addEventListener('drop', (e) => {
+        const f = e.dataTransfer.files[0];
+        if (f) setFile(f);
+    });
+
+    function updateProgress(data) {
+        const pct = data.percent || 0;
+        progressBar.style.width = pct + '%';
+        progressBar.textContent = pct + '%';
+        progressPercent.textContent = pct + '%';
+        progressMessage.textContent = data.message || '';
+        progressDetail.textContent = data.total > 0 ? '进度：' + (data.current || 0) + ' / ' + data.total : '';
+        if (data.status === 'running') progressBar.classList.add('progress-bar-animated');
+    }
+
+    function showResult(result, hasErrors) {
+        progressCard.classList.add('d-none');
+        resultCard.classList.remove('d-none');
+        resultTitle.className = hasErrors ? 'fw-bold text-warning mb-3' : 'fw-bold text-success mb-3';
+        resultTitle.innerHTML = hasErrors
+            ? '<i class="bi bi-exclamation-triangle me-2"></i>导入完成（有部分失败）'
+            : '<i class="bi bi-check-circle me-2"></i>导入完成';
+        const items = [
+            ['新增', result.imported, 'primary'],
+            ['更新', result.updated, 'info'],
+            ['跳过', result.skipped, 'secondary'],
+            ['失败', result.errors, 'danger'],
+        ];
+        resultStats.innerHTML = items.map(([lbl, num, color]) =>
+            '<div class="col-6 col-xl-3 mb-2"><div class="kpi-card kpi-' + color + '">' +
+            '<div class="kpi-value">' + (num || 0) + '</div>' +
+            '<div class="kpi-label">' + lbl + '</div></div></div>'
+        ).join('');
+        if (result.error_messages && result.error_messages.length) {
+            resultErrors.classList.remove('d-none');
+            errorList.innerHTML = result.error_messages.map(e => '<li>' + e + '</li>').join('');
+        } else {
+            resultErrors.classList.add('d-none');
+        }
+        btnStart.disabled = false;
+    }
+
+    function pollProgress(taskId) {
+        const url = '{% url "inventory_import_progress" "00000000-0000-0000-0000-000000000000" %}'.replace(
+            '00000000-0000-0000-0000-000000000000', taskId
+        );
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) { clearInterval(pollTimer); alert(data.error); btnStart.disabled = false; return; }
+                updateProgress(data);
+                if (data.status === 'done') {
+                    clearInterval(pollTimer);
+                    progressBar.classList.remove('progress-bar-animated');
+                    showResult(data.result || {}, (data.result && data.result.errors > 0));
+                } else if (data.status === 'error') {
+                    clearInterval(pollTimer);
+                    progressBar.classList.remove('progress-bar-animated');
+                    progressBar.classList.add('bg-danger');
+                    progressTitle.textContent = '导入失败';
+                    progressMessage.textContent = data.message || data.error || '未知错误';
+                    btnStart.disabled = false;
+                }
+            })
+            .catch(() => { clearInterval(pollTimer); alert('无法获取导入进度，请检查网络后重试'); btnStart.disabled = false; });
+    }
+
+    btnStart.addEventListener('click', () => {
+        if (!selectedFile) return;
+        btnStart.disabled = true;
+        resultCard.classList.add('d-none');
+        progressCard.classList.remove('d-none');
+        progressBar.classList.remove('bg-danger');
+        progressBar.classList.add('progress-bar-animated');
+        updateProgress({ percent: 0, message: '正在上传文件…', current: 0, total: 0 });
+
+        const formData = new FormData();
+        formData.append('excel_file', selectedFile);
+
+        fetch('{% url "inventory_import_start" %}', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            body: formData,
+        })
+            .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
+            .then(({ ok, body }) => {
+                if (!ok || body.error) throw new Error(body.error || '启动导入失败');
+                progressTitle.textContent = '正在导入…';
+                pollTimer = setInterval(() => pollProgress(body.task_id), 500);
+                pollProgress(body.task_id);
+            })
+            .catch(err => {
+                progressCard.classList.add('d-none');
+                alert(err.message);
+                btnStart.disabled = false;
+            });
+    });
+
+    btnAgain.addEventListener('click', () => {
+        resultCard.classList.add('d-none');
+        selectedFile = null;
+        fileInput.value = '';
+        fileNameEl.textContent = '未选择文件';
+        uploadZone.classList.remove('has-file');
+        btnStart.disabled = true;
+    });
+})();
+</script>
+{% endblock %}

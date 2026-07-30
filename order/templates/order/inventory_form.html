@@ -1,0 +1,221 @@
+{% extends 'order/base.html' %}
+
+{% block title %}{{ form_title }} - 服装订单管理系统{% endblock %}
+
+{% block content %}
+<div class="container-fluid main-container orders-page">
+    <nav aria-label="breadcrumb" class="mb-3"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="{% url 'dashboard' %}">仪表板</a></li><li class="breadcrumb-item"><a href="{% url 'inventory_list' %}">库存列表</a></li><li class="breadcrumb-item active" aria-current="page">编辑库存</li></ol></nav>
+
+    <div class="page-hero mb-4">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h2 class="fw-bold mb-1">
+                    <i class="bi bi-pencil-square text-primary me-2"></i>{{ form_title }}
+                </h2>
+                <p class="text-muted mb-0">
+                    序号 <span class="fw-bold text-primary">#{{ item.serial_no|default:"-" }}</span>
+                    <span class="mx-2">|</span>
+                    {{ item.cloth_name|default:"" }} {{ item.color|default:"" }}
+                </p>
+            </div>
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="d-flex gap-2 justify-content-lg-end">
+                    <a href="{% url 'inventory_detail' item.pk %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-arrow-left me-1"></i> 返回详情
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger">
+        {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <!-- 布料基本信息 -->
+        <div class="card card-flat mb-3">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-grid me-2 text-primary"></i>布料基本信息</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-2 col-6">
+                        <label class="form-label">序号</label>
+                        {{ form.serial_no }}
+                        {% for e in form.serial_no.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <label class="form-label">布种类型ID</label>
+                        {{ form.cloth_type_id }}
+                        {% for e in form.cloth_type_id.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4 col-12">
+                        <label class="form-label">唯一标识</label>
+                        {{ form.unique_id }}
+                        {% for e in form.unique_id.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4 col-12">
+                        <label class="form-label">布种/加工别</label>
+                        {{ form.cloth_name }}
+                        {% for e in form.cloth_name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">颜色/COLOR</label>
+                        {{ form.color }}
+                        {% for e in form.color.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">规格/SPECIFICATION</label>
+                        {{ form.specification }}
+                        {% for e in form.specification.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">COMPOSITION</label>
+                        {{ form.composition_en }}
+                        {% for e in form.composition_en.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">成份</label>
+                        {{ form.composition_cn }}
+                        {% for e in form.composition_cn.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-2 col-4">
+                        <label class="form-label">幅宽(英寸)</label>
+                        {{ form.width }}
+                        {% for e in form.width.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-2 col-4">
+                        <label class="form-label">克重(g/㎡)</label>
+                        {{ form.weight }}
+                        {% for e in form.weight.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-2 col-4">
+                        <label class="form-label">正反面</label>
+                        {{ form.sides }}
+                        {% for e in form.sides.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">FINISHING</label>
+                        {{ form.finishing_en }}
+                        {% for e in form.finishing_en.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">整理</label>
+                        {{ form.finishing_cn }}
+                        {% for e in form.finishing_cn.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 库存与客户 -->
+        <div class="card card-flat mb-3">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-stack me-2 text-success"></i>库存与客户</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-2 col-4">
+                        <label class="form-label fw-bold">库存数量 <span class="text-danger">*</span></label>
+                        {{ form.quantity }}
+                        {% for e in form.quantity.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">客户/CLIENT</label>
+                        {{ form.customer }}
+                        {% for e in form.customer.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">用途/USE</label>
+                        {{ form.usage }}
+                        {% for e in form.usage.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <label class="form-label">存放位置</label>
+                        {{ form.position }}
+                        {% for e in form.position.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <label class="form-label">生产缸号</label>
+                        {{ form.bath_no }}
+                        {% for e in form.bath_no.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <label class="form-label">成品价格</label>
+                        {{ form.finished_price }}
+                        {% for e in form.finished_price.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">备注/REMARK</label>
+                        {{ form.remark }}
+                        {% for e in form.remark.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 胚布信息 -->
+        <div class="card card-flat mb-3">
+            <div class="card-header">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-file-earmark-text me-2 text-secondary"></i>胚布信息</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">胚布编号</label>
+                        {{ form.grey_fabric_no }}
+                        {% for e in form.grey_fabric_no.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">胚布价格</label>
+                        {{ form.grey_fabric_price }}
+                        {% for e in form.grey_fabric_price.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">胚布来源</label>
+                        {{ form.grey_fabric_source }}
+                        {% for e in form.grey_fabric_source.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label">调胚时间</label>
+                        {{ form.grey_fabric_date }}
+                        {% for e in form.grey_fabric_date.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部保存栏 -->
+        <div class="card shadow-sm sticky-bottom-bar">
+            <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                <span class="text-muted small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    带 <span class="text-danger">*</span> 为必填项
+                </span>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'inventory_detail' item.pk %}" class="btn btn-outline-secondary btn-sm">取消</a>
+                    <button type="submit" class="btn btn-primary px-4 btn-sm">
+                        <i class="bi bi-check-lg me-1"></i> 保存修改
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<style>
+.orders-page .breadcrumb { font-size: .875rem; }
+.form-label { font-size: 0.875rem; font-weight: 500; }
+.sticky-bottom-bar {
+    position: sticky;
+    bottom: 1rem;
+    z-index: 10;
+    border-left: 4px solid var(--bs-primary);
+}
+</style>
+{% endblock %}

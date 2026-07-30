@@ -1,0 +1,45 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.whl
+venv/
+.venv/
+*.venv
+
+# Django
+db.sqlite3
+*.sqlite3
+staticfiles/
+media/
+mediafiles/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Temp / generated / logs
+*.bak
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Project specific
+fix_import.py
+start.bat

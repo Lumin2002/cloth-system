@@ -1,0 +1,202 @@
+{% extends "order/supplier_base.html" %}
+{% block title %}我的订单 - 供应商面板{% if page_obj and page_obj.paginator.count > 0 %}
+    {% include 'order/_pagination.html' with page_obj=page_obj %}
+    {% endif %}
+
+<script>
+document.addEventListener("click", function(e) {
+    var row = e.target.closest(".order-row");
+    if (!row) return;
+    var target = document.querySelector(row.dataset.target);
+    if (!target) return;
+    var icon = row.querySelector(".bi-chevron-down, .bi-chevron-up");
+    if (target.style.display === "none") {
+        target.style.display = "";
+        if (icon) { icon.className = icon.className.replace("bi-chevron-down", "bi-chevron-up"); }
+    } else {
+        target.style.display = "none";
+        if (icon) { icon.className = icon.className.replace("bi-chevron-up", "bi-chevron-down"); }
+    }
+});
+</script>
+
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>我的订单</h4>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <a href="{% url 'supplier_dashboard' %}" class="kpi-card kpi-primary text-decoration-none">
+            <div class="kpi-label">全部订单</div>
+            <div class="kpi-value">{{ total_count }}</div>
+            <div class="kpi-meta">待报价 {{ pending_count }} · 已出货 {{ shipped_count }}</div>
+            <i class="bi bi-clipboard-data kpi-icon"></i>
+        </a>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-warning">
+            <div class="kpi-label">待报价</div>
+            <div class="kpi-value">{{ pending_count }}</div>
+            <i class="bi bi-clock-history kpi-icon"></i>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-info">
+            <div class="kpi-label">已报价待出货</div>
+            <div class="kpi-value">{{ quoted_wait_ship_count }}</div>
+            <i class="bi bi-truck kpi-icon"></i>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card kpi-success">
+            <div class="kpi-label">已出货</div>
+            <div class="kpi-value">{{ shipped_count }}</div>
+            <i class="bi bi-check-circle kpi-icon"></i>
+        </div>
+    </div>
+</div>
+
+<div class="card card-flat mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-sm-4 col-md-3">
+                <input type="text" name="search" class="form-control form-control-sm" placeholder="搜索客户/编号/布种" value="{{ request.GET.search }}">
+            </div>
+            <div class="col-6 col-sm-4 col-md-2">
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">全部状态</option>
+                    <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>待报价</option>
+                    <option value="quoted" {% if request.GET.status == 'quoted' %}selected{% endif %}>已报价待出货</option>
+                    <option value="shipped" {% if request.GET.status == 'shipped' %}selected{% endif %}>已出货</option>
+                </select>
+            </div>
+            <div class="col-6 col-sm-4 col-md-2">
+                <input type="date" name="start_date" class="form-control form-control-sm" value="{{ request.GET.start_date }}">
+            </div>
+            <div class="col-6 col-sm-4 col-md-2">
+                <input type="date" name="end_date" class="form-control form-control-sm" value="{{ request.GET.end_date }}">
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+                <div class="d-flex gap-1">
+                    <button type="submit" class="btn btn-sm btn-primary flex-fill"><i class="bi bi-search me-1"></i>筛选</button>
+                    <a href="{% url 'supplier_dashboard' %}" class="btn btn-sm btn-outline-secondary flex-fill"><i class="bi bi-x-lg me-1"></i>清空</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><strong>订单列表</strong></span>
+        <span class="text-muted small">{{ total_count }} 条记录</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>序号</th>
+                    <th>客户</th>
+                    <th>订单类型</th>
+                    <th>昇奕隆编号</th>
+                    <th>下单日期</th>
+                    <th>出货总数量</th>
+                    <th>成品成本价格</th>
+                    <th>总价格</th>
+                    <th>订单状态</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                <tr class="order-row" data-target="#shipments-{{ order.pk }}" style="cursor:pointer;">
+                    <td><i class="bi bi-chevron-down me-1 text-muted small"></i>{{ order.serial_number|default:"-" }}</td>
+                    <td>{{ order.customer|default:"-" }}</td>
+                    <td>{{ order.get_order_type_display|default:"-" }}</td>
+                    <td>{{ order.cloth_type|default:"-" }}</td>
+                    <td>{{ order.order_date|date:"Y-m-d"|default:"-" }}</td>
+                    <td>{{ order.total_shipment_from_shipments|default:"-" }} {{ order.shipment_quantity_unit }}</td>
+                    <td>
+                        {% if order.finished_product_cost_price %}
+                            {{ order.finished_product_cost_price }} {{ order.cost_price_unit }}
+                        {% else %}
+                            <span class="badge bg-secondary">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if order.finished_product_cost_price %}
+                            <strong>{{ order.computed_total_amount|floatformat:2 }} 元</strong>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>{% if order.order_status == "cancelled" %}<span class="badge bg-secondary">已取消</span>{% else %}<span class="badge bg-success">正常</span>{% endif %}</td>
+                    <td>
+                        {% if order.has_active_shipments %}
+                            <span class="badge bg-success">已出货</span>
+                        {% elif order.finished_product_cost_price %}
+                            <span class="badge bg-info">已提交待出货</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">待提交</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'supplier_order_detail' order.pk %}" class="btn btn-sm btn-primary">
+                            {% if order.finished_product_cost_price %}查看{% else %}进行编辑{% endif %}
+                        </a>
+                    </td>
+                </tr>
+                <tr id="shipments-{{ order.pk }}" class="shipment-detail-row" style="display:none;">
+                    <td colspan="11" class="p-0">
+                        <div class="p-3 bg-light">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead>
+                                    <tr><th>批次</th><th>出货日期</th><th class="text-end">出货数量</th><th class="text-end">出货总价</th></tr>
+                                </thead>
+                                <tbody>
+                                {% for s in order.shipments.all %}
+                                    <tr class="{% if s.is_deleted %}text-decoration-line-through text-muted{% endif %}">
+                                        <td>{{ s.batch_number }}</td>
+                                        <td>{{ s.date|date:"Y-m-d"|default:"-" }}</td>
+                                        <td class="text-end">{{ s.quantity|floatformat:2|default:"-" }}</td>
+                                        <td class="text-end"><strong>¥{{ s.quantity|floatformat:2|default:"0.00" }}</strong></td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="4" class="text-center text-muted py-2">暂无出货记录</td></tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="9" class="text-center text-muted py-4">暂无分配给您的订单</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% if page_obj and page_obj.paginator.count > 0 %}
+    {% include 'order/_pagination.html' with page_obj=page_obj %}
+    {% endif %}
+
+<script>
+document.addEventListener("click", function(e) {
+    var row = e.target.closest(".order-row");
+    if (!row) return;
+    var target = document.querySelector(row.dataset.target);
+    if (!target) return;
+    var icon = row.querySelector(".bi-chevron-down, .bi-chevron-up");
+    if (target.style.display === "none") {
+        target.style.display = "";
+        if (icon) { icon.className = icon.className.replace("bi-chevron-down", "bi-chevron-up"); }
+    } else {
+        target.style.display = "none";
+        if (icon) { icon.className = icon.className.replace("bi-chevron-up", "bi-chevron-down"); }
+    }
+});
+</script>
+
+{% endblock %}

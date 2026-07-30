@@ -1,0 +1,248 @@
+﻿{% extends 'order/base.html' %}
+{% block title %}添加订单{% endblock %}
+{% block content %}
+{% load static %}
+{% load pagination %}
+<div class="container-fluid main-container orders-page">
+<nav aria-label="breadcrumb" class="mb-3"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="{% url 'dashboard' %}">仪表板</a></li><li class="breadcrumb-item"><a href="{% url 'order_list' %}">订单列表</a></li><li class="breadcrumb-item active" aria-current="page">新增订单</li></ol></nav>
+
+<div class="page-hero mb-4">
+    <div class="row align-items-center">
+        <div class="col-lg-8">
+            <h2 class="fw-bold mb-1"><i class="bi bi-plus-circle text-primary me-2"></i>添加订单</h2>
+            <p class="text-muted mb-0">请填写以下信息创建新订单，序号可留空，保存后系统自动生成。供应商相关的价格、出货、地址等信息由供应商登录后填写。</p>
+        </div>
+        <div class="col-lg-4 mt-3 mt-lg-0">
+            <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                <a href="{% url 'orders_import' %}" class="btn btn-outline-success btn-sm"><i class="bi bi-upload me-1"></i> 导入订单</a>
+                <a href="{% url 'order_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-lg me-1"></i> 取消</a>
+            </div>
+        </div>
+    </div>
+</div></div>
+
+<div class="row">
+<div class="col-lg-9">
+{% if form.non_field_errors %}
+<div class="alert alert-danger">{% for err in form.non_field_errors %}{{ err }}{% endfor %}</div>
+{% endif %}
+
+<form method="post" novalidate id="order-create-form">
+{% csrf_token %}
+
+{% for section in form_sections_primary %}
+<div class="card card-flat mb-4">
+<div class="card-header {{ section.header }} py-2"><h6 class="mb-0 fw-bold"><i class="bi {{ section.icon }} me-2"></i>{{ section.title }}</h6></div>
+<div class="card-body">
+<div class="row g-3">
+{% for field_name in section.fields %}
+{% with field=form|get_field:field_name %}
+{% if field %}
+<div class="col-md-6 col-lg-4{% if field.name == 'bulk_progress_tracking' %} col-12{% endif %}">
+<label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="text-danger">*</span>{% endif %}</label>
+{{ field }}
+{% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+{% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+{% endfor %}
+</div></div></div>
+{% endfor %}
+
+
+{% for section in form_sections_extra %}
+<div class="card card-flat mb-4">
+<div class="card-header {{ section.header }} py-2"><h6 class="mb-0 fw-bold"><i class="bi {{ section.icon }} me-2"></i>{{ section.title }}</h6></div>
+<div class="card-body"><div class="row g-3">
+{% for field_name in section.fields %}
+{% with field=form|get_field:field_name %}
+{% if field %}
+<div class="col-md-6 col-lg-4">
+<label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="text-danger">*</span>{% endif %}</label>
+{{ field }}
+{% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+{% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+{% endfor %}
+</div></div></div>
+{% endfor %}
+
+
+<div class="card shadow-sm border-primary sticky-bottom-bar">
+<div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
+<span class="text-muted small"><i class="bi bi-info-circle me-1"></i>创建后可进入详情页继续补充</span>
+<div class="d-flex gap-2">
+<a href="{% url 'order_list' %}" class="btn btn-outline-secondary">取消</a>
+<button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i> 创建订单</button>
+</div></div></div>
+</form>
+</div>
+
+<div class="col-lg-3 mt-4 mt-lg-0">
+<div class="card shadow-sm border-0">
+<div class="card-header bg-light py-2"><strong class="small"><i class="bi bi-lightbulb me-1"></i>填写提示</strong></div>
+<ul class="list-group list-group-flush small">
+<li class="list-group-item"><span class="text-danger">*</span> 客户、下单日期建议必填</li>
+<li class="list-group-item">订单类型默认「大货订单」</li>
+<li class="list-group-item">选择供应商后，供应商登录后可填写价格和出货信息</li>
+<li class="list-group-item">金额类字段支持小数</li>
+<li class="list-group-item">单位选择米或码后，价格单位自动填充</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+
+<style>
+.sticky-bottom-bar { position:sticky; bottom:1rem; z-index:10; border-left:4px solid var(--bs-primary) !important; }
+.form-label { font-size:.875rem; font-weight:500; }
+</style>
+{% endblock %}
+{% block extra_js %}
+<style>
+.cloth-ac-dropdown { position:absolute; z-index:999; width:100%; max-height:280px; overflow-y:auto; background:#fff; border:1px solid #dee2e6; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); display:none; }
+.cloth-ac-dropdown .ac-item { padding:8px 12px; cursor:pointer; border-bottom:1px solid #f0f0f0; font-size:.85rem; }
+.cloth-ac-dropdown .ac-item:hover { background:#e8f0fe; }
+.cloth-ac-dropdown .ac-item .ac-code { font-weight:600; color:#4361ee; }
+.cloth-ac-dropdown .ac-item .ac-detail { color:#6c757d; font-size:.75rem; }
+.cloth-ac-wrapper { position:relative; }
+</style>
+<script>
+(function(){
+var f=document.getElementById("id_cloth_type");if(!f||f.tagName!=="INPUT")return;
+var w=document.createElement("div");w.className="cloth-ac-wrapper";f.parentNode.insertBefore(w,f);w.appendChild(f);
+var d=document.createElement("div");d.className="cloth-ac-dropdown";w.appendChild(d);
+var t=null;
+f.addEventListener("input",function(){clearTimeout(t);var v=this.value.trim();if(v.length<1){d.style.display="none";return;}
+t=setTimeout(function(){fetch("/cloth-catalog/api/autocomplete/?q="+encodeURIComponent(v)).then(function(r){return r.json();}).then(function(data){
+if(!data.length){d.style.display="none";return;}
+d.innerHTML=data.map(function(it){var det=[it.cloth_type,it.customer,it.composition_cn].filter(Boolean).join(" | ");return "<div class='ac-item' data-id='"+it.id+"'><div><span class='ac-code'>"+it.cloth_code+"</span> - "+(it.cloth_name||"")+"</div><div class='ac-detail'>"+(det||"")+"</div></div>";}).join("");
+d.style.display="block";
+[].slice.call(d.querySelectorAll(".ac-item")).forEach(function(el){el.addEventListener("click",function(){
+var sel=data.find(function(i){return i.id==parseInt(el.dataset.id);});if(!sel)return;
+f.value=sel.cloth_code||"";
+function sv(i,v){var e=document.getElementById(i);if(e)e.value=v||"";}
+sv("id_composition",sel.composition_cn);
+sv("id_width",sel.width);
+sv("id_weight",sel.weight);
+sv("id_specification",sel.specification);
+sv("id_finished_product_supplier",sel.supplier1);
+sv("id_supplier_code",sel.supplier1_code);
+sv("id_booth",sel.supplier2);
+d.style.display="none";});});
+});},300);});
+f.addEventListener("blur",function(){setTimeout(function(){d.style.display="none";},200);});
+f.addEventListener("focus",function(){if(d.children.length)d.style.display="block";});
+})();
+</script>
+
+<script>
+(function(){
+var q=document.getElementById("id_quantity_unit");
+var p=document.getElementById("id_price_unit");
+if(!q||!p)return;
+q.addEventListener("change",function(){var v=this.value.trim();if(v==="米")p.value="元/米";else if(v==="码")p.value="元/码";});
+if(q.value&&!p.value){var v2=q.value.trim();if(v2==="米")p.value="元/米";else if(v2==="码")p.value="元/码";}
+})();
+</script>
+<script>
+// 面料报价自动填充：选编号后自动回填价格、成分、门幅、克重
+(function(){
+var f = document.getElementById("id_cloth_type");
+if(!f) return;
+
+// 缓存报价数据，数量变化时重新计算价格
+var _quotationData = null;
+var _autoFilledPrice = null;
+
+var fields = {
+  price: { el: document.getElementById("id_price"), set: true },
+  composition: { el: document.getElementById("id_composition"), set: false },
+  width: { el: document.getElementById("id_width"), set: false },
+  weight: { el: document.getElementById("id_weight"), set: false },
+  supplier: { el: document.getElementById("id_finished_product_supplier"), set: false },
+  remark: { el: document.getElementById("id_remark"), set: false },
+  quantity: { el: document.getElementById("id_order_quantity") },
+};
+
+// 根据数量重新计算价格
+function updatePriceFromQuantity(){
+  if(!_quotationData) return;
+  var qty = parseFloat(fields.quantity.el ? fields.quantity.el.value : 0);
+  var newPrice;
+  if(!fields.quantity.el || !fields.quantity.el.value || qty <= 200){
+    newPrice = _quotationData.price_200m || _quotationData.price_200m_print;
+  } else {
+    newPrice = _quotationData.price_regular || _quotationData.price_regular_print;
+  }
+  // 只有价格是自动填的（未被用户手动改过）才更新
+  if(fields.price.el && _autoFilledPrice !== null && fields.price.el.value === _autoFilledPrice){
+    if(newPrice){
+      fields.price.el.value = newPrice;
+      _autoFilledPrice = newPrice;
+    }
+  }
+}
+
+// 数量变化时同步价格
+if(fields.quantity.el){
+  fields.quantity.el.addEventListener("change", updatePriceFromQuantity);
+  fields.quantity.el.addEventListener("input", updatePriceFromQuantity);
+}
+
+f.addEventListener("blur", function(){
+  var v = this.value.trim();
+  if(v.length < 2) return;
+  fetch("/quotation/lookup/?q=" + encodeURIComponent(v))
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data.found) return;
+      _quotationData = data;
+      
+      if(fields.composition.el && !fields.composition.el.value && data.composition)
+        fields.composition.el.value = data.composition;
+      
+      if(fields.width.el && !fields.width.el.value && data.cuttable_width)
+        var wm = data.cuttable_width.match(/[\d.]+/); if(wm) fields.width.el.value = wm[0];
+      
+      if(fields.weight.el && !fields.weight.el.value && data.weight){
+        var m = data.weight.match(/[\d.]+/);
+        if(m) fields.weight.el.value = m[0];
+      }
+      
+      if(fields.supplier.el && !fields.supplier.el.value && data.supplier_name)
+        fields.supplier.el.value = data.supplier_name;
+      
+      if(fields.remark.el && !fields.remark.el.value && data.remark && data.remark !== "N/A")
+        fields.remark.el.value = data.remark;
+      
+      // 单价单位：跟随数量单位（元/米 或 元/码）
+      if(!document.getElementById("id_price_unit").value){
+        var qu = document.getElementById("id_quantity_unit");
+        if(qu && qu.value === "码") document.getElementById("id_price_unit").value = "元/码";
+        else if(qu && (qu.value === "米" || qu.value === "")) document.getElementById("id_price_unit").value = "元/米";
+      }
+      
+      // 价格自动填充（按数量选200m价或常规价）
+      if(fields.price.el && !fields.price.el.value){
+        var qty = parseFloat(fields.quantity.el ? fields.quantity.el.value : 0);
+        var usePrice;
+        if(!fields.quantity.el || !fields.quantity.el.value || qty <= 200){
+          usePrice = data.price_200m || data.price_200m_print;
+        } else {
+          usePrice = data.price_regular || data.price_regular_print;
+        }
+        if(usePrice){
+          fields.price.el.value = usePrice;
+          _autoFilledPrice = usePrice;
+        }
+      }
+    })
+    .catch(function(){});
+});
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.git/
+.gitignore
+.gitkeep
+.env
+*.venv
+.venv/
+.idea/
+.vscode/
+_Dockerfile
+*.xlsx
+!**/*.xlsx
+*.sh
+*.bat
+db.sqlite3

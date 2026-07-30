@@ -1,0 +1,28 @@
+﻿{% extends "order/base.html" %}
+{% block title %}导入面料报价{% endblock %}
+{% block content %}
+<div class="container-fluid main-container">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{% url 'quotation_list' %}">面料报价表</a></li>
+      <li class="breadcrumb-item active">导入Excel</li>
+    </ol>
+  </nav>
+
+  <div class="card card-flat">
+    <div class="card-header"><h6 class="mb-0"><i class="bi bi-upload me-2 text-primary"></i>导入面料报价</h6></div>
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">选择 Excel 文件（.xlsx）</label>
+          <p class="text-muted small">格式须与 GFG Fabric Quotation Chart 一致：第1行为表头，第3行为填写说明（自动跳过），H列为面料编号，L/N列为价格</p>
+          <input type="file" name="excel_file" class="form-control" accept=".xlsx" required>
+        </div>
+        <button type="submit" class="btn btn-primary" id="importBtn"><i class="bi bi-upload me-1"></i>开始导入</button>
+        <a href="{% url 'quotation_list' %}" class="btn btn-outline-secondary btn-sm">取消</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

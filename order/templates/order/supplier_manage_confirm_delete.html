@@ -1,0 +1,15 @@
+{% extends "order/base.html" %}
+{% block title %}删除供应商{% endblock %}
+{% block content %}
+<div class="container-fluid main-container">
+<div class="row justify-content-center"><div class="col-lg-6">
+<div class="card card-flat border-danger"><div class="card-header bg-danger text-white"><h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>确认删除</h5></div>
+<div class="card-body">
+<p class="mb-3">确定要删除供应商账号 <strong>{{ supplier.company_name }}</strong> 吗？</p>
+<p class="text-danger small"><i class="bi bi-info-circle me-1"></i>此操作将同时删除对应的登录账号。已分配给此供应商的订单将保留但解除关联。</p>
+<form method="post">{% csrf_token %}
+<div class="d-flex gap-2">
+<button type="submit" class="btn btn-danger"><i class="bi bi-trash me-1"></i>确认删除</button>
+<a href="{% url 'supplier_manage_list' %}" class="btn btn-outline-secondary">取消</a>
+</div></form></div></div></div></div></div>
+{% endblock %}

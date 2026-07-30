@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: cloth-mysql
+    restart: unless-stopped
+    user: root
+    volumes:
+      - mysql-data-volume:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: "[REDACTED]"
+      MYSQL_DATABASE: cloth_order_db
+      TZ: Asia/Shanghai
+      MYSQL_DEFAULT_AUTH_PLUGIN: mysql_native_password
+    networks:
+      app-net:
+
+  web:
+    build: .
+    container_name: cloth-system
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./:/app
+      - static_volume:/app/staticfiles
+    depends_on:
+      - db
+      - redis
+    networks:
+      app-net:
+
+  nginx:
+    image: nginx:alpine
+    container_name: cloth-nginx
+    restart: unless-stopped
+    ports:
+      - "8233:80"
+    volumes:
+      - static_volume:/app/staticfiles
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - web
+    networks:
+      app-net:
+
+  redis:
+    image: redis:alpine
+    container_name: cloth-redis
+    restart: unless-stopped
+    networks:
+      app-net:
+      
+networks:
+  app-net:
+
+volumes:
+  mysql-data-volume:
+  # 共享静态文件卷，nginx和web共用
+  static_volume:

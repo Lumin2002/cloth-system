@@ -1,0 +1,233 @@
+{% extends "order/supplier_base.html" %}
+{% block title %}订单 #{{ order.serial_number }} - 供应商面板{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="{% url 'supplier_dashboard' %}">我的订单</a></li><li class="breadcrumb-item active" aria-current="page">订单 #{{ order.serial_number }}</li></ol></nav>
+
+<div class="row g-4">
+    <div class="col-md-8">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><strong>订单详情</strong></span>
+					{% if order.order_status == "cancelled" %}
+					<span class="badge bg-secondary fs-6">已取消</span>
+					{% else %}
+					<span class="badge bg-success fs-6">正常</span>
+					{% endif %}
+                <span class="badge {% if order.shipments.exists %}bg-success{% elif order.finished_product_cost_price %}bg-info{% else %}bg-warning text-dark{% endif %} fs-6">
+                    {% if order.shipments.exists %}已出货{% elif order.finished_product_cost_price %}已提交待出货{% else %}待提交{% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                <table class="table table-bordered table-sm">
+                    <tbody>
+                        <tr><th style="width:110px;">序号</th><td>{{ order.serial_number|default:"-" }}</td>
+                            <th style="width:110px;">下单日期</th><td>{{ order.order_date|date:"Y-m-d"|default:"-" }}</td></tr>
+                        <tr><th>订单类型</th><td>{{ order.get_order_type_display|default:"-" }}</td>
+                            <th>订单号</th><td>{{ order.order_number|default:"-" }}</td></tr>
+                        <tr><th>款号</th><td>{{ order.style_number|default:"-" }}</td>
+                            <th>昇奕隆编号</th><td>{{ order.cloth_type|default:"-" }}</td></tr>
+                        <tr><th>纹织类型</th><td>{{ order.textile_type|default:"-" }}</td>
+                            <th>档口</th><td>{{ order.booth|default:"-" }}</td></tr>
+                        <tr><th>档口编号</th><td>{{ order.supplier_code|default:"-" }}</td>
+                            <th>颜色</th><td>{{ order.color|default:"-" }}</td></tr>
+                        </tr><tr><th>成份</th><td>{{ order.composition|default:"-" }}</td></tr>
+                        <tr><th>幅宽</th><td>{{ order.width|default:"-" }}</td>
+                            <th>克重</th><td>{{ order.weight|default:"-" }}</td></tr>
+                        <tr><th>订单数量</th><td>{{ order.order_quantity|default:"-" }} {{ order.quantity_unit }}</td>
+                            <th>单位</th><td>{{ order.quantity_unit|default:"-" }}</td></tr>
+                        <tr><th>规格</th><td colspan="3">{{ order.specification|default:"-" }}</td></tr>
+                        <tr><th>客人要求交期</th><td colspan="3">{{ order.customer_delivery_date|date:"Y-m-d"|default:"-" }}</td></tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 出货记录 -->
+        <div class="card mb-3">
+            <div class="card-header"><strong>出货记录</strong></div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0" id="shipmentTable">
+                    <thead><tr><th class="text-center" style="width:60px">批次</th><th>出货日期</th><th class="text-end">出货数量</th><th class="text-end">出货总价</th><th class="text-center" style="width:100px">操作</th></tr></thead>
+                    <tbody>
+                    {% for s in shipments %}
+                    <tr id="ship-row-{{ s.pk }}" class="{% if s.is_deleted %}table-danger text-decoration-line-through opacity-75{% endif %}">
+                        <td class="text-center batch-num">{{ s.batch_number }}</td>
+                        <td class="ship-date">{{ s.date|date:"Y-m-d"|default:"-" }}</td>
+                        <td class="text-end ship-qty">{{ s.quantity|floatformat:2|default:"-" }}</td>
+                        <td class="text-end"><strong class="{% if s.is_deleted %}text-muted{% else %}text-primary{% endif %}">{{ s.shipment_total|floatformat:2|default:"-" }}</strong></td>
+                        <td class="text-center">
+                            {% if s.is_deleted %}
+                            <span class="badge bg-secondary">已删除</span>
+                            {% else %}
+                            <button class="btn btn-sm btn-outline-primary py-0 px-1" onclick="editShipment({{ s.pk }})" title="编辑">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <form method="post" action="{% url 'order_shipment_delete' order.pk s.pk %}" style="display:inline" onsubmit="return confirm('确定删除此出货记录？')">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="删除">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="text-center text-muted py-1">暂无出货</td></tr>
+                    {% endfor %}
+                    </tbody>
+                    <tfoot>
+                    <tr class="table-active fw-bold">
+                        <td colspan="2" class="text-end">合计：</td>
+                        <td class="text-end">{{ order.total_shipment_from_shipments|floatformat:2|default:"0.00" }} 米</td>
+                        <td class="text-end text-primary">{{ shipment_total_sum|floatformat:2|default:"0.00" }} 元</td>
+						<td></td>
+                    </tr>
+                    </tfoot>
+                    </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header"><strong>成本与出货</strong></div>
+            <div class="card-body">
+
+				<form method="post">
+					{% csrf_token %}
+					<div class="row g-2 mb-3">
+						<div class="col-6">
+							<label class="form-label fw-bold small">
+								{{ price_form.finished_product_cost_price.label }}
+								<span class="text-danger">*</span>
+							</label>
+							{{ price_form.finished_product_cost_price }}
+							{% if price_form.finished_product_cost_price.errors %}<div class="text-danger small mt-1">{{ price_form.finished_product_cost_price.errors }}</div>{% endif %}
+						</div>
+						<div class="col-6">
+							<label class="form-label fw-bold small">
+								{{ price_form.cost_price_unit.label }}
+								<span class="text-danger">*</span>
+							</label>
+							{{ price_form.cost_price_unit }}
+							{% if price_form.cost_price_unit.errors %}<div class="text-danger small mt-1">{{ price_form.cost_price_unit.errors }}</div>{% endif %}
+						</div>
+					</div>
+	
+					{% if order.supplier_remark %}
+					<div class="mb-3">
+						<label class="form-label fw-bold small">备注给供应商</label>
+						<div class="p-2 bg-light rounded small">{{ order.supplier_remark|linebreaks }}</div>
+					</div>
+					{% endif %}
+					<div class="mb-3">
+						<label class="form-label fw-bold small">{{ price_form.address.label }}</label>
+						{{ price_form.address }}
+						{% if price_form.address.errors %}<div class="text-danger small mt-1">{{ price_form.address.errors }}</div>{% endif %}
+					</div>
+					<div class="mb-3">
+						<label class="form-label fw-bold small">{{ price_form.remark.label }}</label>
+						{{ price_form.remark }}
+						{% if price_form.remark.errors %}<div class="text-danger small mt-1">{{ price_form.remark.errors }}</div>{% endif %}
+					</div>
+					<button type="submit" class="btn btn-primary w-100 mb-2">
+						<i class="bi bi-check-lg me-1"></i>{% if order.finished_product_cost_price %}更新{% else %}提交{% endif %}
+					</button>
+					
+				</form>
+
+                <hr>
+                <h6 class="fw-bold small mb-2"><i class="bi bi-truck me-1"></i>新增出货</h6>
+                <form method="post" action="{% url 'order_shipment_create' order.pk %}">
+                    {% csrf_token %}
+                    <div class="mb-2">
+                        <label class="form-label small">{{ shipment_form.date.label }} <span class="text-danger">*</span></label>
+                        <input type="date" name="date" class="form-control form-control-sm" required id="id_date">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">{{ shipment_form.quantity.label }} <span class="text-danger">*</span></label>
+                        <input type="number" name="quantity" step="0.01" class="form-control form-control-sm" required placeholder="例如 100.00" id="id_quantity">
+                    </div>
+                    <button type="submit" class="btn btn-success btn-sm w-100">
+                        <i class="bi bi-plus-lg me-1"></i>添加出货
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+.edit-inline { display: flex; gap: 4px; align-items: center; }
+.edit-inline input { width: 100%; min-width: 80px; }
+.edit-inline .btn { white-space: nowrap; }
+</style>
+<script>
+function editShipment(shipmentPk) {
+    var row = document.getElementById('ship-row-' + shipmentPk);
+    if (!row) return;
+    
+    var dateCell = row.querySelector('.ship-date');
+    var qtyCell = row.querySelector('.ship-qty');
+    var batchNum = row.querySelector('.batch-num').textContent.trim();
+    
+    // If already editing, do nothing
+    if (row.classList.contains('editing')) return;
+    row.classList.add('editing');
+    
+    var origDate = dateCell.textContent.trim();
+    var origQty = qtyCell.textContent.trim();
+    
+    dateCell.innerHTML = '<input type="date" class="form-control form-control-sm" value="' + origDate + '" id="edit-date-' + shipmentPk + '">';
+    qtyCell.innerHTML = '<input type="number" step="0.01" class="form-control form-control-sm text-end" value="' + origQty + '" id="edit-qty-' + shipmentPk + '">';
+    
+    var actionCell = row.querySelector('td:last-child');
+    actionCell.innerHTML = 
+        '<button class="btn btn-sm btn-success py-0 px-1 me-1" onclick="saveShipment(' + shipmentPk + ')" title="保存"><i class="bi bi-check-lg"></i></button>' +
+        '<button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="cancelEditShipment(' + shipmentPk + ')" title="取消"><i class="bi bi-x-lg"></i></button>';
+}
+
+function saveShipment(shipmentPk) {
+    var dateVal = document.getElementById('edit-date-' + shipmentPk).value;
+    var qtyVal = document.getElementById('edit-qty-' + shipmentPk).value;
+    
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/orders/{{ order.pk }}/shipments/' + shipmentPk + '/edit/';
+    
+    var csrf = document.createElement('input');
+    csrf.type = 'hidden';
+    csrf.name = 'csrfmiddlewaretoken';
+    csrf.value = '{{ csrf_token }}';
+    form.appendChild(csrf);
+    
+    var dateInput = document.createElement('input');
+    dateInput.type = 'hidden';
+    dateInput.name = 'date';
+    dateInput.value = dateVal;
+    form.appendChild(dateInput);
+    
+    var qtyInput = document.createElement('input');
+    qtyInput.type = 'hidden';
+    qtyInput.name = 'quantity';
+    qtyInput.value = qtyVal;
+    form.appendChild(qtyInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function cancelEditShipment(shipmentPk) {
+    location.reload();
+}
+</script>
+{% endblock %}

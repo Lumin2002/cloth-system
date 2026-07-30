@@ -1,0 +1,27 @@
+{
+  "name": "服装订单管理系统",
+  "short_name": "服装管理",
+  "description": "服装订单与库存管理系统",
+  "start_url": "/dashboard/",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#4361ee",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/static/pwa/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    },
+    {
+      "src": "/static/pwa/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/static/pwa/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}

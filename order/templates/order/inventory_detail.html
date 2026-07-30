@@ -1,0 +1,208 @@
+{% extends 'order/base.html' %}
+
+{% block title %}库存详情 - {{ item.cloth_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid main-container orders-page">
+    <nav aria-label="breadcrumb" class="mb-3"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="{% url 'dashboard' %}">仪表板</a></li><li class="breadcrumb-item"><a href="{% url 'inventory_list' %}">库存列表</a></li><li class="breadcrumb-item active" aria-current="page">库存详情</li></ol></nav>
+
+    <div class="page-hero mb-4">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h2 class="fw-bold mb-1">
+                    <i class="bi bi-box-seam text-primary me-2"></i>库存详情
+                </h2>
+                <p class="text-muted mb-0">
+                    <i class="bi bi-hash me-1"></i> 序号: <span class="fw-bold text-primary">#{{ item.serial_no|default:"-" }}</span>
+                    <span class="mx-2">|</span>
+                    库存数量:
+                    <span class="fw-bold {% if item.quantity == 0 %}text-secondary{% elif item.quantity < 50 %}text-warning{% else %}text-success{% endif %}">
+                        {{ item.quantity }} 码
+                    </span>
+                </p>
+            </div>
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                    <a href="{% url 'inventory_list' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-arrow-left me-1"></i> 返回列表
+                    </a>
+                    <a href="{% url 'inventory_edit' item.pk %}" class="btn btn-warning btn-sm">
+                        <i class="bi bi-pencil me-1"></i> 编辑
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- 左列 -->
+        <div class="col-md-6">
+            <!-- 布料基本信息 -->
+            <div class="card card-flat mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-grid me-2 text-primary"></i>布料信息</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="detail-label">唯一标识</div>
+                            <div class="detail-value">{{ item.unique_id|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">布种/加工别</div>
+                            <div class="detail-value fw-semibold text-primary">{{ item.cloth_name|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">颜色/COLOR</div>
+                            <div class="detail-value">{{ item.color|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">规格/SPECIFICATION</div>
+                            <div class="detail-value">{{ item.specification|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">COMPOSITION</div>
+                            <div class="detail-value small">{{ item.composition_en|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">成份</div>
+                            <div class="detail-value small">{{ item.composition_cn|default:"-" }}</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="detail-label">幅宽(英寸)</div>
+                            <div class="detail-value">{{ item.width|default:"-" }}</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="detail-label">克重(g/㎡)</div>
+                            <div class="detail-value">{{ item.weight|default:"-" }}</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="detail-label">正反面</div>
+                            <div class="detail-value">{{ item.sides|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">FINISHING</div>
+                            <div class="detail-value small">{{ item.finishing_en|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">整理</div>
+                            <div class="detail-value small">{{ item.finishing_cn|default:"-" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 胚布信息 -->
+            <div class="card card-flat mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2 text-secondary"></i>胚布信息</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="detail-label">胚布编号</div>
+                            <div class="detail-value">{{ item.grey_fabric_no|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">胚布价格</div>
+                            <div class="detail-value">{{ item.grey_fabric_price|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">胚布来源</div>
+                            <div class="detail-value">{{ item.grey_fabric_source|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">调胚时间</div>
+                            <div class="detail-value">{{ item.grey_fabric_date|default:"-" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右列 -->
+        <div class="col-md-6">
+            <!-- 库存与客户 -->
+            <div class="card card-flat mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-stack me-2 text-success"></i>库存与客户</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="detail-label">库存数量</div>
+                            <div class="detail-value" style="font-size:2rem; font-weight:700;">
+                                <span class="{% if item.quantity == 0 %}text-secondary{% elif item.quantity < 50 %}text-warning{% else %}text-success{% endif %}">
+                                    {{ item.quantity }}
+                                </span>
+                                <span class="text-muted fs-6 fw-normal ms-1">码</span>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">客户/CLIENT</div>
+                            <div class="detail-value fw-semibold">{{ item.customer|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">用途/USE</div>
+                            <div class="detail-value">{{ item.usage|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">存放位置</div>
+                            <div class="detail-value">{{ item.position|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">生产缸号</div>
+                            <div class="detail-value">{{ item.bath_no|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">成品价格</div>
+                            <div class="detail-value fw-semibold text-success">{{ item.finished_price|default:"-" }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">布种类型ID</div>
+                            <div class="detail-value text-muted small">{{ item.cloth_type_id|default:"-" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 备注 -->
+            <div class="card card-flat mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-chat-left-text me-2 text-info"></i>备注/REMARK</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0 small">{{ item.remark|default:"-"|linebreaks }}</p>
+                </div>
+            </div>
+
+            <!-- 时间戳 & 操作 -->
+            <div class="card card-flat">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-gear me-2 text-warning"></i>操作</h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="bi bi-clock me-1"></i> 创建：{{ item.created_at|date:"Y-m-d H:i" }}<br>
+                        <i class="bi bi-pencil me-1"></i> 更新：{{ item.updated_at|date:"Y-m-d H:i" }}
+                    </p>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'inventory_edit' item.pk %}" class="btn btn-warning btn-sm">
+                            <i class="bi bi-pencil me-1"></i> 编辑库存
+                        </a>
+                        <a href="{% url 'inventory_list' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-arrow-left me-1"></i> 返回列表
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.orders-page .breadcrumb { font-size: .875rem; }
+.detail-label { font-size: .8rem; color: #6c757d; font-weight: 500; margin-bottom: .2rem; }
+.detail-value { font-size: .9375rem; font-weight: 500; color: #212529; }
+</style>
+{% endblock %}

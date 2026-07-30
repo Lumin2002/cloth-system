@@ -1,0 +1,493 @@
+{% extends 'order/base.html' %}
+{% load pagination %}
+
+{% block title %}仪表板 - 服装订单管理系统{% endblock %}
+
+{% block content %}
+<div class="container-fluid main-container dashboard-page">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item active" aria-current="page">仪表板</li>
+        </ol>
+    </nav>
+
+    <div class="page-hero mb-4">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h2 class="fw-bold mb-1">
+                    <i class="bi bi-speedometer2 text-primary me-2"></i>系统仪表板
+                </h2>
+                <p class="text-muted mb-0">
+                    欢迎，<strong>{{ request.user.username }}</strong>
+                    · 订单与财务汇总一览
+                </p>
+            </div>
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                    <a href="{% url 'order_create' %}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i> 添加订单
+                    </a>
+                    <a href="{% url 'order_list' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-list-ul me-1"></i> 订单列表
+                    </a>
+					<a href="{% url 'inventory_list' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-list-ul me-1"></i> 库存列表
+                    </a>
+                    <a href="{% url 'inventory_log_list' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-list-ul me-1"></i> 库存更改日志
+                    </a>
+                    <a href="{% url 'logout' %}" class="btn btn-outline-secondary btn-sm" title="退出">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 核心指标 -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-3">
+            <a href="{% url 'order_list' %}" class="kpi-card kpi-primary text-decoration-none">
+                <div class="kpi-label">订单总数</div>
+                <div class="kpi-value">{{ total_orders }}</div>
+                <div class="kpi-meta">
+                    正常 {{ active_orders_count }} · 已取消 {{ cancelled_orders }}
+                    · {{ total_customers }} 客户
+                </div>
+                <i class="bi bi-clipboard-data kpi-icon"></i>
+            </a>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-success">
+                <div class="kpi-label">总营收</div>
+                <div class="kpi-value">¥{{ total_revenue|floatformat:0 }}</div>
+                <div class="kpi-meta">仅统计正常订单</div>
+                <i class="bi bi-graph-up-arrow kpi-icon"></i>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-warning">
+                <div class="kpi-label">总成本</div>
+                <div class="kpi-value">¥{{ total_cost|floatformat:0 }}</div>
+                <div class="kpi-meta">采购/成本金额合计</div>
+                <i class="bi bi-wallet2 kpi-icon"></i>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-info">
+                <div class="kpi-label">总利润</div>
+                <div class="kpi-value">¥{{ total_profit|floatformat:0 }}</div>
+                <div class="kpi-meta">利润率约 {{ profit_margin|floatformat:1 }}%</div>
+                <i class="bi bi-piggy-bank kpi-icon"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- 状态快捷入口 -->
+    <div class="row g-2 mb-4">
+        <div class="col-6 col-md-4 col-lg">
+            <a href="{% filter_url payment_status='unpaid' %}" class="status-chip chip-danger">
+                <span class="chip-num">{{ unpaid_orders }}</span>
+                <span class="chip-text">未付款</span>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <a href="{% filter_url overdue_status='overdue' %}" class="status-chip chip-warning">
+                <span class="chip-num">{{ overdue_orders }}</span>
+                <span class="chip-text">逾期</span>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <a href="{% filter_url payment_status='paid' %}" class="status-chip chip-success">
+                <span class="chip-num">{{ paid_orders }}</span>
+                <span class="chip-text">已付款</span>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <a href="{% filter_url order_status='cancelled' %}" class="status-chip chip-secondary">
+                <span class="chip-num">{{ cancelled_orders }}</span>
+                <span class="chip-text">已取消</span>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <a href="{% filter_url order_type='bulk' %}" class="status-chip chip-primary">
+                <span class="chip-num"><i class="bi bi-box-seam"></i></span>
+                <span class="chip-text">大货</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- 本月对比 -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="mini-stat-card stat-primary">
+                <div class="mini-stat-label">本月订单 · {{ month_compare.this_label }}</div>
+                <div class="mini-stat-value">{{ month_compare.this.order_count }}</div>
+                <div class="mini-stat-meta">
+                    上月 {{ month_compare.last.order_count }}
+                    {% if month_compare.order_delta is not None %}
+                    <span class="{% if month_compare.order_delta >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        ({{ month_compare.order_delta|floatformat:1 }}%)
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="mini-stat-card stat-success">
+                <div class="mini-stat-label">本月营收</div>
+                <div class="mini-stat-value text-success">¥{{ month_compare.this.revenue|floatformat:0 }}</div>
+                <div class="mini-stat-meta">
+                    上月 ¥{{ month_compare.last.revenue|floatformat:0 }}
+                    {% if month_compare.revenue_delta is not None %}
+                    <span class="{% if month_compare.revenue_delta >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        ({{ month_compare.revenue_delta|floatformat:1 }}%)
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="mini-stat-card stat-info">
+                <div class="mini-stat-label">本月利润</div>
+                <div class="mini-stat-value text-info">¥{{ month_compare.this.profit|floatformat:0 }}</div>
+                <div class="mini-stat-meta">
+                    上月 ¥{{ month_compare.last.profit|floatformat:0 }}
+                    {% if month_compare.profit_delta is not None %}
+                    <span class="{% if month_compare.profit_delta >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        ({{ month_compare.profit_delta|floatformat:1 }}%)
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 按月图表 -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-8">
+            <div class="card card-flat h-100">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-bar-chart-line me-2 text-primary"></i>近 12 个月营收 / 成本 / 利润</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="financeChart" height="120"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card card-flat h-100">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-graph-up me-2 text-primary"></i>近 12 个月订单量</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="ordersChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if monthly_rows %}
+    <div class="card card-flat mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h6 class="mb-0"><i class="bi bi-table me-2 text-primary"></i>按月统计明细</h6>
+            <span class="small text-muted">按下单日期汇总</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover data-table mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th>月份</th>
+                            <th class="text-end">订单数</th>
+                            <th class="text-end">营收</th>
+                            <th class="text-end">成本</th>
+                            <th class="text-end">利润</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in monthly_rows %}
+                        <tr>
+                            <td class="fw-semibold">{{ row.label }}</td>
+                            <td class="text-end">{{ row.order_count }}</td>
+                            <td class="text-end text-success">¥{{ row.revenue|floatformat:2 }}</td>
+                            <td class="text-end text-warning">¥{{ row.cost|floatformat:2 }}</td>
+                            <td class="text-end {% if row.profit >= 0 %}text-info{% else %}text-danger{% endif %}">
+                                ¥{{ row.profit|floatformat:2 }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            {% if alert_unpaid or alert_overdue %}
+            <div class="card card-flat mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-bell me-2 text-warning"></i>待跟进</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        {% if alert_unpaid %}
+                        <div class="col-md-6">
+                            <p class="small text-muted mb-2 fw-bold">未付款订单</p>
+                            <ul class="list-group list-group-flush small">
+                                {% for o in alert_unpaid %}
+                                <li class="list-group-item px-0 d-flex justify-content-between align-items-center border-0 border-bottom">
+                                    <span>
+                                        <a href="{% url 'order_detail' o.pk %}">#{{ o.serial_number }}</a>
+                                        {{ o.customer|truncatechars:8 }}
+                                    </span>
+                                    <span class="text-success">¥{{ o.finished_product_total_amount|floatformat:0|default:"-" }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            <a href="{% filter_url payment_status='unpaid' %}" class="small text-decoration-none">查看全部 →</a>
+                        </div>
+                        {% endif %}
+                        {% if alert_overdue %}
+                        <div class="col-md-6">
+                            <p class="small text-muted mb-2 fw-bold">逾期订单</p>
+                            <ul class="list-group list-group-flush small">
+                                {% for o in alert_overdue %}
+                                <li class="list-group-item px-0 d-flex justify-content-between align-items-center border-0 border-bottom">
+                                    <span>
+                                        <a href="{% url 'order_detail' o.pk %}">#{{ o.serial_number }}</a>
+                                        {{ o.customer|truncatechars:8 }}
+                                    </span>
+                                    <span class="text-muted">{{ o.order_date|date:"Y-m-d"|default:"-" }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            <a href="{% filter_url overdue_status='overdue' %}" class="small text-decoration-none">查看全部 →</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card card-flat">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="mb-0"><i class="bi bi-clock-history me-2 text-primary"></i>最近订单</h6>
+                    <a href="{% url 'order_list' %}" class="btn btn-sm btn-outline-primary">全部订单</a>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_orders %}
+                    <div class="table-responsive">
+                        <table class="table table-hover data-table mb-0 align-middle">
+                            <thead>
+                                <tr>
+                                    <th>序号</th>
+                                    <th>客户</th>
+                                    <th>布种</th>
+                                    <th>下单日期</th>
+                                    <th>营收</th>
+                                    <th>付款</th>
+                                    <th class="text-end">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in recent_orders %}
+                                <tr>
+                                    <td class="fw-semibold text-primary text-nowrap">#{{ order.serial_number|default:"-" }}</td>
+                                    <td>{{ order.customer|default:"-"|truncatechars:10 }}</td>
+                                    <td class="small">{{ order.cloth_type|truncatechars:12|default:"-" }}</td>
+                                    <td class="small text-nowrap">{{ order.order_date|date:"Y-m-d"|default:"-" }}</td>
+                                    <td class="text-success fw-semibold small text-nowrap">
+                                        ¥{{ order.finished_product_total_amount|floatformat:0|default:"-" }}
+                                    </td>
+                                    <td>
+                                        {% if order.payment_status == 'paid' %}
+                                        <span class="badge bg-success">已付</span>
+                                        {% elif order.payment_status == 'unpaid' %}
+                                        <span class="badge bg-danger">未付</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ order.get_payment_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <a href="{% url 'order_detail' order.pk %}" class="btn btn-sm btn-outline-primary" title="详情">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="{% url 'order_edit' order.pk %}" class="btn btn-sm btn-outline-secondary" title="编辑">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5 px-3">
+                        <i class="bi bi-inbox display-4 text-muted opacity-50"></i>
+                        <p class="text-muted mt-3 mb-3">还没有订单数据</p>
+                        <a href="{% url 'order_create' %}" class="btn btn-primary btn-sm me-1">添加订单</a>
+                        <a href="{% url 'orders_import' %}" class="btn btn-outline-success btn-sm">Excel 导入</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if top_customers %}
+            <div class="card card-flat mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-trophy me-2 text-warning"></i>客户 TOP5（按营收）</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover data-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 3rem;">#</th>
+                                    <th>客户</th>
+                                    <th>订单数</th>
+                                    <th>总营收</th>
+                                    <th>均单</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for c in top_customers %}
+                                <tr>
+                                    <td><span class="badge bg-primary rounded-pill">{{ forloop.counter }}</span></td>
+                                    <td class="fw-semibold">{{ c.customer }}</td>
+                                    <td>{{ c.order_count }}</td>
+                                    <td class="text-success">¥{{ c.total_amount|floatformat:2|default:"0.00" }}</td>
+                                    <td>¥{{ c.avg_amount|floatformat:2 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-4">
+
+            {% if order_type_stats %}
+            <div class="card card-flat mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-pie-chart me-2 text-primary"></i>订单类型分布</h6>
+                </div>
+                <div class="card-body">
+                    {% for item in order_type_stats %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span>{{ item.label }}</span>
+                            <span class="fw-bold">{{ item.count }} 单</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-primary" role="progressbar"
+                                 style="width: {% if total_orders %}{% widthratio item.count total_orders 100 %}{% else %}0{% endif %}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if top_suppliers %}
+            <div class="card card-flat mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-building me-2 text-primary"></i>供应商 TOP5</h6>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for s in top_suppliers %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center small">
+                        <span>{{ s.finished_product_supplier|truncatechars:14 }}</span>
+                        <span>
+                            <span class="text-muted me-2">{{ s.order_count }}单</span>
+                            <span class="fw-bold text-warning">¥{{ s.total_amount|floatformat:0|default:"0" }}</span>
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <div class="card card-flat">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-person-circle me-2 text-primary"></i>账户信息</h6>
+                </div>
+                <div class="card-body small">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-2 me-2">
+                            <i class="bi bi-person text-primary"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold">{{ request.user.username }}</div>
+                            <span class="badge {% if request.user.is_superuser %}bg-danger{% else %}bg-secondary{% endif %}">
+                                {% if request.user.is_superuser %}管理员{% else %}用户{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    <p class="text-muted mb-1">
+                        <i class="bi bi-calendar3 me-1"></i>
+                        上次登录：{{ request.user.last_login|date:"Y-m-d H:i"|default:"—" }}
+                    </p>
+                    <p class="text-muted mb-0">
+                        <i class="bi bi-shield-check me-1"></i> 服装订单管理系统
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ monthly_chart|json_script:"monthly-chart-data" }}
+<script>
+(function () {
+    const dataEl = document.getElementById('monthly-chart-data');
+    if (!dataEl || typeof Chart === 'undefined') return;
+
+    const chartData = JSON.parse(dataEl.textContent);
+    const labels = chartData.labels || [];
+    if (!labels.length) return;
+
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: { legend: { position: 'bottom' } },
+    };
+
+    const financeCtx = document.getElementById('financeChart');
+    if (financeCtx) {
+        new Chart(financeCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: '营收', data: chartData.revenue, borderColor: '#198754', backgroundColor: 'rgba(25,135,84,0.1)', tension: 0.3, fill: true },
+                    { label: '成本', data: chartData.cost, borderColor: '#fd7e14', backgroundColor: 'rgba(253,126,20,0.08)', tension: 0.3, fill: true },
+                    { label: '利润', data: chartData.profit, borderColor: '#0dcaf0', borderDash: [4, 4], tension: 0.3, fill: false },
+                ],
+            },
+            options: {
+                ...commonOptions,
+                scales: { y: { ticks: { callback: function (v) { return '¥' + v.toLocaleString(); } } } },
+            },
+        });
+    }
+
+    const ordersCtx = document.getElementById('ordersChart');
+    if (ordersCtx) {
+        new Chart(ordersCtx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{ label: '订单数', data: chartData.orders, backgroundColor: 'rgba(67,97,238,0.75)', borderRadius: 4 }],
+            },
+            options: { ...commonOptions, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } },
+        });
+    }
+})();
+</script>
+{% endblock %}

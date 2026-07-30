@@ -1,0 +1,89 @@
+{% extends "order/base.html" %}
+{% block title %}导入布种编号{% endblock %}
+{% block content %}
+<div class="container-fluid main-container">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{% url "cloth_catalog_list" %}">布种编号表</a></li>
+      <li class="breadcrumb-item active">导入Excel</li>
+    </ol>
+  </nav>
+
+  <div class="card card-flat">
+    <div class="card-header"><h6 class="mb-0"><i class="bi bi-upload me-2 text-primary"></i>导入布种编号表</h6></div>
+    <div class="card-body">
+      <form id="importForm" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">选择 Excel 文件（.xlsx）</label>
+          <input type="file" name="excel_file" class="form-control" accept=".xlsx" required>
+        </div>
+        <button type="submit" class="btn btn-primary" id="importBtn"><i class="bi bi-upload me-1"></i>开始导入</button>
+      </form>
+
+      <div id="progressArea" class="mt-3 d-none">
+        <div class="d-flex justify-content-between mb-1">
+          <span id="progressMsg" class="small">处理中...</span>
+          <span id="progressPct" class="small fw-bold">0%</span>
+        </div>
+        <div class="progress" style="height: 20px;">
+          <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;">0%</div>
+        </div>
+      </div>
+
+      <div id="importResult" class="mt-3 d-none"></div>
+    </div>
+  </div>
+</div>
+<script>
+document.getElementById("importForm").addEventListener("submit", async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById("importBtn");
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>上传中...';
+
+  const resp = await fetch("{% url "cloth_catalog_import_start" %}", { method: "POST", body: new FormData(this) });
+  const data = await resp.json();
+  if (data.error) {
+    document.getElementById("importResult").innerHTML = '<div class="alert alert-danger">' + data.error + "</div>";
+    document.getElementById("importResult").classList.remove("d-none");
+    btn.disabled = false; btn.innerHTML = '<i class="bi bi-upload me-1"></i>开始导入';
+    return;
+  }
+
+  const taskId = data.task_id;
+  document.getElementById("importForm").style.display = "none";
+  document.getElementById("progressArea").classList.remove("d-none");
+
+  pollProgress(taskId);
+});
+
+function pollProgress(taskId) {
+  fetch("/cloth-catalog/import/progress/" + taskId + "/")
+    .then(function(r) { return r.json(); })
+    .then(function(state) {
+      var pct = state.percent || 0;
+      var bar = document.getElementById("progressBar");
+      bar.style.width = pct + "%";
+      bar.textContent = pct + "%";
+      document.getElementById("progressPct").textContent = pct + "%";
+      document.getElementById("progressMsg").textContent = state.message || "处理中...";
+
+      if (state.status === "done" || state.status === "error") {
+        bar.classList.remove("progress-bar-animated");
+        var div = document.getElementById("importResult"); div.classList.remove("d-none");
+        if (state.status === "done" && state.result) {
+          bar.classList.add("bg-success");
+          div.innerHTML = '<div class="alert alert-success">导入完成！新增 <strong>' + state.result.imported + '</strong> 条，更新 <strong>' + state.result.updated + '</strong> 条</div>';
+          div.innerHTML += '<a href="{% url "cloth_catalog_list" %}" class="btn btn-sm btn-primary"><i class="bi bi-list-ul me-1"></i>查看列表</a>';
+        } else if (state.status === "error") {
+          bar.classList.add("bg-danger");
+          div.innerHTML = '<div class="alert alert-danger">导入失败：' + (state.error || "未知错误") + "</div>";
+        }
+        return;
+      }
+
+      setTimeout(function() { pollProgress(taskId); }, 500);
+    });
+}
+</script>
+{% endblock %}

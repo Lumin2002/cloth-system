@@ -1,0 +1,667 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+        <meta name="theme-color" content="#4361ee">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="manifest" href="{% static 'pwa/manifest.json' %}">
+    <link rel="icon" type="image/svg+xml" href="{% static 'pwa/icon.svg' %}">
+    <link rel="apple-touch-icon" href="{% static 'pwa/icon-192.png' %}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}昇奕隆订单系统{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
+	<link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+	<script src="{% static 'js/chart.umd.min.js' %}" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';document.head.appendChild(s);"></script>
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --secondary-color: #3a0ca3;
+            --success-color: #4cc9f0;
+            --warning-color: #f72585;
+            --info-color: #7209b7;
+            --light-color: #f8f9fa;
+            --dark-color: #212529;
+            --gradient-primary: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+            --gradient-success: linear-gradient(135deg, #4cc9f0 0%, #4895ef 100%);
+            --gradient-warning: linear-gradient(135deg, #f72585 0%, #b5179e 100%);
+        }
+
+        body {
+            padding-top: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: var(--gradient-primary) !important;
+            box-shadow: 0 4px 20px rgba(67, 97, 238, 0.3);
+            padding: 1rem 0;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: white !important;
+        }
+
+        .navbar-nav .nav-link {
+            color: rgba(255, 255, 255, 0.9) !important;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .navbar-nav .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white !important;
+            transform: translateY(-2px);
+        }
+
+        .navbar-nav .dropdown-menu {
+            border: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+        }
+
+        .card {
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+        }
+
+        .card-header {
+            background: var(--gradient-primary);
+            color: white;
+            border-bottom: none;
+            padding: 1.25rem 1.5rem;
+            border-radius: 16px 16px 0 0 !important;
+        }
+
+        .card-header h5 {
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .btn {
+            border-radius: 10px;
+            font-weight: 600;
+            padding: 0.6rem 1.5rem;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            border: none;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(67, 97, 238, 0.4);
+        }
+
+        .btn-success {
+            background: var(--gradient-success);
+            border: none;
+        }
+
+        .btn-warning {
+            background: var(--gradient-warning);
+            border: none;
+        }
+
+        .btn-outline-primary {
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .btn-outline-primary:hover {
+            background: var(--gradient-primary);
+            border-color: transparent;
+        }
+
+        .table {
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+
+        .table tbody tr {
+            transition: all 0.2s ease;
+        }
+
+        .table tbody tr:hover {
+            background-color: rgba(67, 97, 238, 0.05);
+            transform: translateX(5px);
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .alert {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .pagination .page-link {
+            border: none;
+            color: var(--primary-color);
+            border-radius: 8px;
+            margin: 0 3px;
+        }
+
+        .pagination .page-item.active .page-link {
+            background: var(--gradient-primary);
+            color: white;
+        }
+
+        .form-control, .form-select {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            padding: 0.75rem 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.25);
+        }
+
+        .stat-card {
+            border-radius: 16px;
+            color: white;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card .stat-icon { font-size: 2.5rem; opacity: 0.9; }
+        .stat-card .stat-number { font-size: 2.2rem; font-weight: 700; margin: 0.5rem 0; }
+        .stat-card .stat-label { font-size: 0.9rem; opacity: 0.9; }
+
+        .main-container { padding: 2rem 0; }
+
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: var(--gradient-primary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            color: white;
+            font-size: 1.8rem;
+        }
+
+        .login-card {
+            max-width: 450px;
+            margin: 0 auto;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .login-header {
+            background: var(--gradient-primary);
+            color: white;
+            padding: 2.5rem;
+            text-align: center;
+        }
+
+        .login-body {
+            padding: 2.5rem;
+            background: white;
+        }
+
+        .footer {
+            margin-top: 3rem;
+            padding: 2rem 0;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 20px 20px 0 0;
+        }
+
+        /* 仪表板 / 订单列表等页面共用 */
+        .page-hero, .dashboard-hero {
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,.08);
+        }
+
+        .kpi-card {
+            position: relative;
+            display: block;
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,.08);
+            border-left: 4px solid #dee2e6;
+            overflow: hidden;
+            color: inherit;
+            height: 100%;
+            transition: transform .15s, box-shadow .15s;
+        }
+        .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+        .kpi-primary { border-left-color: #4361ee; }
+        .kpi-success { border-left-color: #198754; }
+        .kpi-warning { border-left-color: #fd7e14; }
+        .kpi-info { border-left-color: #0dcaf0; }
+        .kpi-danger { border-left-color: #dc3545; }
+        .kpi-dark { border-left-color: #212529; }
+        .kpi-label { font-size: .8rem; color: #6c757d; font-weight: 500; }
+        .kpi-value { font-size: 1.75rem; font-weight: 700; line-height: 1.2; margin: .25rem 0; }
+        .kpi-meta { font-size: .75rem; color: #adb5bd; }
+        .kpi-icon {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 2.5rem;
+            opacity: .12;
+        }
+
+        .status-chip {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: .75rem;
+            border-radius: 10px;
+            text-decoration: none;
+            color: inherit;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,.08);
+            transition: transform .15s;
+        }
+        .status-chip:hover { transform: translateY(-2px); color: inherit; }
+        .chip-num { font-size: 1.5rem; font-weight: 700; }
+        .chip-text { font-size: .8rem; color: #6c757d; }
+        .chip-danger .chip-num { color: #dc3545; }
+        .chip-warning .chip-num { color: #fd7e14; }
+        .chip-success .chip-num { color: #198754; }
+        .chip-secondary .chip-num { color: #6c757d; }
+        .chip-primary .chip-num { color: #4361ee; }
+
+        /* 内容卡片（白底、轻阴影、无上浮） */
+        .card-flat {
+            border: none !important;
+            border-radius: 12px !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,.08) !important;
+            overflow: hidden;
+            transition: box-shadow .15s ease;
+        }
+        .card-flat:hover {
+            transform: none !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,.1) !important;
+        }
+        .card-flat .card-header {
+            background: #fff !important;
+            color: #212529 !important;
+            border-bottom: 1px solid #eee;
+            padding: .875rem 1.25rem;
+            border-radius: 0 !important;
+        }
+        .card-flat .card-header h6,
+        .card-flat .card-header h5 { margin: 0; font-weight: 600; }
+        .card-flat .card-footer { background: #fff; border-top: 1px solid #eee; }
+
+        .mini-stat-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,.08);
+            border-left: 4px solid #dee2e6;
+            height: 100%;
+        }
+        .mini-stat-card.stat-primary { border-left-color: #4361ee; }
+        .mini-stat-card.stat-success { border-left-color: #198754; }
+        .mini-stat-card.stat-info { border-left-color: #0dcaf0; }
+        .mini-stat-label { font-size: .8rem; color: #6c757d; margin-bottom: .25rem; }
+        .mini-stat-value { font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+        .mini-stat-meta { font-size: .75rem; color: #adb5bd; margin-top: .35rem; }
+
+        .table thead th,
+        .orders-table thead th {
+            background: #f8f9fa !important;
+            color: #495057 !important;
+            font-size: .8125rem;
+            font-weight: 600;
+            padding: .75rem 1rem;
+            white-space: nowrap;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .data-table tbody tr:hover,
+        .orders-table tbody tr:hover {
+            background-color: rgba(67, 97, 238, 0.05);
+            transform: none;
+        }
+        .dashboard-page .breadcrumb,
+        .orders-page .breadcrumb { font-size: .875rem; }
+    
+        /* Global breadcrumb style */
+        .breadcrumb {
+            font-size: 0.875rem;
+            background: transparent;
+            padding: 0;
+            margin-bottom: 0;
+        }
+        .breadcrumb-item + .breadcrumb-item::before {
+            color: #adb5bd;
+        }
+        .breadcrumb-item a {
+            color: #4361ee;
+            text-decoration: none;
+        }
+        .breadcrumb-item a:hover {
+            text-decoration: underline;
+        }
+
+    
+        /* Global page-hero style */
+        .page-hero {
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,.08);
+        }
+        .page-hero h2,
+        .page-hero h4 {
+            font-size: 1.25rem;
+        }
+        .page-hero p {
+            font-size: .875rem;
+        }
+    
+        /* ========== Mobile Responsive ========== */
+        @media (max-width: 767.98px) {
+            body { font-size: .875rem; }
+            .main-container { padding: 1rem 0; }
+            .navbar { padding: .5rem 0; }
+            .navbar-brand { font-size: 1.1rem; }
+            .page-hero { padding: 1rem; }
+            .page-hero h2, .page-hero h4 { font-size: 1.1rem; }
+            .kpi-card { padding: .9rem; }
+            .kpi-value { font-size: 1.35rem; }
+            .kpi-icon { font-size: 1.8rem; }
+            .card-body { padding: .9rem; }
+            .table td, .table th { padding: .5rem .4rem; font-size: .8rem; white-space: nowrap; }
+            .btn { padding: .4rem .8rem; font-size: .8rem; }
+            .btn-sm { padding: .25rem .5rem; font-size: .75rem; }
+            .form-control, .form-select { padding: .5rem .65rem; font-size: .875rem; }
+            .stat-card { padding: 1rem; }
+            .stat-card .stat-number { font-size: 1.5rem; }
+            #notification-bell .dropdown-menu { width: 280px !important; right: -60px !important; }
+            .breadcrumb { font-size: .8rem !important; }
+            .mini-stat-value { font-size: 1.2rem; }
+            .status-chip { padding: .5rem; }
+            .chip-num { font-size: 1.2rem; }
+            .card-flat .card-header { padding: .7rem 1rem; }
+            .page-hero .d-flex.flex-wrap.gap-2 { gap: .35rem !important; }
+            .page-hero .d-flex.flex-wrap.gap-2 .btn { font-size: .75rem; padding: .2rem .5rem; }
+        }
+
+        @media (max-width: 575.98px) {
+            .container-fluid { padding-left: .75rem; padding-right: .75rem; }
+            .kpi-card { padding: .7rem; }
+            .kpi-value { font-size: 1.15rem; }
+            .kpi-label { font-size: .7rem; }
+            .stat-card .stat-number { font-size: 1.2rem; }
+            .card { border-radius: 10px; }
+            .page-hero { border-radius: 10px; }
+            .row.g-3 { --bs-gutter-y: .75rem; --bs-gutter-x: .75rem; }
+            .row.g-4 { --bs-gutter-y: .75rem; --bs-gutter-x: .75rem; }
+            #notification-bell .dropdown-menu { width: 260px !important; right: -80px !important; }
+            .progress-stepper .btn { font-size: .7rem; padding: .2rem .5rem; }
+            .detail-label { font-size: .7rem; }
+            .detail-value { font-size: .85rem; }
+        }
+
+        /* Filter section on mobile */
+        @media (max-width: 991.98px) {
+            .filter-row .col-auto { width: 100%; }
+            .filter-row .col-auto select,
+            .filter-row .col-auto input,
+            .filter-row .col-auto .btn { width: 100%; margin-bottom: .35rem; }
+            .filter-row .d-flex { flex-wrap: wrap; }
+        }
+
+    
+        /* Pagination responsive */
+        @media (max-width: 767.98px) {
+            .order-pagination .btn-text { display: none; }
+            .order-pagination .btn-group .btn { padding: .25rem .5rem; font-size: .8rem; min-width: 2rem; }
+            .order-pagination .btn-group .btn i { font-size: .8rem; }
+            .order-pagination .d-flex.flex-wrap { gap: .5rem !important; }
+            .order-pagination form .form-select-sm { font-size: .75rem; padding: .2rem .4rem; }
+            .order-pagination form .form-control-sm { font-size: .75rem; padding: .2rem .4rem; width: 3rem !important; }
+            .order-pagination form .btn-sm { font-size: .75rem; padding: .2rem .5rem; }
+        }
+        @media (max-width: 575.98px) {
+            .order-pagination .btn-group .btn { padding: .2rem .4rem; font-size: .75rem; min-width: 1.8rem; }
+            .order-pagination .btn-group { gap: .15rem; }
+        }
+        .order-pagination .btn-group .btn:focus-visible { outline: 2px solid #4361ee; outline-offset: 1px; }
+
+    
+        /* Navbar mobile */
+        @media (max-width: 991.98px) {
+            .navbar { padding: .4rem 0; }
+            .navbar-brand { font-size: 1rem; }
+            .navbar-toggler { padding: .25rem .4rem; font-size: .9rem; border: none; }
+            .navbar-toggler:focus { box-shadow: none; }
+            .navbar-nav .nav-link { padding: .4rem .75rem; border-radius: 6px; }
+            .navbar-nav .dropdown-menu { border: none; box-shadow: none; padding-left: .75rem; }
+            .navbar-nav .dropdown-menu .dropdown-item { font-size: .875rem; padding: .3rem .75rem; }
+            #notification-bell .dropdown-menu { left: 0 !important; right: auto !important; }
+        }
+
+    
+        .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 30 30%27%3e%3cpath stroke=%27rgba(255,255,255,0.9)%27 stroke-linecap=%27round%27 stroke-miterlimit=%2710%27 stroke-width=%272%27 d=%27M4 7h22M4 15h22M4 23h22%27/%3e%3c/svg%3e") !important;
+        }
+
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-white">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'home' %}">
+                <strong>昇奕隆订单系统</strong>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNavbar">
+            <div class="navbar-nav ms-auto">
+                {% if user.is_authenticated %}
+                    <a class="nav-link" href="{% url 'dashboard' %}">仪表板</a>
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-clipboard-data me-1"></i> 订单管理
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'order_list' %}">全部订单</a></li>
+                            <li><a class="dropdown-item" href="{% url 'order_create' %}"><i class="bi bi-plus-lg me-1"></i>新增订单</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'order_list' %}?order_type=bulk">大货订单</a></li>
+                            <li><a class="dropdown-item" href="{% url 'order_list' %}?order_type=bulk_print">印花订单</a></li>
+                            <li><a class="dropdown-item" href="{% url 'order_list' %}?order_type=sample">样品订单</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'orders_import' %}">
+                                <i class="bi bi-upload me-1"></i>导入订单
+                            </a></li>
+							<li><a class="dropdown-item" href="{% url 'orders_export' %}">
+                                <i class="bi bi-download me-1"></i>导出订单
+                            </a></li>
+                        </ul>
+                    </div>
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-boxes me-1"></i> 库存管理
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'inventory_list' %}">全部库存</a></li>
+							<li><a class="dropdown-item" href="{% url 'inventory_log_list' %}">库存变动日志</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'inventory_list' %}?qty_min=1">正常库存</a></li>
+                            <li><a class="dropdown-item" href="{% url 'inventory_list' %}?qty_max=49&amp;qty_min=1">低库存（&lt;50）</a></li>
+                            <li><a class="dropdown-item" href="{% url 'inventory_list' %}?qty_max=0">零库存</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'inventory_import' %}">
+                                <i class="bi bi-upload me-1"></i>导入库存
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'inventory_export' %}">
+                                <i class="bi bi-download me-1"></i>导出库存
+                            </a></li>
+                        </ul>
+                   </div>
+                    <a class="nav-link" href="{% url 'supplier_manage_list' %}"><i class="bi bi-people me-1"></i> 供应商管理</a>
+                    <a class="nav-link" href="{% url 'cloth_catalog_list' %}">
+                        <i class="bi bi-grid me-1"></i> 布种编号
+                    </a>
+                    <a class="nav-link" href="{% url 'quotation_list' %}">
+                        <i class="bi bi-currency-dollar me-1"></i> 面料报价
+                    </a>
+                    <!-- Notification Bell -->
+                    <div class="nav-item dropdown" id="notification-bell">
+                        <a class="nav-link position-relative" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-bell"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notif-badge" style="font-size:0.6rem;display:none;">0</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" style="width:320px;max-height:400px;overflow-y:auto;">
+                            <li><h6 class="dropdown-header">消息通知</h6></li>
+                            <li><div id="notif-dropdown-list"><div class="text-center text-muted small py-2">加载中...</div></div></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li class="d-flex justify-content-between px-3 py-1">
+                                <a href="{% url 'notification_list' %}" class="small">查看全部</a>
+                                <a href="#" class="small" id="notif-mark-all-read">全部标为已读</a>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i> {{ user.username }}
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'logout' %}">退出登录</a></li>
+                        </ul>
+                    </div>
+                   <a class="nav-link" href="/admin/">系统管理</a>
+                {% else %}
+                    <a class="nav-link" href="{% url 'home' %}">首页</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    {% block extra_js %}{% endblock %}
+    <script>
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("{% static 'pwa/sw.js' %}")
+                .catch(function(err) { console.warn("SW registration failed", err); });
+        }
+    </script>
+
+<script>
+// Notification polling
+function fetchNotifCount() {
+    fetch("/notifications/unread-count/")
+        .then(r => r.json())
+        .then(data => {
+            var badge = document.getElementById("notif-badge");
+            if (data.count > 0) {
+                badge.textContent = data.count;
+                badge.style.display = "inline";
+            } else {
+                badge.style.display = "none";
+            }
+        })
+        .catch(function(){});
+}
+
+function fetchNotifList() {
+    fetch("/notifications/unread-list/")
+        .then(r => r.json())
+        .then(data => {
+            var list = document.getElementById("notif-dropdown-list");
+            if (data.notifications.length === 0) {
+                list.innerHTML = '<div class="text-center text-muted small py-2">暂无新通知</div>';
+                return;
+            }
+            var html = "";
+            data.notifications.forEach(function(n) {
+                var link = n.link || "#";
+                html += '<a href="' + link + '" data-id="' + n.id + '" class="dropdown-item text-wrap notif-item" style="white-space:normal;border-bottom:1px solid #f0f0f0;">';
+                html += '<div class="fw-bold small">' + n.title + '</div>';
+                html += '<div class="text-muted" style="font-size:0.75rem;">' + n.message + '</div>';
+                html += '<div class="text-muted" style="font-size:0.65rem;">' + n.created_at + '</div>';
+                html += '</a>';
+            });
+            list.innerHTML = html;
+            // Attach click handler to mark as read
+            list.querySelectorAll("a.notif-item").forEach(function(a) {
+                a.addEventListener("click", function(e) {
+                    var nid = this.getAttribute("data-id");
+                    if (nid) {
+                        fetch("/notifications/" + nid + "/mark-read/", {
+                            method: "POST",
+                            headers: {"X-CSRFToken":"{{ csrf_token }}","X-Requested-With":"XMLHttpRequest"}
+                        }).catch(function(){});
+                    }
+                });
+            });
+        })
+        .catch(function(){});
+}
+
+// Mark all as read
+document.addEventListener("DOMContentLoaded", function() {
+    var markAllBtn = document.getElementById("notif-mark-all-read");
+    if (markAllBtn) {
+        markAllBtn.addEventListener("click", function(e) {
+            e.preventDefault();
+            fetch("/notifications/mark-all-read/", {method:"POST", headers:{"X-CSRFToken":"{{ csrf_token }}","X-Requested-With":"XMLHttpRequest"}})
+                .then(function() { fetchNotifCount(); fetchNotifList(); });
+        });
+    }
+    // Initial fetch
+    fetchNotifCount();
+    fetchNotifList();
+    // Poll every 15 seconds
+    setInterval(fetchNotifCount, 15000);
+    setInterval(fetchNotifList, 30000);
+});
+</script>
+
+</body>
+</html>

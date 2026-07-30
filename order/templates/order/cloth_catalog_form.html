@@ -1,0 +1,126 @@
+{% extends "order/base.html" %}
+{% block title %}{{ form_title }}{% endblock %}
+{% block content %}
+<div class="container-fluid main-container">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{% url "cloth_catalog_list" %}">布种编号表</a></li>
+      <li class="breadcrumb-item active">{{ form_title }}</li>
+    </ol>
+  </nav>
+
+  <div class="page-hero mb-4">
+    <div class="row align-items-center">
+        <div class="col-lg-8">
+            <h2 class="fw-bold mb-1"><i class="bi bi-plus-lg text-primary me-2"></i>{{ form_title }}</h2>
+            <p class="text-muted mb-0">填写布种信息，标 * 字段建议填写</p>
+        </div>
+    </div>
+</div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="card card-flat mb-3">
+      <div class="card-header bg-primary text-white py-2"><h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>基本资料</h6></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6 col-lg-3">
+            <label class="form-label">布种编号 <span class="text-danger">*</span></label>
+            {{ form.cloth_code }}
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <label class="form-label">材料名称</label>
+            {{ form.cloth_name }}
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <label class="form-label">布种类型</label>
+            {{ form.cloth_type }}
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <label class="form-label">客户</label>
+            {{ form.customer }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-flat mb-3">
+      <div class="card-header bg-info text-white py-2"><h6 class="mb-0"><i class="bi bi-rulers me-2"></i>规格参数</h6></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label">成份（中文）</label>
+            {{ form.composition_cn }}
+          </div>
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label">成份（英文）</label>
+            {{ form.composition_en }}
+          </div>
+          <div class="col-md-4 col-lg-2">
+            <label class="form-label">可裁门幅</label>
+            {{ form.width }}
+          </div>
+          <div class="col-md-4 col-lg-2">
+            <label class="form-label">克重GSM</label>
+            {{ form.weight }}
+          </div>
+          <div class="col-md-4 col-lg-2">
+            <label class="form-label">规格</label>
+            {{ form.specification }}
+          </div>
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label">密度</label>
+            {{ form.density }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-flat mb-3">
+      <div class="card-header bg-secondary text-white py-2"><h6 class="mb-0"><i class="bi bi-gear me-2"></i>加工工艺</h6></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">工艺（中文）</label>
+            {{ form.process_cn }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">工艺（英文）</label>
+            {{ form.process_en }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-flat mb-3">
+      <div class="card-header bg-warning text-dark py-2"><h6 class="mb-0"><i class="bi bi-building me-2"></i>供应商信息</h6></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6 col-lg-3">
+            <label class="form-label">一级供应商</label>
+            {{ form.supplier1 }}
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <label class="form-label">供应商编号</label>
+            {{ form.supplier1_code }}
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <label class="form-label">二级供应商</label>
+            {{ form.supplier2 }}
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <label class="form-label">备注</label>
+            {{ form.remark }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mb-4">
+      <a href="{% url "cloth_catalog_list" %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg me-1"></i>取消</a>
+      <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i>保存</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

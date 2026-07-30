@@ -1,0 +1,289 @@
+﻿{% extends "order/base.html" %}
+{% block title %}订单详情 - {{ order.serial_number }}{% endblock %}
+{% block content %}
+{% load static %}
+{% load pagination %}
+<div class="container-fluid main-container orders-page">
+<nav aria-label="breadcrumb" class="mb-3"><ol class="breadcrumb mb-0">
+<li class="breadcrumb-item"><a href="{% url "dashboard" %}">仪表板</a></li>
+<li class="breadcrumb-item"><a href="{% url "order_list" %}">订单列表</a></li>
+<li class="breadcrumb-item active">订单详情</li>
+</ol></nav>
+
+<div class="page-hero mb-4">
+    <div class="row align-items-center">
+        <div class="col-lg-8">
+            <h2 class="fw-bold mb-1"><i class="bi bi-clipboard-data text-primary me-2"></i>订单详情</h2>
+            <p class="text-muted mb-0"><i class="bi bi-hash me-1"></i> 序号: <span class="fw-bold text-primary">#{{ order.serial_number|default:"-" }}</span>
+            <span class="mx-2">|</span>
+            {% if order.order_status == "cancelled" %}<span class="badge bg-secondary">已取消</span>{% else %}<span class="badge bg-success">正常</span>{% endif %}
+            <span class="mx-2">|</span><i class="bi bi-calendar me-1"></i> 下单日期: <span class="fw-bold">{{ order.order_date|date:"Y-m-d"|default:"-" }}</span>
+            </p>
+        </div>
+        <div class="col-lg-4 mt-3 mt-lg-0">
+            <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                <a href="{% url "order_list" %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> 返回列表</a>
+                <form method="post" action="{% url 'order_refresh_calculations' order.pk %}" style="display:inline">{% csrf_token %}<button type="submit" class="btn btn-outline-info btn-sm"><i class="bi bi-arrow-clockwise me-1"></i> 刷新</button></form>
+                <a href="{% url "orders_export" %}?ids={{ order.pk }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-download me-1"></i> 导出</a>
+                <a href="{% url "order_statement" order.pk %}" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i> 对账单</a>
+                <form method="post" action="{% url "order_delete" order.pk %}" style="display:inline" onsubmit="return confirm('确定要删除订单 {{ order.serial_number }} 吗？此操作不可撤销！')">{% csrf_token %}<button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1"></i> 删除</button></form>
+                <a href="?edit=1" class="btn btn-warning btn-sm"><i class="bi bi-pencil me-1"></i> 编辑订单</a>
+            </div>
+        </div>
+    </div></div>
+
+{% if not edit_mode %}
+<div class="card card-flat mb-4">
+<div class="card-header"><h6 class="mb-0"><i class="bi bi-bar-chart-steps me-2 text-primary"></i>订单进度</h6></div>
+<div class="card-body">
+<div class="d-flex justify-content-between small mb-2">
+<span class="fw-bold text-primary" id="stageLabel">{{ order.current_stage_name }}</span>
+<span class="text-muted">{{ progress_percent }}%</span>
+</div>
+<div class="progress mb-3" style="height:12px"><div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width:{{ progress_percent }}%"></div></div>
+<div class="d-flex flex-wrap align-items-center gap-1" id="stageContainer">{% for stage in order.stage_list %}
+<button type="button" class="btn btn-sm rounded-pill stage-btn {% if forloop.counter0 <= order.progress_current %}btn-primary{% else %}btn-outline-primary{% endif %}" data-index="{{ forloop.counter0 }}">{{ stage }}</button>{% if not forloop.last %} <span class="text-muted" style="font-size:.65rem;">→</span> {% endif %}
+{% endfor %}</div>
+</div></div>
+{% endif %}
+
+{% if edit_mode %}
+<form method="post" novalidate>{% csrf_token %}
+{% for section in form_sections %}
+<div class="card card-flat mb-3">
+<div class="card-header {{ section.header }} py-2"><h6 class="mb-0 fw-bold"><i class="bi {{ section.icon }} me-2"></i>{{ section.title }}</h6></div>
+<div class="card-body"><div class="row g-3">
+{% for field_name in section.fields %}
+{% with field=form|get_field:field_name %}
+<div class="col-md-6 col-lg-4{% if field.name == "bulk_progress_tracking" %} col-12{% endif %}">
+<label class="form-label">{{ field.label }}{% if field.field.required %}<span class="text-danger">*</span>{% endif %}</label>
+{{ field }}
+{% for err in field.errors %}<div class="text-danger small mt-1">{{ err }}</div>{% endfor %}
+</div>
+{% endwith %}
+{% endfor %}
+</div></div></div>
+{% endfor %}
+<div class="d-flex gap-2 mb-4">
+<button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i> 保存修改</button>
+<a href="{% url "order_detail" order.pk %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg me-1"></i> 取消</a>
+</div></form>
+
+{% else %}
+
+<div class="row g-4">
+<div class="col-md-6">
+<div class="card card-flat mb-4"><div class="card-header"><h6 class="mb-0"><i class="bi bi-info-circle me-2 text-primary"></i>基本信息</h6></div>
+<div class="card-body"><div class="row g-3">
+<div class="col-6"><div class="detail-label">客户</div><div class="detail-value fw-semibold text-primary">{{ order.customer|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">跟单员</div><div class="detail-value">{{ order.order_follower|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">订单类型</div><div class="detail-value">{{ order.get_order_type_display|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">订单状态</div><div class="detail-value">
+{% if order.order_status == "cancelled" %}<span class="badge bg-secondary">已取消</span>{% else %}<span class="badge bg-success">正常</span>{% endif %}
+<form method="post" action="{% url 'order_toggle_status' order.pk %}" style="display:inline" class="ms-1">{% csrf_token %}<button type="submit" class="btn btn-sm {% if order.order_status == "cancelled" %}btn-outline-success{% else %}btn-outline-danger{% endif %}">{% if order.order_status == "cancelled" %}恢复订单{% else %}取消订单{% endif %}</button></form>
+</div></div>
+<div class="col-6"><div class="detail-label">订单号</div><div class="detail-value">{{ order.order_number|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">款号</div><div class="detail-value">{{ order.style_number|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">规格</div><div class="detail-value">{{ order.specification|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">下单日期</div><div class="detail-value">{{ order.order_date|date:"Y-m-d"|default:"-" }}</div></div>
+</div></div></div>
+
+<div class="card card-flat mb-4"><div class="card-header"><h6 class="mb-0"><i class="bi bi-grid me-2 text-info"></i>布料信息</h6></div>
+<div class="card-body"><div class="row g-3">
+<div class="col-6"><div class="detail-label">布种</div><div class="detail-value">{{ order.cloth_type|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">纹织类型</div><div class="detail-value">{{ order.textile_type|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">颜色</div><div class="detail-value">{{ order.color|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">色号</div><div class="detail-value">{{ order.color_code|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">成份</div><div class="detail-value">{{ order.composition|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">门幅</div><div class="detail-value">{{ order.width|floatformat:2|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">克重</div><div class="detail-value">{{ order.weight|floatformat:2|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">加工别</div><div class="detail-value">{{ order.processing_type|default:"-" }}</div></div>
+</div></div></div>
+
+<div class="card card-flat mb-4"><div class="card-header"><h6 class="mb-0"><i class="bi bi-list-check me-2 text-secondary"></i>大货进度跟踪</h6></div>
+<div class="card-body"><div class="row g-3">
+<div class="col-12"><div class="detail-value">{{ order.bulk_progress_tracking|linebreaks|default:"-" }}</div></div>
+</div></div></div>
+
+
+<div class="card card-flat mb-4"><div class="card-header d-flex justify-content-between align-items-center py-2">
+    <h6 class="mb-0"><i class="bi bi-truck me-2 text-success"></i>出货记录</h6>
+    <small class="text-muted">共 {{ order.shipments.count }} 批</small>
+</div>
+<div class="card-body p-0">
+<div class="table-responsive">
+<table class="table table-sm table-bordered mb-0">
+<thead>
+<tr>
+    <th class="text-center" style="width:60px">批次</th>
+    <th>出货日期</th>
+    <th class="text-end">出货数量</th>
+    <th class="text-end">出货总价</th>
+    <th class="text-center" style="width:100px">登记人</th>
+</tr>
+</thead>
+<tbody>
+{% for s in shipments %}
+<tr class="{% if s.is_deleted %}table-danger text-decoration-line-through opacity-75{% endif %}">
+    <td class="text-center">{{ s.batch_number }}</td>
+    <td>{{ s.date|date:"Y-m-d"|default:"-" }}</td>
+    <td class="text-end">{{ s.quantity|floatformat:2|default:"-" }}</td>
+    <td class="text-end"><strong class="{% if s.is_deleted %}text-muted{% else %}text-primary{% endif %}">{{ s.shipment_total|floatformat:2|default:"-" }}</strong></td>
+    <td class="text-center text-muted small">{% if s.is_deleted %}<span class="badge bg-secondary">已删除</span>{% else %}{% if s.created_by %}{{ s.created_by.get_full_name|default:s.created_by.username }}{% else %}-{% endif %}{% endif %}</td>
+</tr>
+{% empty %}
+<tr><td colspan="5" class="text-center text-muted py-1">暂无出货记录</td></tr>
+{% endfor %}
+</tbody>
+<tfoot>
+<tr class="table-active fw-bold">
+    <td colspan="2" class="text-end">合计：</td>
+    <td class="text-end">{{ order.total_shipment_from_shipments|floatformat:2|default:"0.00" }} {{ order.shipment_quantity_unit }}</td>
+    <td class="text-end text-primary">{{ computed_total_amount|floatformat:2|default:"0.00" }} 元</td>
+    <td></td>
+</tr>
+</tfoot>
+</table>
+</div>
+</div>
+</div>
+<div class="card card-flat mb-4"><div class="card-header"><h6 class="mb-0"><i class="bi bi-chat-dots me-2 text-secondary"></i>供应商出货备注</h6></div>
+<div class="card-body"><div class="row g-3">
+<div class="col-6"><div class="detail-label">地址</div><div class="detail-value">{{ order.address|default:"-"|linebreaks }}</div></div>
+<div class="col-6"><div class="detail-label">备注</div><div class="detail-value">{{ order.remark|default:"-"|linebreaks }}</div></div>
+<div class="col-6"><div class="detail-label">备注给供应商</div><div class="detail-value">{{ order.supplier_remark|default:"-"|linebreaks }}</div></div>
+</div></div></div>
+</div>
+
+<div class="col-md-6">
+<div class="card card-flat mb-4"><div class="card-header"><h6 class="mb-0"><i class="bi bi-currency-yen me-2 text-success"></i>订单与财务</h6></div>
+<div class="card-body"><div class="row g-3">
+<div class="col-6"><div class="detail-label">订单数量</div><div class="detail-value">{{ order.order_quantity|floatformat:2|default:"-" }} {{ order.quantity_unit|default:"" }}</div></div>
+<div class="col-6"><div class="detail-label">价格</div><div class="detail-value">{{ order.price|floatformat:2|default:"-" }} {{ order.price_unit|default:"" }}</div></div>
+<div class="col-6"><div class="detail-label">小缸费</div><div class="detail-value">{{ order.small_vat_fee|floatformat:2|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">毛利</div><div class="detail-value {% if profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ profit|floatformat:2 }} 元</div></div>
+<div class="col-6"><div class="detail-label">毛利率</div><div class="detail-value {% if profit_margin >= 0 %}text-success{% else %}text-danger{% endif %}">{{ profit_margin|floatformat:1 }}%</div></div>
+<div class="col-6"><div class="detail-label">订单总金额</div><div class="detail-value">{{ total_value|floatformat:2 }} 元</div></div>
+<div class="col-6"><div class="detail-label">成品出货对账金额</div><div class="detail-value fw-bold text-success">{{ order.computed_finished_product_total_amount|floatformat:2|default:"-" }} 元</div></div>
+<div class="col-6"><div class="detail-label">付款方式</div><div class="detail-value">{{ order.get_payment_method_display|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">账期/天</div><div class="detail-value">{{ order.payment_period|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">对账时间</div><div class="detail-value">{{ order.reconciliation_date|date:"Y-m-d"|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">付款时间</div><div class="detail-value">{{ order.payment_date|date:"Y-m-d"|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">客户是否已付款</div><div class="detail-value">
+{% if order.payment_status == "paid" %}<span class="badge bg-success">已付款</span>
+{% elif order.payment_status == "unpaid" %}<span class="badge bg-danger">未付款</span>
+{% elif order.payment_status == "partial" %}<span class="badge bg-warning text-dark">部分付款</span>
+{% else %}<span class="badge bg-secondary">-</span>{% endif %}
+<form method="post" action="{% url 'order_toggle_payment_status' order.pk %}" style="display:inline" class="ms-2">{% csrf_token %}<button type="submit" class="btn btn-sm {% if order.payment_status == "paid" %}btn-outline-warning{% else %}btn-success{% endif %}">{% if order.payment_status == "paid" %}取消付款{% else %}标记已付{% endif %}</button></form>
+</div></div>
+<div class="col-6"><div class="detail-label">订单是否逾期</div><div class="detail-value">{% if order.is_overdue %}<span class="badge bg-danger">逾期</span>{% else %}<span class="badge bg-success">正常</span>{% endif %}</div></div>
+<div class="col-6"><div class="detail-label">开票状态</div><div class="detail-value">{{ order.get_invoice_status_display|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">出货总金额</div><div class="detail-value">{{ order.total_shipment_from_shipments|floatformat:2|default:"0" }} × {{ order.finished_product_cost_price|floatformat:2|default:"0" }} = <strong class="text-success">{{ computed_total_amount|floatformat:2 }}</strong> 元</div></div>
+
+<div class="col-6"><div class="detail-label">出货成本价格</div><div class="detail-value">{{ order.finished_product_cost_price|floatformat:2|default:"-" }} {{ order.cost_price_unit }}</div></div>
+</div></div></div>
+
+<div class="card card-flat mb-4"><div class="card-header"><h6 class="mb-0"><i class="bi bi-building me-2 text-warning"></i>供应商信息</h6></div>
+<div class="card-body"><div class="row g-3">
+<div class="col-6"><div class="detail-label">成品供应商</div><div class="detail-value">{{ order.finished_product_supplier|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">分配供应商账号</div><div class="detail-value">{% if order.supplier %}<span class="badge bg-primary me-1">{{ order.supplier.company_name }}</span>{% else %}<span class="text-muted">-</span>{% endif %}</div></div>
+<div class="col-6"><div class="detail-label">档口</div><div class="detail-value">{{ order.booth|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">供应商是否出货</div><div class="detail-value">{% if order.supplier_shipped %}<span class="badge bg-success">已出货</span>{% else %}<span class="badge bg-secondary">未出货</span>{% endif %}</div></div>
+<div class="col-6"><div class="detail-label">是否已付款给供应商</div><div class="detail-value">
+{% if order.supplier_paid %}<span class="badge bg-success">已付款</span>{% else %}<span class="badge bg-secondary">未付款</span>{% endif %}
+{% if order.supplier_shipped %}
+<form method="post" action="{% url 'order_toggle_supplier_paid' order.pk %}" style="display:inline" class="ms-2">{% csrf_token %}<button type="submit" class="btn btn-sm {% if order.supplier_paid %}btn-outline-warning{% else %}btn-success{% endif %}">{% if order.supplier_paid %}取消{% else %}付款{% endif %}</button></form>
+{% endif %}
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+<style>
+.orders-page .breadcrumb { font-size: .875rem; }
+.detail-label { font-size: .8rem; color: #6c757d; font-weight: 500; margin-bottom: .2rem; }
+.detail-value { font-size: .9375rem; font-weight: 500; color: #212529; }
+</style>
+<style>
+.cloth-ac-dropdown { position:absolute; z-index:999; width:100%; max-height:280px; overflow-y:auto; background:#fff; border:1px solid #dee2e6; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); display:none; }
+.cloth-ac-dropdown .ac-item { padding:8px 12px; cursor:pointer; border-bottom:1px solid #f0f0f0; font-size:.85rem; }
+.cloth-ac-dropdown .ac-item:hover { background:#e8f0fe; }
+.cloth-ac-dropdown .ac-item .ac-code { font-weight:600; color:#4361ee; }
+.cloth-ac-dropdown .ac-item .ac-detail { color:#6c757d; font-size:.75rem; }
+.cloth-ac-wrapper { position:relative; }
+</style>
+<script>
+(function(){
+var f=document.getElementById("id_cloth_type");if(!f||f.tagName!=="INPUT")return;
+var w=document.createElement("div");w.className="cloth-ac-wrapper";f.parentNode.insertBefore(w,f);w.appendChild(f);
+var d=document.createElement("div");d.className="cloth-ac-dropdown";w.appendChild(d);
+var t=null;
+f.addEventListener("input",function(){clearTimeout(t);var v=this.value.trim();if(v.length<1){d.style.display="none";return;}
+t=setTimeout(function(){fetch("/cloth-catalog/api/autocomplete/?q="+encodeURIComponent(v)).then(function(r){return r.json();}).then(function(data){
+if(!data.length){d.style.display="none";return;}
+d.innerHTML=data.map(function(it){var det=[it.cloth_type,it.customer,it.composition_cn].filter(Boolean).join(" | ");return "<div class='ac-item' data-id='"+it.id+"'><div><span class='ac-code'>"+it.cloth_code+"</span> - "+(it.cloth_name||"")+"</div><div class='ac-detail'>"+(det||"")+"</div></div>";}).join("");
+d.style.display="block";
+[].slice.call(d.querySelectorAll(".ac-item")).forEach(function(el){el.addEventListener("click",function(){
+var sel=data.find(function(i){return i.id==parseInt(el.dataset.id);});if(!sel)return;
+f.value=sel.cloth_code||"";
+function sv(i,v){var e=document.getElementById(i);if(e)e.value=v||"";}
+sv("id_composition",sel.composition_cn);
+sv("id_width",sel.width);
+sv("id_weight",sel.weight);
+sv("id_specification",sel.specification);
+sv("id_finished_product_supplier",sel.supplier1);
+sv("id_supplier_code",sel.supplier1_code);
+sv("id_booth",sel.supplier2);
+d.style.display="none";});});
+});},300);});
+f.addEventListener("blur",function(){setTimeout(function(){d.style.display="none";},200);});
+f.addEventListener("focus",function(){if(d.children.length)d.style.display="block";});
+})();
+</script>
+
+<script>
+(function(){
+var c=document.getElementById("stageContainer");if(!c)return;
+function g(){var m=document.cookie.match(/csrftoken=([^;]+)/);return m?m[1]:""}
+c.onclick=function(e){
+var b=e.target.closest(".stage-btn");if(!b)return;
+b.disabled=true;var x=new XMLHttpRequest();
+x.open("POST","{% url "order_update_progress" order.pk %}");
+x.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
+x.setRequestHeader("X-CSRFToken",g());
+x.onload=function(){if(x.status==200)location.reload();else b.disabled=false};
+x.onerror=function(){b.disabled=false};
+x.send("progress_current="+b.dataset.index);
+};
+})();
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const q = document.getElementById('id_quantity_unit');
+    const p = document.getElementById('id_price_unit');
+
+    if (!q || !p) return;
+
+    function setPriceUnit() {
+        const val = q.value.trim();
+        if (val === '米') {
+            p.value = '元/米';
+        } else if (val === '码') {
+            p.value = '元/码';
+        } else {
+            p.value = '';
+        }
+    }
+
+    q.addEventListener('change', setPriceUnit);
+
+    setPriceUnit();
+});
+</script>
+{% endblock %}

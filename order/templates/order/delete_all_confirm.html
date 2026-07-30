@@ -1,0 +1,102 @@
+{% extends 'order/base.html' %}
+
+{% block title %}确认删除所有订单 - 服装订单管理系统{% endblock %}
+
+{% block content %}
+<div class="container-fluid main-container">
+    <nav aria-label="breadcrumb" class="mb-3"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="{% url 'dashboard' %}">仪表板</a></li><li class="breadcrumb-item"><a href="{% url 'order_list' %}">订单列表</a></li><li class="breadcrumb-item active" aria-current="page">清空全部订单</li></ol></nav>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card card-flat">
+                <div class="card-header">
+                    <h6 class="mb-0 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        确认删除所有订单
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <i class="bi bi-trash-fill text-danger display-1"></i>
+                    </div>
+
+                    <div class="alert alert-danger">
+                        <h5 class="alert-heading">警告！</h5>
+                        <p class="mb-0">
+                            您即将删除系统中的 <strong class="fs-4">{{ order_count }}</strong> 条订单记录。
+                            此操作不可恢复，请谨慎操作！
+                        </p>
+                    </div>
+
+                    <div class="card card-flat mb-4">
+                        <div class="card-body">
+                            <p class="fw-bold mb-2">操作影响：</p>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">
+                                    <i class="bi bi-x-circle-fill text-danger me-2"></i>
+                                    所有订单数据将被永久删除
+                                </li>
+                                <li class="list-group-item">
+                                    <i class="bi bi-x-circle-fill text-danger me-2"></i>
+                                    订单相关的统计信息将清零
+                                </li>
+                                <li class="list-group-item">
+                                    <i class="bi bi-x-circle-fill text-danger me-2"></i>
+                                    无法通过常规方式恢复数据
+                                </li>
+                                <li class="list-group-item">
+                                    <i class="bi bi-info-circle-fill text-info me-2"></i>
+                                    建议先导出数据备份
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'order_list' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-arrow-left me-1"></i>
+                            返回订单列表
+                        </a>
+
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'orders_export' %}" class="btn btn-info btn-sm">
+                                <i class="bi bi-download me-1"></i>
+                                导出数据备份
+                            </a>
+
+                            <form method="post" action="{% url 'orders_delete_all' %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger btn-sm"
+                                        onclick="return confirm('确认要删除所有 {{ order_count }} 条订单吗？此操作不可撤销！')">
+                                    <i class="bi bi-trash-fill me-1"></i>
+                                    确认删除所有订单
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer text-muted text-center">
+                    <small>
+                        <i class="bi bi-shield-exclamation me-1"></i>
+                        只有管理员可以执行此操作
+                    </small>
+                </div>
+            </div>
+
+            <div class="card card-flat mt-4">
+                <div class="card-body">
+                    <p class="fw-bold mb-2">
+                        <i class="bi bi-lightbulb-fill text-warning me-2"></i>安全建议
+                    </p>
+                    <ul class="mb-0">
+                        <li>在执行删除操作前，请确保已导出数据备份</li>
+                        <li>确认当前用户有执行此操作的权限</li>
+                        <li>考虑使用批量删除功能删除特定订单，而不是全部删除</li>
+                        <li>如需保留部分数据，请先筛选并导出需要保留的订单</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

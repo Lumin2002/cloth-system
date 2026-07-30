@@ -1,0 +1,73 @@
+{% load pagination %}
+{% if page_obj and page_obj.paginator.count > 0 %}
+<nav class="order-pagination" aria-label="分页导航">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="text-muted small text-nowrap">
+            第 <strong>{{ page_obj.start_index }}</strong>-<strong>{{ page_obj.end_index }}</strong> 条 /
+            共 <strong>{{ page_obj.paginator.count }}</strong> 条
+            <span class="mx-1">·</span>
+            第 <strong>{{ page_obj.number }}</strong>/<strong>{{ page_obj.paginator.num_pages }}</strong> 页
+        </div>
+
+        <div class="btn-group btn-group-sm order-page-buttons" role="group" aria-label="翻页">
+            {% if page_obj.has_previous %}
+            <a class="btn btn-outline-primary" href="{% pagination_url 1 %}" title="首页">
+                <i class="bi bi-chevron-double-left"></i><span class="btn-text ms-1">首页</span>
+            </a>
+            <a class="btn btn-outline-primary" href="{% pagination_url page_obj.previous_page_number %}">
+                <i class="bi bi-chevron-left"></i><span class="btn-text ms-1">上一页</span>
+            </a>
+            {% else %}
+            <button type="button" class="btn btn-outline-secondary" disabled>
+                <i class="bi bi-chevron-double-left"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" disabled>
+                <i class="bi bi-chevron-left"></i>
+            </button>
+            {% endif %}
+
+            {% for i in page_obj.paginator.page_range %}
+                {% if i == page_obj.number %}
+                <button type="button" class="btn btn-primary" disabled>{{ i }}</button>
+                {% elif i == 1 or i == page_obj.paginator.num_pages or i >= page_obj.number|add:"-2" and i <= page_obj.number|add:"2" %}
+                <a class="btn btn-outline-primary" href="{% pagination_url i %}">{{ i }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <a class="btn btn-outline-primary" href="{% pagination_url page_obj.next_page_number %}">
+                <span class="btn-text me-1">下一页</span><i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="btn btn-outline-primary" href="{% pagination_url page_obj.paginator.num_pages %}" title="末页">
+                <span class="btn-text me-1">末页</span><i class="bi bi-chevron-double-right"></i>
+            </a>
+            {% else %}
+            <button type="button" class="btn btn-outline-secondary" disabled>
+                <i class="bi bi-chevron-right"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" disabled>
+                <i class="bi bi-chevron-double-right"></i>
+            </button>
+            {% endif %}
+        </div>
+
+        <form method="get" class="d-flex align-items-center gap-1 flex-nowrap">
+            {% for key, value in request.GET.items %}
+                {% if key != "page" and key != "per_page" %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endif %}
+            {% endfor %}
+            <label class="small text-muted mb-0 text-nowrap">每页</label>
+            <select name="per_page" class="form-select form-select-sm" style="width:auto;min-width:3.5rem;" onchange="this.form.submit()">
+                {% for size in per_page_options %}
+                <option value="{{ size }}" {% if per_page == size %}selected{% endif %}>{{ size }}</option>
+                {% endfor %}
+            </select>
+            <label class="small text-muted mb-0 text-nowrap ms-1">跳转</label>
+            <input type="number" name="page" class="form-control form-control-sm" style="width:3.5rem;"
+                   min="1" max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
+            <button type="submit" class="btn btn-sm btn-primary">GO</button>
+        </form>
+    </div>
+</nav>
+{% endif %}

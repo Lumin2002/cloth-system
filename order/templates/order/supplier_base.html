@@ -1,0 +1,201 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}供应商面板{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <style>
+        :root { --primary: #4361ee; }
+        body { background: #f5f7fa; min-height: 100vh; font-family: "Segoe UI",sans-serif; }
+        .navbar { background: #4361ee !important; box-shadow: 0 4px 20px rgba(67,97,238,0.3); padding: 1rem 0; }
+        .navbar-brand { font-weight: 700; font-size: 1.5rem; color: #fff !important; }
+        .navbar .nav-link { color: rgba(255,255,255,0.9) !important; font-weight: 500; border-radius: 8px; }
+        .navbar .nav-link:hover { background: rgba(255,255,255,0.1); color: #fff !important; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; }
+        .btn { border-radius: 10px; font-weight: 600; border: none; }
+        .btn-primary { background: #4361ee; }
+        .table thead th { background: #f8f9fa; color: #495057; font-weight: 600; border-bottom: 1px solid #dee2e6; white-space: nowrap; }
+        .form-control, .form-select { border-radius: 10px; border: 2px solid #e9ecef; padding: 0.75rem 1rem; }
+        .form-control:focus { border-color: #4361ee; box-shadow: 0 0 0 0.25rem rgba(67,97,238,0.25); }
+        .main-container { padding: 2rem 0; }
+    
+        @media (max-width: 991.98px) {
+            .navbar { padding: .4rem 0; }
+            .navbar-brand { font-size: 1rem; }
+            .navbar-toggler { padding: .25rem .4rem; font-size: .9rem; border: none; }
+            .navbar-toggler:focus { box-shadow: none; }
+            .navbar-toggler-icon {
+                background-image: url("data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 30 30%27%3e%3cpath stroke=%27rgba(255,255,255,0.9)%27 stroke-linecap=%27round%27 stroke-miterlimit=%2710%27 stroke-width=%272%27 d=%27M4 7h22M4 15h22M4 23h22%27/%3e%3c/svg%3e") !important;
+            }
+            .navbar-nav .nav-link { padding: .4rem .75rem; border-radius: 6px; }
+            .navbar-nav .dropdown-menu { border: none; box-shadow: none; padding-left: .75rem; }
+            .navbar-nav .dropdown-menu .dropdown-item { font-size: .875rem; padding: .3rem .75rem; }
+        }
+
+    
+        @media (max-width: 767.98px) {
+            body { font-size: .875rem; }
+            .main-container { padding: 1rem 0; }
+            .table td, .table th { padding: .5rem .4rem; font-size: .8rem; white-space: nowrap; }
+            .btn { padding: .4rem .8rem; font-size: .8rem; }
+            .btn-sm { padding: .25rem .5rem; font-size: .75rem; }
+            .kpi-card { padding: .9rem; }
+            .kpi-value { font-size: 1.35rem; }
+            .card-body { padding: .9rem; }
+            .form-control, .form-select { padding: .5rem .65rem; font-size: .875rem; }
+            #notification-bell .dropdown-menu { width: 280px !important; left: 0 !important; right: auto !important; }
+        }
+        @media (max-width: 575.98px) {
+            .container { padding-left: .75rem; padding-right: .75rem; }
+            .kpi-card { padding: .7rem; }
+            .kpi-value { font-size: 1.15rem; }
+            .row.g-3 { --bs-gutter-y: .5rem; --bs-gutter-x: .5rem; }
+        }
+
+    
+        .kpi-card {
+            position: relative;
+            display: block;
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,.08);
+            border-left: 4px solid #dee2e6;
+            overflow: hidden;
+            color: inherit;
+            height: 100%;
+            transition: transform .15s, box-shadow .15s;
+        }
+        .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+        .kpi-primary { border-left-color: #4361ee; }
+        .kpi-success { border-left-color: #198754; }
+        .kpi-warning { border-left-color: #fd7e14; }
+        .kpi-info { border-left-color: #0dcaf0; }
+        .kpi-danger { border-left-color: #dc3545; }
+        .kpi-label { font-size: .8rem; color: #6c757d; font-weight: 500; }
+        .kpi-value { font-size: 1.75rem; font-weight: 700; line-height: 1.2; margin: .25rem 0; }
+        .kpi-meta { font-size: .75rem; color: #adb5bd; }
+        .kpi-icon {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 2.5rem;
+            opacity: .12;
+        }
+
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'supplier_dashboard' %}">供应商面板</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#supplierNavbar">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="supplierNavbar">
+            <div class="navbar-nav ms-auto">
+                <span class="nav-link"><i class="bi bi-building me-1"></i>{{ supplier.company_name }}</span>
+                <a class="nav-link" href="{% url 'supplier_dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>我的订单</a>
+                <!-- Notification Bell for Supplier -->
+                <div class="nav-item dropdown" id="notification-bell">
+                    <a class="nav-link position-relative" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-bell"></i>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notif-badge" style="font-size:0.6rem;display:none;">0</span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" style="width:320px;max-height:400px;overflow-y:auto;">
+                        <li><h6 class="dropdown-header">消息通知</h6></li>
+                        <li><div id="notif-dropdown-list"><div class="text-center text-muted small py-2">加载中...</div></div></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li class="d-flex justify-content-between px-3 py-1">
+                            <a href="{% url 'notification_list' %}" class="small">查看全部</a>
+                            <a href="#" class="small" id="notif-mark-all-read">全部标为已读</a>
+                        </li>
+                    </ul>
+                </div>
+                <a class="nav-link" href="{% url 'supplier_logout' %}"><i class="bi bi-box-arrow-right me-1"></i>退出登录</a>
+            </div>
+            </div>
+        </div>
+    </nav>
+    <div class="container main-container">
+        {% if messages %}{% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}{% endif %}
+        {% block content %}{% endblock %}
+    </div>
+{% block extra_js %}{% endblock %}
+
+<script>
+function fetchNotifCount() {
+    fetch("/notifications/unread-count/")
+        .then(r => r.json())
+        .then(data => {
+            var badge = document.getElementById("notif-badge");
+            if (data.count > 0) {
+                badge.textContent = data.count;
+                badge.style.display = "inline";
+            } else {
+                badge.style.display = "none";
+            }
+        })
+        .catch(function(){});
+}
+function fetchNotifList() {
+    fetch("/notifications/unread-list/")
+        .then(r => r.json())
+        .then(data => {
+            var list = document.getElementById("notif-dropdown-list");
+            if (data.notifications.length === 0) {
+                list.innerHTML = '<div class="text-center text-muted small py-2">暂无新通知</div>';
+                return;
+            }
+            var html = "";
+            data.notifications.forEach(function(n) {
+                var link = n.link || "#";
+                html += '<a href="' + link + '" data-id="' + n.id + '" class="dropdown-item text-wrap notif-item" style="white-space:normal;border-bottom:1px solid #f0f0f0;">';
+                html += '<div class="fw-bold small">' + n.title + '</div>';
+                html += '<div class="text-muted" style="font-size:0.75rem;">' + n.message + '</div>';
+                html += '<div class="text-muted" style="font-size:0.65rem;">' + n.created_at + '</div>';
+                html += '</a>';
+            });
+            list.innerHTML = html;
+            // Attach click handler to mark as read
+            list.querySelectorAll("a.notif-item").forEach(function(a) {
+                a.addEventListener("click", function(e) {
+                    var nid = this.getAttribute("data-id");
+                    if (nid) {
+                        fetch("/notifications/" + nid + "/mark-read/", {
+                            method: "POST",
+                            headers: {"X-CSRFToken":"{{ csrf_token }}","X-Requested-With":"XMLHttpRequest"}
+                        }).catch(function(){});
+                    }
+                });
+            });
+        })
+        .catch(function(){});
+}
+document.addEventListener("DOMContentLoaded", function() {
+    var markAllBtn = document.getElementById("notif-mark-all-read");
+    if (markAllBtn) {
+        markAllBtn.addEventListener("click", function(e) {
+            e.preventDefault();
+            fetch("/notifications/mark-all-read/", {method:"POST",headers:{"X-CSRFToken":"{{ csrf_token }}","X-Requested-With":"XMLHttpRequest"}})
+                .then(function(){ fetchNotifCount(); fetchNotifList(); });
+        });
+    }
+    fetchNotifCount();
+    fetchNotifList();
+    setInterval(fetchNotifCount, 15000);
+    setInterval(fetchNotifList, 30000);
+});
+</script>
+
+</body>
+</html>

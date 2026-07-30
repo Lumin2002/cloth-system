@@ -1,0 +1,37 @@
+﻿# Auto-detect text files and normalize line endings
+* text=auto
+
+# Source code
+*.py text diff=python
+*.js text
+*.css text
+*.html text
+
+# Binary
+*.xlsx binary
+*.xls binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+
+# Shell scripts
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.sh text eol=lf
+
+# Configs
+*.yml text
+*.yaml text
+*.json text
+*.toml text
+*.cfg text
+*.ini text
+*.conf text
+
+# Docker
+Dockerfile text
+docker-compose.yml text
+.dockerignore text
+nginx.conf text

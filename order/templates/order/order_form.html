@@ -1,0 +1,138 @@
+{% extends 'order/base.html' %}
+
+{% block title %}{{ form_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid main-container">
+    <nav aria-label="breadcrumb" class="mb-3"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="{% url 'dashboard' %}">仪表板</a></li><li class="breadcrumb-item"><a href="{% url 'order_list' %}">订单列表</a></li><li class="breadcrumb-item active" aria-current="page">编辑订单</li></ol></nav>
+
+    <div class="page-hero mb-4">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h2 class="fw-bold mb-1">
+                    <i class="bi {% if is_create %}bi-plus-circle{% else %}bi-pencil-square{% endif %} text-primary me-2"></i>
+                    {{ form_title }}
+                </h2>
+                {% if not is_create and object %}
+                <p class="text-muted mb-0">
+                    <i class="bi bi-hash me-1"></i> 序号: <span class="fw-bold text-primary">#{{ object.serial_number|default:"-" }}</span>
+                    <span class="mx-2">|</span>
+                    <i class="bi bi-person me-1"></i> 客户: <span class="fw-bold">{{ object.customer|default:"未填客户" }}</span>
+                </p>
+                {% else %}
+                <p class="text-muted mb-0">填写订单信息，序号可留空由系统自动生成</p>
+                {% endif %}
+            </div>
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                    <a href="{% if object %}{% url 'order_detail' object.pk %}{% else %}{% url 'order_list' %}{% endif %}"
+                       class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-arrow-left me-1"></i> 返回
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger">
+        {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% include 'order/_order_form_fields.html' %}
+
+        <div class="card shadow-sm sticky-bottom-bar">
+            <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                <span class="text-muted small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    带 <span class="text-danger">*</span> 为必填项；保存后可继续编辑
+                </span>
+                <div class="d-flex gap-2">
+                    <a href="{% if object %}{% url 'order_detail' object.pk %}{% else %}{% url 'order_list' %}{% endif %}"
+                       class="btn btn-outline-secondary">取消</a>
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="bi bi-check-lg me-1"></i> {{ submit_label }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<style>
+.sticky-bottom-bar {
+    position: sticky;
+    bottom: 1rem;
+    z-index: 10;
+    border-left: 4px solid var(--bs-primary);
+}
+.form-label { font-size: 0.875rem; font-weight: 500; }
+
+.cloth-ac-dropdown { position:absolute; z-index:999; width:100%; max-height:280px; overflow-y:auto; background:#fff; border:1px solid #dee2e6; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); display:none; }
+.cloth-ac-dropdown .ac-item { padding:8px 12px; cursor:pointer; border-bottom:1px solid #f0f0f0; font-size:.85rem; }
+.cloth-ac-dropdown .ac-item:hover { background:#e8f0fe; }
+.cloth-ac-dropdown .ac-item .ac-code { font-weight:600; color:#4361ee; }
+.cloth-ac-dropdown .ac-item .ac-detail { color:#6c757d; font-size:.75rem; }
+.cloth-ac-wrapper { position:relative; }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 面料自动补全脚本
+(function(){
+var f=document.getElementById("id_cloth_type");if(!f||f.tagName!=="INPUT")return;
+var w=document.createElement("div");w.className="cloth-ac-wrapper";f.parentNode.insertBefore(w,f);w.appendChild(f);
+var d=document.createElement("div");d.className="cloth-ac-dropdown";w.appendChild(d);
+var t=null;
+f.addEventListener("input",function(){clearTimeout(t);var v=this.value.trim();if(v.length<1){d.style.display="none";return;}
+t=setTimeout(function(){fetch("/cloth-catalog/api/autocomplete/?q="+encodeURIComponent(v)).then(function(r){return r.json();}).then(function(data){
+if(!data.length){d.style.display="none";return;}
+d.innerHTML=data.map(function(it){var det=[it.cloth_type,it.customer,it.composition_cn].filter(Boolean).join(" | ");return "<div class='ac-item' data-id='"+it.id+"'><div><span class='ac-code'>"+it.cloth_code+"</span> - "+(it.cloth_name||"")+"</div><div class='ac-detail'>"+(det||"")+"</div></div>";}).join("");
+d.style.display="block";
+[].slice.call(d.querySelectorAll(".ac-item")).forEach(function(el){el.addEventListener("click",function(){
+var sel=data.find(function(i){return i.id==parseInt(el.dataset.id);});if(!sel)return;
+f.value=sel.cloth_code||"";
+function sv(i,v){var e=document.getElementById(i);if(e)e.value=v||"";}
+sv("id_composition",sel.composition_cn);
+sv("id_width",sel.width);
+sv("id_weight",sel.weight);
+sv("id_specification",sel.specification);
+sv("id_finished_product_supplier",sel.supplier1);
+sv("id_supplier_code",sel.supplier1_code);
+sv("id_booth",sel.supplier2);
+d.style.display="none";});});
+});},300);});
+f.addEventListener("blur",function(){setTimeout(function(){d.style.display="none";},200);});
+f.addEventListener("focus",function(){if(d.children.length)d.style.display="block";});
+})();
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const q = document.getElementById('id_quantity_unit');
+    const p = document.getElementById('id_price_unit');
+
+    if (!q || !p) return;
+
+    function setPriceUnit() {
+        const val = q.value.trim();
+        if (val === '米') {
+            p.value = '元/米';
+        } else if (val === '码') {
+            p.value = '元/码';
+        } else {
+            p.value = '';
+        }
+    }
+
+    q.addEventListener('change', setPriceUnit);
+
+    setPriceUnit();
+});
+</script>
+{% endblock %}

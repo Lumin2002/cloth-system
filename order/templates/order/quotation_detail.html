@@ -1,0 +1,105 @@
+﻿{% extends "order/base.html" %}
+{% block title %}报价详情 - {{ item.article_no }}{% endblock %}
+{% block content %}
+<div class="container-fluid main-container">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{% url 'quotation_list' %}">面料报价表</a></li>
+      <li class="breadcrumb-item active">{{ item.article_no }}</li>
+    </ol>
+  </nav>
+
+  <div class="page-hero mb-4">
+    <div class="row align-items-center">
+        <div class="col-lg-8">
+            <h2 class="fw-bold mb-1"><i class="bi bi-currency-dollar text-primary me-2"></i>{{ item.article_no }}</h2>
+            <p class="text-muted mb-0">{{ item.supplier_name }} · {{ item.date_sent|date:"Y-m-d"|default:"-" }}</p>
+        </div>
+        <div class="col-lg-4 mt-3 mt-lg-0">
+            <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                <a href="{% url 'quotation_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> 返回</a>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card card-flat mb-4">
+        <div class="card-header"><h6 class="mb-0"><i class="bi bi-info-circle me-2 text-primary"></i>基本信息</h6></div>
+        <div class="card-body">
+          <table class="table table-sm table-borderless mb-0">
+            <tr><td class="text-muted" style="width:120px">面料编号</td><td class="fw-semibold">{{ item.article_no|default:"-" }}</td></tr>
+            <tr><td class="text-muted">供应商</td><td>{{ item.supplier_name|default:"-" }}</td></tr>
+            <tr><td class="text-muted">联系人/邮箱</td><td class="small">{{ item.supplier_contact|linebreaks|default:"-" }}</td></tr>
+            <tr><td class="text-muted">报价日期</td><td>{{ item.date_sent|date:"Y-m-d"|default:"-" }}</td></tr>
+            <tr><td class="text-muted">GFG开发号</td><td>{{ item.gfg_dev_no|default:"-" }}</td></tr>
+            <tr><td class="text-muted">环保材料</td><td>{{ item.preferred_material|default:"-" }}</td></tr>
+            <tr><td class="text-muted">色卡</td><td>{{ item.color_card|default:"-" }}</td></tr>
+            <tr><td class="text-muted">报价给</td><td>{{ item.quoted_to|default:"-" }}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card card-flat mb-4">
+        <div class="card-header"><h6 class="mb-0"><i class="bi bi-palette me-2 text-info"></i>面料规格</h6></div>
+        <div class="card-body">
+          <table class="table table-sm table-borderless mb-0">
+            <tr><td class="text-muted" style="width:120px">成分</td><td>{{ item.composition|default:"-" }}</td></tr>
+            <tr><td class="text-muted">克重</td><td>{{ item.weight|default:"-" }}</td></tr>
+            <tr><td class="text-muted">门幅</td><td>{{ item.cuttable_width|default:"-" }}</td></tr>
+            <tr><td class="text-muted">纱支</td><td>{{ item.yarn_count|default:"-" }}</td></tr>
+            <tr><td class="text-muted">密度/针数</td><td>{{ item.density_gauge|default:"-" }}</td></tr>
+            <tr><td class="text-muted">交期</td><td>{{ item.lead_time|default:"-" }}</td></tr>
+            <tr><td class="text-muted">报价有效期</td><td>{{ item.price_validity|default:"-" }}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card card-flat mb-4">
+        <div class="card-header"><h6 class="mb-0"><i class="bi bi-currency-dollar me-2 text-success"></i>200米起订量价格</h6></div>
+        <div class="card-body">
+          <table class="table table-sm table-borderless mb-0">
+            <tr><td class="text-muted" style="width:120px">原文</td><td class="small">{{ item.price_200m_text|default:"-" }}</td></tr>
+            <tr><td class="text-muted">素色价格</td><td class="fw-semibold">{% if item.price_200m %}{{ item.price_200m }} /{{ item.price_200m_unit }}{% else %}-{% endif %}</td></tr>
+            <tr><td class="text-muted">印花价格</td><td class="fw-semibold">{% if item.price_200m_print %}{{ item.price_200m_print }} /{{ item.price_200m_unit }}{% else %}-{% endif %}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card card-flat mb-4">
+        <div class="card-header"><h6 class="mb-0"><i class="bi bi-currency-exchange me-2 text-warning"></i>常规起订量价格</h6></div>
+        <div class="card-body">
+          <table class="table table-sm table-borderless mb-0">
+            <tr><td class="text-muted" style="width:120px">常规起订量</td><td>{{ item.regular_mcq|default:"-" }}</td></tr>
+            <tr><td class="text-muted">原文</td><td class="small">{{ item.price_regular_text|default:"-" }}</td></tr>
+            <tr><td class="text-muted">素色价格</td><td class="fw-semibold">{% if item.price_regular %}{{ item.price_regular }} /{{ item.price_regular_unit }}{% else %}-{% endif %}</td></tr>
+            <tr><td class="text-muted">印花价格</td><td class="fw-semibold">{% if item.price_regular_print %}{{ item.price_regular_print }} /{{ item.price_regular_unit }}{% else %}-{% endif %}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-12">
+      <div class="card card-flat mb-4">
+        <div class="card-header"><h6 class="mb-0"><i class="bi bi-chat-dots me-2 text-secondary"></i>备注</h6></div>
+        <div class="card-body">
+          <table class="table table-sm table-borderless mb-0">
+            <tr><td class="text-muted" style="width:120px">备注</td><td>{{ item.remark|default:"-" }}</td></tr>
+            <tr><td class="text-muted">附加备注</td><td>{{ item.extra_remark|default:"-" }}</td></tr>
+            <tr><td class="text-muted">导入时间</td><td>{{ item.created_at|date:"Y-m-d H:i"|default:"-" }}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

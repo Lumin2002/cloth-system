@@ -1,0 +1,87 @@
+{% extends "order/base.html" %}
+{% block title %}布种详情 - {{ item.cloth_code }}{% endblock %}
+{% block content %}
+<div class="container-fluid main-container">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{% url "cloth_catalog_list" %}">布种编号表</a></li>
+      <li class="breadcrumb-item active">{{ item.cloth_code }}</li>
+    </ol>
+  </nav>
+
+  <div class="page-hero mb-4">
+    <div class="row align-items-center">
+        <div class="col-lg-8">
+            <h2 class="fw-bold mb-1"><i class="bi bi-grid text-primary me-2"></i>{{ item.cloth_code }}</h2>
+            <p class="text-muted mb-0">{{ item.cloth_name|default:"" }}</p>
+        </div>
+        <div class="col-lg-4 mt-3 mt-lg-0">
+            <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                <a href="{% url 'cloth_catalog_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> 返回</a>
+            </div>
+        </div>
+    </div>
+</div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card card-flat mb-4">
+        <div class="card-header"><h6 class="mb-0"><i class="bi bi-info-circle me-2 text-primary"></i>基本资料</h6></div>
+        <div class="card-body">
+          <table class="table table-sm table-borderless mb-0">
+            <tr><td class="text-muted" style="width:120px">布种编号</td><td class="fw-semibold">{{ item.cloth_code|default:"-" }}</td></tr>
+            <tr><td class="text-muted">材料名称</td><td>{{ item.cloth_name|default:"-" }}</td></tr>
+            <tr><td class="text-muted">布种类型</td><td>{{ item.cloth_type|default:"-" }}</td></tr>
+            <tr><td class="text-muted">客户</td><td>{{ item.customer|default:"-" }}</td></tr>
+            <tr><td class="text-muted">创建时间</td><td>{{ item.created_at|date:"Y-m-d H:i"|default:"-" }}</td></tr>
+            <tr><td class="text-muted">更新时间</td><td>{{ item.updated_at|date:"Y-m-d H:i"|default:"-" }}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card card-flat mb-4">
+        <div class="card-header"><h6 class="mb-0"><i class="bi bi-palette me-2 text-info"></i>规格参数</h6></div>
+        <div class="card-body">
+          <table class="table table-sm table-borderless mb-0">
+            <tr><td class="text-muted" style="width:120px">成份（中文）</td><td>{{ item.composition_cn|default:"-" }}</td></tr>
+            <tr><td class="text-muted">成份（英文）</td><td>{{ item.composition_en|default:"-" }}</td></tr>
+            <tr><td class="text-muted">可裁门幅</td><td>{{ item.width|default:"-" }}</td></tr>
+            <tr><td class="text-muted">克重GSM</td><td>{{ item.weight|default:"-" }}</td></tr>
+            <tr><td class="text-muted">规格</td><td>{{ item.specification|default:"-" }}</td></tr>
+            <tr><td class="text-muted">密度</td><td>{{ item.density|default:"-" }}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card card-flat mb-4">
+        <div class="card-header"><h6 class="mb-0"><i class="bi bi-gear me-2 text-secondary"></i>加工工艺</h6></div>
+        <div class="card-body">
+          <table class="table table-sm table-borderless mb-0">
+            <tr><td class="text-muted" style="width:120px">工艺（中文）</td><td>{{ item.process_cn|linebreaks|default:"-" }}</td></tr>
+            <tr><td class="text-muted">工艺（英文）</td><td>{{ item.process_en|linebreaks|default:"-" }}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card card-flat mb-4">
+        <div class="card-header"><h6 class="mb-0"><i class="bi bi-building me-2 text-warning"></i>供应商资料</h6></div>
+        <div class="card-body">
+          <table class="table table-sm table-borderless mb-0">
+            <tr><td class="text-muted" style="width:120px">一级供应商</td><td>{{ item.supplier1|default:"-" }}</td></tr>
+            <tr><td class="text-muted">供应商编号</td><td>{{ item.supplier1_code|default:"-" }}</td></tr>
+            <tr><td class="text-muted">二级供应商</td><td>{{ item.supplier2|default:"-" }}</td></tr>
+            <tr><td class="text-muted">备注</td><td>{{ item.remark|default:"-" }}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

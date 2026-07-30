@@ -1,0 +1,186 @@
+{% extends 'order/base.html' %}
+
+{% block title %}昇奕隆订单系统{% endblock %}
+
+{% block content %}
+<div class="container main-container">
+    <div class="row justify-content-center align-items-center min-vh-80">
+        <div class="col-lg-10">
+            <div class="card shadow-lg border-0">
+                <div class="card-body p-5">
+                    <div class="row align-items-stretch">
+                        <!-- 左边：系统介绍 -->
+                        <div class="col-md-6 border-end pe-md-5">
+                            <div class="h-100 d-flex flex-column justify-content-center">
+                                <div class="text-center mb-4">
+                                    <div class="feature-icon mx-auto mb-3">
+                                        <i class="bi bi-clipboard-data"></i>
+                                    </div>
+                                    <h1 class="fw-bold mb-3" style="background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                                        昇奕隆订单系统
+                                    </h1>
+                                    <p class="lead text-muted mb-4">便捷、高效的服装行业订单管理解决方案</p>
+                                </div>
+
+                                <div class="mb-4">
+                                    <h5 class="fw-bold mb-3">
+                                        <i class="bi bi-stars text-primary me-2"></i> 核心功能
+                                    </h5>
+                                    <div class="row g-3">
+                                        <div class="col-6">
+                                            <div class="d-flex align-items-center p-3 bg-light rounded">
+                                                <i class="bi bi-clipboard-check text-primary fs-4 me-3"></i>
+                                                <div>
+                                                    <div class="fw-bold">订单管理</div>
+                                                    <small class="text-muted">全面管理客户订单</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="d-flex align-items-center p-3 bg-light rounded">
+                                                <i class="bi bi-box text-success fs-4 me-3"></i>
+                                                <div>
+                                                    <div class="fw-bold">库存跟踪</div>
+                                                    <small class="text-muted">实时监控库存变化</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="d-flex align-items-center p-3 bg-light rounded">
+                                                <i class="bi bi-graph-up text-info fs-4 me-3"></i>
+                                                <div>
+                                                    <div class="fw-bold">数据分析</div>
+                                                    <small class="text-muted">智能报表与分析</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="d-flex align-items-center p-3 bg-light rounded">
+                                                <i class="bi bi-file-earmark-excel text-warning fs-4 me-3"></i>
+                                                <div>
+                                                    <div class="fw-bold">供应商接口</div>
+                                                    <small class="text-muted">无缝对接供应商</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-auto">
+                                    <div class="alert alert-light border">
+                                        <div class="d-flex">
+                                            <i class="bi bi-check-circle-fill text-success fs-4 me-3"></i>
+                                            <div>
+                                                <strong>专为服装行业设计</strong>
+                                                <p class="mb-0 small text-muted">支持布种管理、颜色规格、订单跟踪等专业功能</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 右边：登录模块（无注册入口，仅账号密码登录） -->
+                        <div class="col-md-6 ps-md-5">
+                            <div class="h-100 d-flex flex-column justify-content-center">
+                                <div class="text-center mb-4">
+                                    <h3 class="fw-bold">登录系统</h3>
+                                    <p class="text-muted">请输入您的账号信息</p>
+                                </div>
+
+                                <form method="post">
+                                    {% csrf_token %}
+
+                                    <div class="mb-4">
+                                        <label for="username" class="form-label fw-bold">用户名</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-light border-end-0">
+                                                <i class="bi bi-person text-primary"></i>
+                                            </span>
+                                            <input type="text" class="form-control border-start-0" id="username" name="username"
+                                                   placeholder="请输入用户名" required autofocus>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label for="password" class="form-label fw-bold">密码</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-light border-end-0">
+                                                <i class="bi bi-lock text-primary"></i>
+                                            </span>
+                                            <input type="password" class="form-control border-start-0" id="password" name="password"
+                                                   placeholder="请输入密码" required>
+                                        </div>
+                                    </div>
+
+                                    {% if messages %}
+                                        {% for message in messages %}
+                                            {% if message.tags == 'error' %}
+                                                <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+                                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                                    {{ message }}
+                                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                                </div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+
+                                    <div class="d-grid mb-4">
+                                        <button type="submit" class="btn btn-primary btn-lg fw-bold">
+                                            <i class="bi bi-box-arrow-in-right me-2"></i> 登录系统
+                                        </button>
+                                    </div>
+                                </form>
+
+                                <div class="text-center mt-4 pt-3 border-top">
+                                    <p class="small text-muted mb-0">
+                                        <i class="bi bi-shield-check me-1"></i>
+                                        安全登录，数据加密存储
+                                    </p>
+									<p class="small text-muted mb-2"></p>
+									<p class="small text-muted mb-0">
+                                        <i class="bi bi-shield-check me-1"></i>
+                                        供应商请联系系统管理员添加账号
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <p class="text-muted small">
+                    <i class="bi bi-c-circle me-1"></i> 2026 昇奕隆订单系统
+                    <span class="mx-2">•</span>
+                    企业内部系统订单管理
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.min-vh-80 {
+    min-height: 80vh;
+}
+.feature-icon {
+    width: 80px;
+    height: 80px;
+    background: var(--gradient-primary);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2.5rem;
+}
+/* 按钮悬浮轻微动效，提升交互手感 */
+.btn-primary {
+    transition: all 0.2s ease;
+}
+.btn-primary:hover {
+    box-shadow: 0 3px 10px rgba(13, 110, 255, 0.25);
+}
+</style>
+{% endblock %}

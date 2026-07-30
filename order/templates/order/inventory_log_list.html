@@ -1,0 +1,279 @@
+{% extends 'order/base.html' %}
+{% load pagination %}
+
+{% block title %}库存日志{% endblock %}
+
+{% block content %}
+<div class="container-fluid main-container orders-page">
+    <nav aria-label="breadcrumb" class="mb-3"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="{% url 'dashboard' %}">仪表板</a></li><li class="breadcrumb-item"><a href="{% url 'inventory_list' %}">库存列表</a></li><li class="breadcrumb-item active" aria-current="page">库存变动日志</li></ol></nav>
+
+    <div class="page-hero mb-4">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h2 class="fw-bold mb-1">
+                    <i class="bi bi-journal-text text-primary me-2"></i>库存变动日志
+                </h2>
+                <p class="text-muted mb-0">记录所有入库、出库、库存调整历史，不可修改</p>
+            </div>
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                    <a href="{% url 'inventory_list' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-boxes me-1"></i> 返回库存列表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 汇总卡片 -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-primary">
+                <div class="kpi-label">总日志条数</div>
+                <div class="kpi-value">{{ total_count }}</div>
+                <div class="kpi-meta">条记录</div>
+                <i class="bi bi-journal kpi-icon"></i>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-success">
+                <div class="kpi-label">入库次数</div>
+                <div class="kpi-value">{{ in_count|default:0 }}</div>
+                <div class="kpi-meta">入库</div>
+                <i class="bi bi-arrow-down-left kpi-icon"></i>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-danger">
+                <div class="kpi-label">出库次数</div>
+                <div class="kpi-value">{{ out_count|default:0 }}</div>
+                <div class="kpi-meta">出库</div>
+                <i class="bi bi-arrow-up-right kpi-icon"></i>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-warning">
+                <div class="kpi-label">调整次数</div>
+                <div class="kpi-value">{{ adjust_count|default:0 }}</div>
+                <div class="kpi-meta">库存修正</div>
+                <i class="bi bi-sliders kpi-icon"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快捷筛选 -->
+    <div class="row g-2 mb-4">
+        <div class="col-6 col-md-4 col-lg">
+            <a href="{% url 'inventory_log_list' %}"
+               class="status-chip chip-primary {% if not request.GET.log_type and not request.GET.search %}border border-primary{% endif %}">
+                <span class="chip-num">{{ total_count }}</span>
+                <span class="chip-text">全部日志</span>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <a href="{% url 'inventory_log_list' %}?log_type=in"
+               class="status-chip chip-success {% if request.GET.log_type == 'in' %}border border-success{% endif %}">
+                <span class="chip-num">{{ in_count|default:0 }}</span>
+                <span class="chip-text">入库</span>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <a href="{% url 'inventory_log_list' %}?log_type=out"
+               class="status-chip chip-danger {% if request.GET.log_type == 'out' %}border border-danger{% endif %}">
+                <span class="chip-num">{{ out_count|default:0 }}</span>
+                <span class="chip-text">出库</span>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <a href="{% url 'inventory_log_list' %}?log_type=adjust"
+               class="status-chip chip-warning {% if request.GET.log_type == 'adjust' %}border border-warning{% endif %}">
+                <span class="chip-num">{{ adjust_count|default:0 }}</span>
+                <span class="chip-text">调整</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- 筛选条件 -->
+    <div class="card card-flat mb-4">
+        <div class="card-header">
+            <button class="btn btn-link text-decoration-none text-dark p-0 fw-bold w-100 text-start d-flex align-items-center justify-content-between"
+                    type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse"
+                    aria-expanded="{% if active_filters %}true{% else %}false{% endif %}"
+                    aria-controls="filterCollapse">
+                <span><i class="bi bi-funnel me-2 text-primary"></i>筛选条件</span>
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+        <div id="filterCollapse" class="collapse {% if active_filters %}show{% endif %}">
+            <div class="card-body">
+                <form method="get" id="inventory-log-filter-form">
+                    <div class="row g-3">
+                        <div class="col-lg-4 col-md-6">
+                            <label class="form-label small text-muted mb-1">关键字搜索</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" name="search" class="form-control"
+                                       placeholder="布料名称、客户、操作人、备注"
+                                       value="{{ request.GET.search }}">
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-3 col-6">
+                            <label class="form-label small text-muted mb-1">变动类型</label>
+                            <select name="log_type" class="form-select form-select-sm">
+                                <option value="">全部类型</option>
+                                {% for key, label in log_type_choices %}
+                                <option value="{{ key }}" {% if request.GET.log_type == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-lg-2 col-md-3 col-6">
+                            <label class="form-label small text-muted mb-1">每页条数</label>
+                            <select name="per_page" class="form-select form-select-sm">
+                                {% for size in per_page_options %}
+                                <option value="{{ size }}" {% if per_page == size %}selected{% endif %}>{{ size }} 条/页</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12 d-flex flex-wrap gap-2 pt-1">
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                <i class="bi bi-filter me-1"></i> 应用筛选
+                            </button>
+                            <a href="{% url 'inventory_log_list' %}" class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-x-lg me-1"></i> 清空筛选
+                            </a>
+                        </div>
+                    </div>
+                </form>
+
+                {% if active_filters %}
+                <div class="mt-3 pt-3 border-top">
+                    <span class="small text-muted me-2">当前筛选：</span>
+                    {% if request.GET.search %}
+                    <span class="badge bg-light text-dark border me-1">搜索: {{ request.GET.search }}</span>
+                    {% endif %}
+                    {% if request.GET.log_type %}
+                    <span class="badge bg-light text-dark border me-1">类型: {{ request.GET.log_type }}</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 分页（顶部） -->
+    {% if page_obj and page_obj.paginator.count > 0 %}
+    <div class="card card-flat mb-3">
+        <div class="card-body py-2">
+            {% include 'order/_pagination.html' with page_obj=page_obj %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 表格 -->
+    <div class="card card-flat">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <h6 class="mb-0 fw-bold"><i class="bi bi-table me-2"></i>库存变动明细</h6>
+            {% if page_obj %}
+            <span class="small text-muted">本页 {{ page_obj|length }} 条</span>
+            {% endif %}
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover data-table mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th>操作时间</th>
+                            <th>布料信息</th>
+                            <th>客户</th>
+                            <th>变动类型</th>
+                            <th class="text-end">变动数量</th>
+                            <th>操作人</th>
+                            <th>备注</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td class="text-nowrap small">
+                                {{ log.created_at|date:"Y-m-d H:i" }}
+                            </td>
+                            <td>
+                                <div class="fw-semibold">{{ log.item.cloth_name|default:"-" }}</div>
+                                <small class="text-muted">{{ log.item.unique_id|default:"" }}</small>
+                            </td>
+                            <td class="small text-nowrap">{{ log.item.customer|default:"-" }}</td>
+                            <td>
+                                {% if log.log_type == 'in' %}
+                                <span class="badge bg-success">{{ log.get_log_type_display }}</span>
+                                {% elif log.log_type == 'out' %}
+                                <span class="badge bg-danger">{{ log.get_log_type_display }}</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">{{ log.get_log_type_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end fw-bold {% if log.log_type == 'out' %}text-danger{% elif log.log_type == 'in' %}text-success{% endif %}">
+                                {{ log.quantity }}
+                            </td>
+                            <td class="small">{{ log.created_by|default:"系统" }}</td>
+                            <td class="small text-muted" style="max-width: 180px;">
+                                {{ log.remark|default:"-"|truncatechars:25 }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="bi bi-journal-x display-4 d-block mb-2 opacity-50"></i>
+                                暂无库存变动日志
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 回到顶部 -->
+<button id="back-to-top" title="回到顶部" aria-label="回到顶部">
+    <i class="bi bi-chevron-up"></i>
+</button>
+
+<style>
+.orders-page .form-label { font-size: .875rem; }
+.orders-page .breadcrumb { font-size: .875rem; }
+#back-to-top {
+    position: fixed;
+    right: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+    color: #fff;
+    border: none;
+    box-shadow: 0 4px 12px rgba(67, 97, 238, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .25s, visibility .25s, transform .25s;
+    z-index: 1030;
+}
+#back-to-top.show { opacity: 1; visibility: visible; transform: translateY(-50%); }
+#back-to-top:hover { transform: translateY(calc(-50% - 2px)); box-shadow: 0 6px 16px rgba(67,97,238,.55); }
+</style>
+
+<script>
+// 回到顶部
+(function () {
+    const btn = document.getElementById('back-to-top');
+    if (!btn) return;
+    window.addEventListener('scroll', function () { btn.classList.toggle('show', window.scrollY > 300); });
+    btn.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+})();
+</script>
+{% endblock %}

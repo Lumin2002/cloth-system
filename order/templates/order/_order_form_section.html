@@ -1,0 +1,29 @@
+{% load pagination %}
+<div class="card mb-3 shadow-sm">
+    <div class="card-header {{ section.header }} py-2">
+        <h6 class="mb-0 fw-bold">
+            <i class="bi {{ section.icon }} me-2"></i>{{ section.title }}
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% for field_name in section.fields %}
+            {% with field=form|get_field:field_name %}
+            <div class="col-md-6 col-lg-4{% if field.name == 'bulk_progress_tracking' %} col-12{% endif %}">
+                <label class="form-label" for="{{ field.id_for_label }}">
+                    {{ field.label }}
+                    {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ field }}
+                {% if field.help_text %}
+                <div class="form-text">{{ field.help_text }}</div>
+                {% endif %}
+                {% for error in field.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endwith %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
