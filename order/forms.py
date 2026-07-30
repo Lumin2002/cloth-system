@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from datetime import date
 
+import html
 import json
 from .models import ClothOrder, InventoryItem, Supplier, Shipment
 
@@ -31,7 +32,7 @@ class ProgressStepperWidget(forms.Widget):
         html += '<div class="progress-stepper d-flex flex-wrap align-items-center gap-1">'
         for i, stage in enumerate(self.stages):
             cls = 'btn btn-sm rounded-pill fw-bold px-3' + (' btn-primary' if i == value else ' btn-outline-primary')
-            html += f'<button type="button" class="{cls} stage-btn" data-index="{i}">{stage}</button>'
+            html += f'<button type="button" class="{cls} stage-btn" data-index="{i}">{html.escape(stage)}</button>'
             if i < len(self.stages) - 1:
                 html += '<div class="text-muted" style="font-size:.7rem;">\u2192</div>'
         html += '''

@@ -42,7 +42,7 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
-    "192.168.*",
+    # "192.168.*",  # removed wildcard - too permissive for Host header validation
     "your-nginx.example.com",
     "your-nginx.example.com:40614"
 ]
@@ -238,7 +238,7 @@ LOGOUT_REDIRECT_URL = '/'
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "http://your-nginx.example.com:40614",
+    # "http://your-nginx.example.com:40614",  # removed - insecure HTTP, use HTTPS only
     "https://your-nginx.example.com:40614",
 ]
 

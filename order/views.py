@@ -7,6 +7,7 @@ from io import BytesIO
 
 import pandas as pd
 from django.contrib import messages
+from django.core.cache import cache
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -113,6 +114,15 @@ class SupplierRequiredMixin(LoginRequiredMixin):
 
 def home_view(request):
     if request.method == "POST":
+        # Rate limiting: 5 attempts per minute per IP
+        ip = request.META.get("REMOTE_ADDR", "")
+        rate_key = f"login_rate:{ip}"
+        attempts = cache.get(rate_key, 0)
+        if attempts >= 5:
+            messages.error(request, "登录尝试过于频繁，请60秒后再试")
+            return redirect("home")
+        cache.set(rate_key, attempts + 1, 60)
+
         user = authenticate(
             request,
             username=request.POST.get("username"),
@@ -167,20 +177,48 @@ def logout_view(request):
 @admin_required
 @login_required
 def dashboard_view(request):
-    orders = ClothOrder.objects.all()
-    active_orders = orders.filter(order_status="active")
-
-    total_orders = orders.count()
-    cancelled_orders = orders.filter(order_status="cancelled").count()
-
-    # 用 Python 计算（因为 computed_* 是 property，数据库层无法直接聚合）
-    total_revenue = sum(o.computed_finished_product_total_amount for o in active_orders)
-    total_cost = sum(o.computed_total_amount for o in active_orders)
+    # ===== Financial totals: single Shipment join query (replaces N+1 Python loop) =====
+    ship_base = Shipment.objects.filter(is_deleted=False, order__order_status="active")
+    fin = ship_base.aggregate(
+        total_revenue=Coalesce(
+            Sum(F("quantity") * F("order__price")),
+            Value(0.0), output_field=FloatField()
+        ),
+        total_cost=Coalesce(
+            Sum(F("quantity") * F("order__finished_product_cost_price")),
+            Value(0.0), output_field=FloatField()
+        ),
+    )
+    total_revenue = round(float(fin["total_revenue"]), 2)
+    total_cost = round(float(fin["total_cost"]), 2)
     total_profit = total_revenue - total_cost
     profit_margin = (total_profit / total_revenue * 100) if total_revenue else 0
 
+    # ===== Aggregated counts (2 queries instead of 9) =====
+    cnt = ClothOrder.objects.aggregate(
+        total=Count("id"),
+        cancelled=Count("id", filter=Q(order_status="cancelled")),
+    )
+    total_orders = cnt["total"]
+    cancelled_orders = cnt["cancelled"]
+
+    active_qs = ClothOrder.objects.filter(order_status="active")
+    active_cnt = active_qs.aggregate(
+        active_total=Count("id"),
+        paid=Count("id", filter=Q(payment_status="paid")),
+        unpaid=Count("id", filter=Q(payment_status="unpaid")),
+        overdue=Count("id", filter=Q(overdue_status="overdue")),
+        paid_no=Count("id", filter=Q(paid_amount="no")),
+    )
+
+    distinct_cnt = ClothOrder.objects.aggregate(
+        total_customers=Count("customer", distinct=True, filter=~Q(customer="")),
+        total_suppliers=Count("finished_product_supplier", distinct=True, filter=~Q(finished_product_supplier="")),
+    )
+
+    # ===== Top customers =====
     top_customers = list(
-        active_orders.exclude(customer="")
+        active_qs.exclude(customer="")
         .values("customer")
         .annotate(order_count=Count("id"), total_amount=Sum("finished_product_total_amount"))
         .order_by("-total_amount")[:5]
@@ -190,8 +228,9 @@ def dashboard_view(request):
         count = row["order_count"] or 0
         row["avg_amount"] = amount / count if count else 0
 
+    # ===== Order type stats =====
     order_type_stats = list(
-        active_orders.exclude(order_type="")
+        active_qs.exclude(order_type="")
         .values("order_type")
         .annotate(count=Count("id"))
         .order_by("-count")
@@ -200,40 +239,46 @@ def dashboard_view(request):
     for row in order_type_stats:
         row["label"] = type_labels.get(row["order_type"], row["order_type"] or t("label.unclassified"))
 
-    monthly_chart = build_monthly_chart_data(active_orders, months_count=12)
-    month_compare = build_month_compare(active_orders)
+    # ===== Monthly charts =====
+    monthly_chart = build_monthly_chart_data(active_qs, months_count=12)
+    month_compare = build_month_compare(active_qs)
 
-    # TOP 供应商统计
-    _top_suppliers = []
-    _sup_data = {}
-    for o in orders.exclude(finished_product_supplier=""):
-        s = o.finished_product_supplier
-        if s not in _sup_data:
-            _sup_data[s] = {"order_count": 0, "total_amount": 0}
-        _sup_data[s]["order_count"] += 1
-        _sup_data[s]["total_amount"] += o.computed_total_amount
+    # ===== TOP suppliers via Shipment join (single query, no Python loop) =====
+    _top_suppliers = list(
+        ship_base.exclude(order__finished_product_supplier="")
+        .values("order__finished_product_supplier")
+        .annotate(
+            order_count=Count("order_id", distinct=True),
+            total_amount=Coalesce(Sum(F("quantity") * F("order__finished_product_cost_price")), Value(0.0), output_field=FloatField()),
+        )
+        .order_by("-total_amount")[:5]
+    )
+    for s in _top_suppliers:
+        s["finished_product_supplier"] = s.pop("order__finished_product_supplier")
 
-    for s, data in sorted(_sup_data.items(), key=lambda x: -x[1]["total_amount"])[:5]:
-        data["finished_product_supplier"] = s
-        _top_suppliers.append(data)
+    # ===== Recent orders & alerts =====
+    all_orders = ClothOrder.objects.all()
+    recent_orders = all_orders.order_by("-order_date", "-created_at")[:8]
+    alert_unpaid = active_qs.filter(payment_status="unpaid").order_by("-order_date")[:5]
+    alert_overdue = active_qs.filter(overdue_status="overdue").order_by("-order_date")[:5]
 
     context = {
         "total_orders": total_orders,
         "cancelled_orders": cancelled_orders,
-        "active_orders_count": active_orders.count(),
-        "total_customers": orders.exclude(customer="").values("customer").distinct().count(),
-        "total_suppliers": orders.exclude(finished_product_supplier="").values("finished_product_supplier").distinct().count(),
+        "active_orders_count": active_cnt["active_total"],
+        "total_customers": distinct_cnt["total_customers"],
+        "total_suppliers": distinct_cnt["total_suppliers"],
         "total_revenue": total_revenue,
         "total_cost": total_cost,
         "total_profit": total_profit,
         "profit_margin": profit_margin,
-        "paid_orders": active_orders.filter(payment_status="paid").count(),
-        "unpaid_orders": active_orders.filter(payment_status="unpaid").count(),
-        "overdue_orders": active_orders.filter(overdue_status="overdue").count(),
-        "paid_amount_no": active_orders.filter(paid_amount="no").count(),
-        "recent_orders": orders.order_by("-order_date", "-created_at")[:8],
-        "alert_unpaid": active_orders.filter(payment_status="unpaid").order_by("-order_date")[:5],
-        "alert_overdue": active_orders.filter(overdue_status="overdue").order_by("-order_date")[:5],
+        "paid_orders": active_cnt["paid"],
+        "unpaid_orders": active_cnt["unpaid"],
+        "overdue_orders": active_cnt["overdue"],
+        "paid_amount_no": active_cnt["paid_no"],
+        "recent_orders": recent_orders,
+        "alert_unpaid": alert_unpaid,
+        "alert_overdue": alert_overdue,
         "top_customers": top_customers,
         "top_suppliers": _top_suppliers,
         "order_type_stats": order_type_stats,
@@ -981,6 +1026,7 @@ def cloth_catalog_autocomplete(request):
 # ---------------------------------------------------------------------------
 
 
+@admin_required
 @login_required
 @require_POST
 def order_update_progress(request, pk):
@@ -1084,6 +1130,7 @@ def order_toggle_status(request, pk):
     return redirect("order_detail", pk=pk)
 
 
+@admin_required
 @login_required
 @require_POST
 def order_toggle_payment_status(request, pk):
@@ -1098,6 +1145,7 @@ def order_toggle_payment_status(request, pk):
     return redirect("order_detail", pk=pk)
 
 
+@admin_required
 @login_required
 @require_POST
 def order_refresh_calculations(request, pk):
@@ -1449,6 +1497,16 @@ class SupplierOrderDetailView(SupplierRequiredMixin, DetailView):
 @require_POST
 def order_shipment_create(request, pk):
     order = get_object_or_404(ClothOrder, pk=pk)
+    # Permission check: admin always allowed, supplier only if assigned
+    if not request.user.is_staff:
+        if not hasattr(request.user, "supplier_profile") or not order.supplier_id or order.supplier.user_id != request.user.id:
+            from django.contrib import messages
+            messages.error(request, "无权访问此订单的出货记录")
+            if hasattr(request.user, "supplier_profile"):
+                from django.shortcuts import redirect
+                return redirect("supplier_dashboard")
+            return redirect("dashboard")
+
     form = ShipmentForm(request.POST)
     if form.is_valid():
         shipment = form.save(commit=False)
@@ -1493,6 +1551,16 @@ def order_shipment_create(request, pk):
 def order_shipment_delete(request, pk, shipment_pk):
     shipment = get_object_or_404(Shipment, pk=shipment_pk, order_id=pk)
     order = shipment.order
+    # Permission check: admin always allowed, supplier only if assigned
+    if not request.user.is_staff:
+        if not hasattr(request.user, "supplier_profile") or not order.supplier_id or order.supplier.user_id != request.user.id:
+            from django.contrib import messages
+            messages.error(request, "无权访问此订单的出货记录")
+            if hasattr(request.user, "supplier_profile"):
+                from django.shortcuts import redirect
+                return redirect("supplier_dashboard")
+            return redirect("dashboard")
+
     batch = shipment.batch_number
 
     logger.info(
@@ -1524,6 +1592,16 @@ def order_shipment_delete(request, pk, shipment_pk):
 def order_shipment_edit(request, pk, shipment_pk):
     shipment = get_object_or_404(Shipment, pk=shipment_pk, order_id=pk)
     order = shipment.order
+    # Permission check: admin always allowed, supplier only if assigned
+    if not request.user.is_staff:
+        if not hasattr(request.user, "supplier_profile") or not order.supplier_id or order.supplier.user_id != request.user.id:
+            from django.contrib import messages
+            messages.error(request, "无权访问此订单的出货记录")
+            if hasattr(request.user, "supplier_profile"):
+                from django.shortcuts import redirect
+                return redirect("supplier_dashboard")
+            return redirect("dashboard")
+
 
     if request.method == "POST":
         form = ShipmentForm(request.POST, instance=shipment)
