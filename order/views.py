@@ -52,10 +52,13 @@ from .i18n import t
 from .import_progress import (
     create_catalog_task,
     create_import_task,
+    create_inventory_task,
     get_catalog_task,
     get_import_task,
+    get_inventory_task,
     start_catalog_task,
     start_import_task,
+    start_inventory_task,
 )
 from .models import (
     ClothCatalog,
@@ -550,14 +553,42 @@ def orders_import_progress(request, task_id):
 def inventory_import_page(request):
     return render(request, "order/inventory_import.html")
 
+@login_required
+@require_POST
+@validate_file_upload
 def inventory_import_start(request):
-    messages.error(request, t("msg.import_unavailable"))
-    return redirect("inventory_import")
+    task_id = create_inventory_task(request.user.id)
+    start_inventory_task(task_id, request.upload_file_bytes)
+    return JsonResponse({"task_id": task_id})
 
 
 @login_required
 def inventory_import_progress(request, task_id):
-    return JsonResponse({"status": "error", "message": t("msg.import_unavailable")})
+    task = get_inventory_task(str(task_id), request.user.id)
+    if not task:
+        return JsonResponse(
+            {
+                "status": "pending",
+                "percent": 0,
+                "message":  t("page.task_initializing"),
+                "current": 0,
+                "total": 0,
+                "result": None,
+                "error": None,
+            }
+        )
+    return JsonResponse(
+        {
+            "status": task.get("status"),
+            "percent": task.get("percent", 0),
+            "message": task.get("message", ""),
+            "phase": task.get("phase", "import"),
+            "current": task.get("current", 0),
+            "total": task.get("total", 0),
+            "result": task.get("result"),
+            "error": task.get("error"),
+        }
+    )
 
 
 @login_required
