@@ -547,7 +547,6 @@ def orders_import_progress(request, task_id):
 
 
 @login_required
-@require_POST
 def inventory_import_page(request):
     return render(request, "order/inventory_import.html")
 
