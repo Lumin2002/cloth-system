@@ -44,6 +44,8 @@ from .dashboard_stats import (
     build_monthly_chart_data,
 )
 from .decorators import admin_required, validate_file_upload
+# 会话超时功能已注释停用，后续需要时恢复本行
+# from .middleware import mark_session_activity
 from .forms import (
     CREATE_DEFAULTS,
     ORDER_CREATE_PRIMARY_COUNT,
@@ -138,6 +140,7 @@ def home_view(request):
                 messages.error(request, t("auth.supplier_disabled"))
                 return redirect("home")
             login(request, user)
+            # mark_session_activity(request)  # 会话超时功能已注释停用
             logger.info(t("log.login", username=request.POST.get("username")))
             if hasattr(user, "supplier_profile"):
                 return redirect("supplier_dashboard")

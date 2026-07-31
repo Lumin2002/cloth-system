@@ -3,7 +3,8 @@
     "no_access": "无权访问管理面板",
     "login_error": "用户名或密码错误",
     "supplier_disabled": "该供应商账号已被禁用，请联系管理员",
-    "supplier_no_access": "无权访问供应商界面"
+    "supplier_no_access": "无权访问供应商界面",
+    "session_expired": "登录已超时，请重新登录"
   },
   "msg": {
     "field_error": "{field}: {err}",

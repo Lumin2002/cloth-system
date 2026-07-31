@@ -224,3 +224,22 @@ python manage.py runserver
 - 环境变量 `DB_NAME` 不设时会自动回落 SQLite，方便本地开发
 - 日志目录 `logs/` 自动创建
 - 静态文件收集到 `staticfiles/`
+
+## 安全
+
+### 会话超时
+
+- 当前默认已注释停用；后续需要时恢复 `cloth_system/settings.py`、`order/views.py`、两个 base 模板中的注释即可
+- 供应商账号默认空闲 30 分钟、超管账号默认空闲 15 分钟后强制退出并重新登录
+- 超时分钟数可通过 `SUPPLIER_SESSION_IDLE_TIMEOUT_MINUTES`、`SUPERUSER_SESSION_IDLE_TIMEOUT_MINUTES` 环境变量调整，设为 `0` 可关闭
+- 服务端由 `order.middleware.SessionTimeoutMiddleware` 强制执行，前端倒计时仅作提醒
+- 通知、监控、导入进度等后台轮询接口不会延长会话
+
+## 系统监控
+
+### 依赖服务健康检查
+
+- 监控页新增数据库、Redis、Nginx 状态卡片，展示正常 / 异常 / 未配置及响应延迟
+- 数据库按 Django 当前配置探测（MySQL 或 SQLite 均可），Redis 仅在配置 `REDIS_URL` 时探测
+- Nginx 通过 `NGINX_CHECK_URL` 探测，生产默认使用 `https://your-nginx.example.com:40614`，使用 GET 请求并兼容自签名证书
+- 服务未配置时显示“未配置”，不会导致监控页报错

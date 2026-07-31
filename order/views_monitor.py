@@ -15,6 +15,7 @@ from .monitor import (
     read_log_tail,
     resolve_log_file,
 )
+from .service_monitor import get_service_status
 
 
 def _log_payload(log_name="", limit=200, include_content=True):
@@ -47,6 +48,7 @@ def monitor_view(request):
         "log_lines": logs["lines"],
         "log_limit": logs["limit"],
         "generated_at": timezone.localtime(),
+        "services": get_service_status(),
     }
     return render(request, "order/monitor.html", context)
 
@@ -65,4 +67,5 @@ def monitor_api(request):
         "generated_at": timezone.localtime().isoformat(),
         "metrics": get_metrics(blocking=False),
         "logs": logs,
+        "services": get_service_status(),
     })

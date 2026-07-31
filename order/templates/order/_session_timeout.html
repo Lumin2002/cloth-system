@@ -1,0 +1,76 @@
+{% if user.is_authenticated and session_timeout_seconds %}
+<div class="modal fade" id="sessionTimeoutModal" tabindex="-1" role="dialog" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">登录即将超时</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                距自动退出还剩 <strong id="sessionTimeoutCountdown">{{ session_timeout_warning_seconds }}</strong> 秒
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="sessionTimeoutLogout">立即退出</button>
+                <button type="button" class="btn btn-primary" id="sessionTimeoutStay">继续使用</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var timeoutMs = {{ session_timeout_seconds }} * 1000;
+    var warnMs = Math.min({{ session_timeout_warning_seconds }} * 1000, timeoutMs);
+    var modalEl = document.getElementById("sessionTimeoutModal");
+    var logoutUrl = "{% if user.supplier_profile %}{% url 'supplier_logout' %}{% else %}{% url 'logout' %}{% endif %}";
+    var timer = null;
+    var countdownTimer = null;
+    var expiresAt = 0;
+
+    function hideModal() {
+        if (!modalEl) return;
+        var modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    }
+
+    function forceLogout() {
+        window.location.href = logoutUrl;
+    }
+
+    function updateCountdown() {
+        var seconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+        var el = document.getElementById("sessionTimeoutCountdown");
+        if (el) el.textContent = seconds;
+        if (seconds <= 0) {
+            forceLogout();
+        }
+    }
+
+    function schedule() {
+        if (timer) clearTimeout(timer);
+        if (countdownTimer) clearInterval(countdownTimer);
+        hideModal();
+        expiresAt = Date.now() + timeoutMs;
+        timer = setTimeout(function () {
+            if (!modalEl) return forceLogout();
+            var modal = bootstrap.Modal.getInstance(modalEl);
+            if (!modal) modal = new bootstrap.Modal(modalEl);
+            modal.show();
+            updateCountdown();
+            countdownTimer = setInterval(updateCountdown, 1000);
+            timer = setTimeout(forceLogout, Math.max(0, expiresAt - Date.now()));
+        }, Math.max(0, timeoutMs - warnMs));
+    }
+
+    ["mousemove", "mousedown", "keydown", "touchstart", "scroll"].forEach(function (evt) {
+        document.addEventListener(evt, schedule, { passive: true });
+    });
+
+    var stayBtn = document.getElementById("sessionTimeoutStay");
+    var logoutBtn = document.getElementById("sessionTimeoutLogout");
+    if (stayBtn) stayBtn.addEventListener("click", schedule);
+    if (logoutBtn) logoutBtn.addEventListener("click", forceLogout);
+
+    schedule();
+})();
+</script>
+{% endif %}

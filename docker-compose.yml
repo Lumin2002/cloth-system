@@ -22,6 +22,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # 通过 FRP 公网地址做端到端 Nginx 健康探测
+      NGINX_CHECK_URL: https://your-nginx.example.com:40614
     volumes:
       - ./:/app
       - static_volume:/app/staticfiles

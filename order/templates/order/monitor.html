@@ -29,6 +29,10 @@
     .monitor-page .log-line.log-warning { color: #fcd34d; background: rgba(245, 158, 11, .1); }
     .monitor-page .log-empty { color: #64748b; text-align: center; padding: 2rem 0; }
     .monitor-page .status-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #22c55e; }
+    .monitor-page .service-item { height: 100%; border: 1px solid #e9ecef; border-radius: 10px; padding: .9rem 1rem; background: #fff; }
+    .monitor-page .service-name { font-weight: 600; }
+    .monitor-page .service-detail { font-size: .8rem; color: #6c757d; margin-top: .25rem; word-break: break-all; }
+    .monitor-page .service-meta { font-size: .75rem; color: #adb5bd; margin-top: .25rem; }
 
     @media (max-width: 767.98px) {
         .monitor-page .chart-box, .monitor-page .chart-box-sm { height: 220px; }
@@ -213,6 +217,35 @@
     </div>
 
     <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card card-flat h-100">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-shield-check me-2 text-primary"></i>依赖服务</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3" id="service-status-grid">
+                        {% for key, service in services.items %}
+                        <div class="col-md-4">
+                            <div class="service-item" data-service="{{ key }}">
+                                <div class="d-flex justify-content-between align-items-center gap-2">
+                                    <span class="service-name">{{ service.name }}</span>
+                                    <span class="badge service-badge {% if service.status == "ok" %}bg-success{% elif service.status == "error" %}bg-danger{% else %}bg-secondary{% endif %}">{{ service.label }}</span>
+                                </div>
+                                <div class="service-detail">{{ service.detail }}</div>
+                                <div class="service-meta">
+                                    {% if service.latency_ms is not None %}延迟 {{ service.latency_ms }} ms{% endif %}
+                                    {% if service.checked_at %} · {{ service.checked_at }}{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
         <div class="col-lg-4">
             <div class="card card-flat h-100">
                 <div class="card-header">
@@ -301,6 +334,7 @@
 
 {{ metrics|json_script:"initial-metrics" }}
 {{ log_lines|json_script:"initial-log-lines" }}
+{{ services|json_script:"initial-services" }}
 {% endblock %}
 
 {% block extra_js %}
@@ -562,6 +596,39 @@
         container.innerHTML = html || '<div class="text-muted small p-3">暂无日志文件</div>';
     }
 
+    function serviceBadge(status) {
+        if (status === 'ok') return ['bg-success', '正常'];
+        if (status === 'error') return ['bg-danger', '异常'];
+        return ['bg-secondary', '未配置'];
+    }
+
+    function updateServices(services) {
+        var grid = document.getElementById('service-status-grid');
+        if (!grid || !services) return;
+        Object.keys(services).forEach(function (key) {
+            var s = services[key];
+            var card = grid.querySelector('[data-service="' + key + '"]');
+            if (!card) return;
+            var nameEl = card.querySelector('.service-name');
+            var badgeEl = card.querySelector('.service-badge');
+            var detailEl = card.querySelector('.service-detail');
+            var metaEl = card.querySelector('.service-meta');
+            if (nameEl) nameEl.textContent = s.name;
+            if (badgeEl) {
+                var badge = serviceBadge(s.status);
+                badgeEl.className = 'badge service-badge ' + badge[0];
+                badgeEl.textContent = badge[1];
+            }
+            if (detailEl) detailEl.textContent = s.detail || '-';
+            if (metaEl) {
+                var parts = [];
+                if (s.latency_ms != null) parts.push('延迟 ' + Number(s.latency_ms).toFixed(1) + ' ms');
+                if (s.checked_at) parts.push(String(s.checked_at).replace('T', ' ').slice(0, 19));
+                metaEl.textContent = parts.join(' · ');
+            }
+        });
+    }
+
     function fetchMetrics() {
         fetch('{% url "monitor_api" %}')
             .then(function (res) { return res.json(); })
@@ -571,6 +638,7 @@
                 renderTrend(data.metrics);
                 renderCores(data.metrics);
                 renderDisk(data.metrics);
+                updateServices(data.services);
             })
             .catch(function () {});
     }
@@ -610,6 +678,8 @@
     var initialMetrics = initialEl ? JSON.parse(initialEl.textContent) : null;
     var initialLogEl = document.getElementById('initial-log-lines');
     var initialLogLines = initialLogEl ? JSON.parse(initialLogEl.textContent) : [];
+    var initialServicesEl = document.getElementById('initial-services');
+    var initialServices = initialServicesEl ? JSON.parse(initialServicesEl.textContent) : null;
 
     setupCharts();
     if (initialMetrics) {
@@ -618,6 +688,7 @@
         renderCores(initialMetrics);
         renderDisk(initialMetrics);
     }
+    if (initialServices) updateServices(initialServices);
     renderLogLines(initialLogLines);
 
     var fileList = document.getElementById('log-file-list');

@@ -67,6 +67,8 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    # 会话超时中间件：已注释停用，后续需要时取消本行注释
+    # 'order.middleware.SessionTimeoutMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -82,6 +84,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                # 会话超时前端配置：与中间件一起停用
+                # 'order.context_processors.session_security',
             ],
         },
     },
@@ -232,6 +236,16 @@ LOGGING = {
 LOGIN_URL = '/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
+
+# ===================== 会话超时安全设置 =====================
+# 当前功能已注释停用；重新启用时恢复 MIDDLEWARE、context processor、views/templates 中的注释即可
+# 供应商 / 超管账户空闲超时（分钟），0 表示不启用
+SUPPLIER_SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SUPPLIER_SESSION_IDLE_TIMEOUT_MINUTES", "30"))
+SUPERUSER_SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SUPERUSER_SESSION_IDLE_TIMEOUT_MINUTES", "15"))
+SESSION_TIMEOUT_WARNING_SECONDS = int(os.environ.get("SESSION_TIMEOUT_WARNING_SECONDS", "60"))
+
+# Nginx 健康探测地址（生产使用 FRP 公网地址；本地可改成 http://127.0.0.1:8233/）
+NGINX_CHECK_URL = os.environ.get("NGINX_CHECK_URL", "https://your-nginx.example.com:40614")
 
 # ===================== FRP HTTPS穿透兼容 =====================
 # 信任FRP外网HTTPS地址，提交表单不报400/403
