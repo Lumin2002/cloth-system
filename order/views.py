@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import date, datetime
 from functools import wraps
 from io import BytesIO
 
@@ -27,7 +27,7 @@ from django.db.models import (
     Sum,
     Value,
 )
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, TruncMonth
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -37,7 +37,12 @@ from django.utils.timezone import now
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
-from .dashboard_stats import build_month_compare, build_monthly_chart_data
+from .dashboard_stats import (
+    build_current_month_finance,
+    build_current_month_orders,
+    build_month_compare,
+    build_monthly_chart_data,
+)
 from .decorators import admin_required, validate_file_upload
 from .forms import (
     CREATE_DEFAULTS,
@@ -240,7 +245,56 @@ def dashboard_view(request):
         row["label"] = type_labels.get(row["order_type"], row["order_type"] or t("label.unclassified"))
 
     # ===== Monthly charts =====
+    today = date.today()
+    month_param = (request.GET.get("month") or "").strip()
+
+    # 只列出有订单数据的月份
+    month_rows = (
+        active_qs.filter(order_date__isnull=False)
+        .annotate(month_key=TruncMonth("order_date"))
+        .values("month_key")
+        .annotate(order_count=Count("id"))
+        .order_by("-month_key")
+    )
+    month_options = []
+    for row in month_rows:
+        month_key = row["month_key"]
+        if month_key:
+            month_options.append({
+                "value": month_key.strftime("%Y-%m"),
+                "label": f"{month_key.year}年{month_key.month}月",
+            })
+    if not month_options:
+        month_options.append({
+            "value": today.strftime("%Y-%m"),
+            "label": f"{today.year}年{today.month}月",
+        })
+
+    selected_value = month_options[0]["value"]
+    month_match = re.match(r"^(\d{4})-(\d{2})$", month_param)
+    if month_match:
+        try:
+            year = int(month_match.group(1))
+            month = int(month_match.group(2))
+            date(year, month, 1)
+            candidate = f"{year:04d}-{month:02d}"
+            if any(opt["value"] == candidate for opt in month_options):
+                selected_value = candidate
+        except ValueError:
+            pass
+    chart_year, chart_month = int(selected_value[:4]), int(selected_value[5:7])
+
     monthly_chart = build_monthly_chart_data(active_qs, months_count=12)
+    month_chart_data = {}
+    for opt in month_options:
+        year = int(opt["value"][:4])
+        month = int(opt["value"][5:7])
+        month_chart_data[opt["value"]] = {
+            "orders": build_current_month_orders(active_qs, year, month),
+            "finance": build_current_month_finance(active_qs, year, month),
+        }
+    current_month_orders = month_chart_data[selected_value]["orders"]
+    current_month_finance = month_chart_data[selected_value]["finance"]
     month_compare = build_month_compare(active_qs)
 
     # ===== TOP suppliers via Shipment join (single query, no Python loop) =====
@@ -258,9 +312,29 @@ def dashboard_view(request):
 
     # ===== Recent orders & alerts =====
     all_orders = ClothOrder.objects.all()
-    recent_orders = all_orders.order_by("-order_date", "-created_at")[:8]
-    alert_unpaid = active_qs.filter(payment_status="unpaid").order_by("-order_date")[:5]
-    alert_overdue = active_qs.filter(overdue_status="overdue").order_by("-order_date")[:5]
+    ship_subq = (
+        Shipment.objects.filter(order=OuterRef("pk"), is_deleted=False)
+        .values("order")
+        .annotate(total=Sum("quantity"))
+        .values("total")[:1]
+    )
+    recent_orders = (
+        all_orders.annotate(
+            _ship_qty=Coalesce(Subquery(ship_subq, output_field=FloatField()), Value(0.0), output_field=FloatField())
+        )
+        .order_by("-order_date", "-created_at")[:8]
+    )
+    ship_qty_annotation = Coalesce(Subquery(ship_subq, output_field=FloatField()), Value(0.0), output_field=FloatField())
+    alert_unpaid = (
+        active_qs.annotate(_ship_qty=ship_qty_annotation)
+        .filter(payment_status="unpaid")
+        .order_by("-order_date")[:5]
+    )
+    alert_supplier_unpaid = (
+        active_qs.annotate(_ship_qty=ship_qty_annotation)
+        .filter(supplier_paid=False)
+        .order_by("-order_date")[:5]
+    )
 
     context = {
         "total_orders": total_orders,
@@ -278,12 +352,17 @@ def dashboard_view(request):
         "paid_amount_no": active_cnt["paid_no"],
         "recent_orders": recent_orders,
         "alert_unpaid": alert_unpaid,
-        "alert_overdue": alert_overdue,
+        "alert_supplier_unpaid": alert_supplier_unpaid,
         "top_customers": top_customers,
         "top_suppliers": _top_suppliers,
         "order_type_stats": order_type_stats,
         "monthly_chart": monthly_chart,
         "monthly_rows": monthly_chart["rows"],
+        "current_month_orders": current_month_orders,
+        "current_month_finance": current_month_finance,
+        "month_chart_data": month_chart_data,
+        "month_options": month_options,
+        "selected_month": selected_value,
         "month_compare": month_compare,
     }
     return render(request, "order/dashboard.html", context)

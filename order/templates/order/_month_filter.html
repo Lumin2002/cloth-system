@@ -1,0 +1,8 @@
+<label class="small text-muted mb-0">月份</label>
+<select name="month" class="form-select form-select-sm month-filter"
+        style="width: auto; min-width: 7.5rem;" onchange="updateCharts(this.value)"
+        aria-label="选择统计月份">
+    {% for opt in month_options %}
+    <option value="{{ opt.value }}" {% if opt.value == selected_month %}selected{% endif %}>{{ opt.label }}</option>
+    {% endfor %}
+</select>

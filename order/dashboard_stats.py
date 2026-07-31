@@ -26,6 +26,32 @@ def _float(value) -> float:
     return float(value)
 
 
+def _month_days(year: int, month: int, end_day: date | None = None) -> list[date]:
+    """指定月份 1 号到 end_day（默认当月最后一天）的所有日期。"""
+    month_start = date(year, month, 1)
+    if end_day is None:
+        if month == 12:
+            next_month = date(year + 1, 1, 1)
+        else:
+            next_month = date(year, month + 1, 1)
+        end_day = next_month - timedelta(days=1)
+    days: list[date] = []
+    cursor = month_start
+    while cursor <= end_day:
+        days.append(cursor)
+        cursor += timedelta(days=1)
+    return days
+
+
+def _resolve_dashboard_month(year=None, month=None, today=None):
+    """解析仪表盘图表月份；默认当月，当月只统计到今天。"""
+    today = today or date.today()
+    if year is None or month is None:
+        year, month = today.year, today.month
+    end_day = today if (year, month) == (today.year, today.month) else None
+    return year, month, end_day
+
+
 
 def _annotate_computed_totals(queryset):
     """用 Shipment 表注解 computed_total 和 computed_revenue，替代 total_amount 字段"""
@@ -108,6 +134,73 @@ def build_monthly_chart_data(queryset, months_count: int = 12) -> dict:
         'profit': profit,
         'rows': rows,
         'chart_months': months_count,
+    }
+
+
+def build_current_month_orders(queryset, year=None, month=None) -> dict:
+    """生成指定月份每日订单量（默认当月），用于“当月订单量”图表。"""
+    today = date.today()
+    year, month, end_day = _resolve_dashboard_month(year, month, today)
+    month_start = date(year, month, 1)
+    days = _month_days(year, month, end_day)
+    range_end = end_day or days[-1]
+
+    by_key = {day: 0 for day in days}
+    order_dates = queryset.filter(
+        order_date__gte=month_start, order_date__lte=range_end, order_date__isnull=False
+    ).values_list('order_date', flat=True)
+    for order_date in order_dates:
+        if order_date:
+            by_key[order_date] = by_key.get(order_date, 0) + 1
+
+    labels = []
+    orders = []
+    for day in days:
+        labels.append(f'{day.month}/{day.day}')
+        orders.append(by_key[day])
+
+    return {
+        'labels': labels,
+        'orders': orders,
+        'total': sum(orders),
+        'month_label': f'{year}年{month}月',
+    }
+
+
+def build_current_month_finance(queryset, year=None, month=None) -> dict:
+    """生成指定月份每日营收/成本/利润（默认当月），用于图表。"""
+    today = date.today()
+    year, month, end_day = _resolve_dashboard_month(year, month, today)
+    month_start = date(year, month, 1)
+    days = _month_days(year, month, end_day)
+    range_end = end_day or days[-1]
+
+    revenue_by_day = {day: 0.0 for day in days}
+    cost_by_day = {day: 0.0 for day in days}
+    rows = queryset.filter(
+        order_date__gte=month_start, order_date__lte=range_end, order_date__isnull=False
+    ).values_list('order_date', 'finished_product_total_amount', 'total_amount')
+    for order_date, revenue, cost in rows:
+        if order_date:
+            revenue_by_day[order_date] = revenue_by_day.get(order_date, 0.0) + _float(revenue)
+            cost_by_day[order_date] = cost_by_day.get(order_date, 0.0) + _float(cost)
+
+    labels, revenue, cost = [], [], []
+    for day in days:
+        labels.append(f'{day.month}/{day.day}')
+        revenue.append(revenue_by_day[day])
+        cost.append(cost_by_day[day])
+    profit = [r - c for r, c in zip(revenue, cost)]
+
+    return {
+        'labels': labels,
+        'revenue': revenue,
+        'cost': cost,
+        'profit': profit,
+        'total_revenue': round(sum(revenue), 2),
+        'total_cost': round(sum(cost), 2),
+        'total_profit': round(sum(profit), 2),
+        'month_label': f'{year}年{month}月',
     }
 
 
