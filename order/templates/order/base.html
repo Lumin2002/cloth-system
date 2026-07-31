@@ -29,7 +29,7 @@
         }
 
         body {
-            padding-top: 0;
+            padding-top: 76px;
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -390,7 +390,7 @@
     
         /* ========== Mobile Responsive ========== */
         @media (max-width: 767.98px) {
-            body { font-size: .875rem; }
+            body { font-size: .875rem; padding-top: 60px; }
             .main-container { padding: 1rem 0; }
             .navbar { padding: .5rem 0; }
             .navbar-brand { font-size: 1.1rem; }
@@ -479,7 +479,7 @@
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-white">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top">
         <div class="container">
             <a class="navbar-brand" href="{% url 'home' %}">
                 <strong>昇奕隆订单系统</strong>
@@ -537,6 +537,9 @@
                     </a>
                     <a class="nav-link" href="{% url 'quotation_list' %}">
                         <i class="bi bi-currency-dollar me-1"></i> 面料报价
+                    </a>
+                    <a class="nav-link" href="{% url 'monitor' %}">
+                        <i class="bi bi-activity me-1"></i> 系统监控
                     </a>
                     <!-- Notification Bell -->
                     <div class="nav-item dropdown" id="notification-bell">

@@ -1,5 +1,6 @@
-﻿from django.urls import path
+from django.urls import path
 from . import views
+from . import views_monitor
 
 urlpatterns = [
     # 主页和其他
@@ -81,5 +82,8 @@ urlpatterns = [
     path("quotation/delete-all/", views.quotation_delete_all, name="quotation_delete_all"),
     path("quotation/<int:pk>/delete/", views.quotation_delete, name="quotation_delete"),
 
+    # 系统监控
+    path("monitor/", views_monitor.monitor_view, name="monitor"),
+    path("monitor/api/", views_monitor.monitor_api, name="monitor_api"),
 
 ]

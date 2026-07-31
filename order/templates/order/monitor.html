@@ -1,0 +1,659 @@
+{% extends 'order/base.html' %}
+{% load static %}
+
+{% block title %}系统监控 - 昇奕隆订单系统{% endblock %}
+
+{% block content %}
+<style>
+    .monitor-page .chart-box { width: 100%; height: 300px; }
+    .monitor-page .chart-box-sm { width: 100%; height: 230px; }
+    .monitor-page .metric-progress { height: 8px; margin-top: .75rem; }
+    .monitor-page .metric-progress .progress-bar { transition: width .6s ease, background-color .3s ease; }
+    .monitor-page .disk-table { font-size: .875rem; }
+    .monitor-page .disk-table .progress { height: 6px; }
+    .monitor-page .process-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem 1rem; }
+    .monitor-page .process-item .label { font-size: .75rem; color: #6c757d; }
+    .monitor-page .process-item .value { font-size: 1rem; font-weight: 600; word-break: break-all; }
+    .monitor-page .log-toolbar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    .monitor-page .log-level-btn { font-size: .75rem; padding: .25rem .6rem; border-radius: 20px; border: 1px solid #dee2e6; background: #fff; color: #495057; }
+    .monitor-page .log-level-btn.active { background: #4361ee; border-color: #4361ee; color: #fff; }
+    .monitor-page .log-file-list { max-height: 460px; overflow-y: auto; }
+    .monitor-page .log-file-btn { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; text-align: left; border: 1px solid #e9ecef; border-radius: 8px; background: #fff; padding: .55rem .75rem; margin-bottom: .4rem; }
+    .monitor-page .log-file-btn:hover { border-color: #4361ee; background: rgba(67, 97, 238, .05); }
+    .monitor-page .log-file-btn.active { border-color: #4361ee; background: rgba(67, 97, 238, .08); }
+    .monitor-page .log-file-name { font-size: .8rem; font-weight: 600; word-break: break-all; }
+    .monitor-page .log-file-meta { font-size: .7rem; color: #6c757d; text-align: right; white-space: nowrap; }
+    .monitor-page .log-content { background: #0f172a; color: #d1d5db; border-radius: 10px; padding: .75rem .5rem; max-height: 460px; overflow-y: auto; font-family: Consolas, "Courier New", monospace; font-size: .78rem; line-height: 1.5; }
+    .monitor-page .log-line { display: block; padding: .1rem .5rem; white-space: pre-wrap; word-break: break-all; }
+    .monitor-page .log-line.log-error { color: #fda4af; background: rgba(220, 38, 38, .12); }
+    .monitor-page .log-line.log-warning { color: #fcd34d; background: rgba(245, 158, 11, .1); }
+    .monitor-page .log-empty { color: #64748b; text-align: center; padding: 2rem 0; }
+    .monitor-page .status-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #22c55e; }
+
+    @media (max-width: 767.98px) {
+        .monitor-page .chart-box, .monitor-page .chart-box-sm { height: 220px; }
+        .monitor-page .process-grid { grid-template-columns: 1fr; }
+        .monitor-page .log-file-list { max-height: 240px; }
+        .monitor-page .log-content { max-height: 340px; }
+    }
+</style>
+
+<div class="container-fluid main-container monitor-page">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item active" aria-current="page">系统监控</li>
+        </ol>
+    </nav>
+
+    <div class="page-hero mb-4">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h2 class="fw-bold mb-1">
+                    <i class="bi bi-activity text-primary me-2"></i>系统监控
+                </h2>
+                <p class="text-muted mb-0">
+                    {{ metrics.system.hostname }} · {{ metrics.system.platform }}
+                </p>
+            </div>
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="d-flex flex-wrap gap-3 justify-content-lg-end align-items-center">
+                    <span class="small text-muted"><span class="status-dot me-1"></span><span id="monitor-status">运行中</span></span>
+                    <span class="small text-muted" id="last-updated">{{ generated_at|date:"H:i:s" }}</span>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="auto-refresh" checked>
+                        <label class="form-check-label small" for="auto-refresh">自动刷新</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-primary">
+                <div class="kpi-label">CPU 使用率</div>
+                <div class="kpi-value" id="kpi-cpu">{{ metrics.cpu_percent|floatformat:1 }}%</div>
+                <div class="kpi-meta">{{ metrics.cpu_count }} 核心</div>
+                <div class="progress metric-progress">
+                    <div class="progress-bar" id="bar-cpu" role="progressbar" style="width: {{ metrics.cpu_percent }}%;"></div>
+                </div>
+                <i class="bi bi-cpu kpi-icon"></i>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-success">
+                <div class="kpi-label">内存使用</div>
+                {% if metrics.memory %}
+                <div class="kpi-value" id="kpi-memory">{{ metrics.memory.used|filesizeformat }}</div>
+                <div class="kpi-meta" id="memory-meta">{{ metrics.memory.percent|floatformat:1 }}% / 共 {{ metrics.memory.total|filesizeformat }}</div>
+                <div class="progress metric-progress">
+                    <div class="progress-bar" id="bar-memory" role="progressbar" style="width: {{ metrics.memory.percent }}%;"></div>
+                </div>
+                {% else %}
+                <div class="kpi-value">-</div>
+                <div class="kpi-meta">不可用</div>
+                {% endif %}
+                <i class="bi bi-memory kpi-icon"></i>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-warning">
+                <div class="kpi-label">磁盘使用</div>
+                {% if metrics.disk %}
+                <div class="kpi-value" id="kpi-disk">{{ metrics.disk.used|filesizeformat }}</div>
+                <div class="kpi-meta" id="disk-meta">{{ metrics.disk.percent|floatformat:1 }}% / 共 {{ metrics.disk.total|filesizeformat }}</div>
+                <div class="progress metric-progress">
+                    <div class="progress-bar" id="bar-disk" role="progressbar" style="width: {{ metrics.disk.percent }}%;"></div>
+                </div>
+                {% else %}
+                <div class="kpi-value">-</div>
+                <div class="kpi-meta">不可用</div>
+                {% endif %}
+                <i class="bi bi-hdd kpi-icon"></i>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="kpi-card kpi-info">
+                <div class="kpi-label">项目目录占用</div>
+                <div class="kpi-value" id="kpi-project">{{ metrics.project.total|filesizeformat }}</div>
+                <div class="kpi-meta text-truncate">{{ metrics.project.path }}</div>
+                <i class="bi bi-folder2-open kpi-icon"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+            <div class="card card-flat h-100">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-graph-up-arrow me-2 text-primary"></i>CPU / 内存趋势</h6>
+                </div>
+                <div class="card-body">
+                    <div id="trendChart" class="chart-box"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card card-flat h-100">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-cpu me-2 text-primary"></i>各核心使用率</h6>
+                </div>
+                <div class="card-body">
+                    <div id="coresChart" class="chart-box-sm"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-4">
+            <div class="card card-flat h-100">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-hdd-stack me-2 text-primary"></i>磁盘空间</h6>
+                </div>
+                <div class="card-body">
+                    <div id="diskChart" class="chart-box-sm"></div>
+                    <div class="d-flex justify-content-between small text-muted mt-2">
+                        <span id="disk-used-text"></span>
+                        <span id="disk-free-text"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="card card-flat h-100">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="mb-0"><i class="bi bi-folder2-open me-2 text-primary"></i>项目目录明细</h6>
+                    <span class="small text-muted text-truncate" style="max-width: 60%;" id="project-path">{{ metrics.project.path }}</span>
+                </div>
+                {% if metrics.project.items %}
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover data-table disk-table mb-0 align-middle">
+                            <thead>
+                                <tr>
+                                    <th>名称</th>
+                                    <th class="text-end">大小</th>
+                                    <th style="width: 40%;">占比</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in metrics.project.items %}
+                                <tr>
+                                    <td class="text-truncate" style="max-width: 260px;">
+                                        {% if item.is_dir %}
+                                        <i class="bi bi-folder2 me-1 text-primary"></i>
+                                        {% else %}
+                                        <i class="bi bi-file-earmark me-1 text-secondary"></i>
+                                        {% endif %}
+                                        {{ item.name }}
+                                    </td>
+                                    <td class="text-end">{{ item.size|filesizeformat }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress flex-grow-1">
+                                                <div class="progress-bar" style="width: {% widthratio item.size metrics.project.total 100 %}%;"></div>
+                                            </div>
+                                            <span class="small text-muted" style="min-width: 44px;">{% widthratio item.size metrics.project.total 100 %}%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% else %}
+                <div class="card-body">
+                    <div class="text-muted small">暂无数据</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-4">
+            <div class="card card-flat h-100">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-terminal me-2 text-primary"></i>应用进程</h6>
+                </div>
+                <div class="card-body">
+                    {% if metrics.process %}
+                    <div class="process-grid">
+                        <div class="process-item">
+                            <div class="label">PID</div>
+                            <div class="value" id="proc-pid">{{ metrics.process.pid }}</div>
+                        </div>
+                        <div class="process-item">
+                            <div class="label">CPU</div>
+                            <div class="value" id="proc-cpu">{{ metrics.process.cpu_percent|floatformat:1 }}%</div>
+                        </div>
+                        <div class="process-item">
+                            <div class="label">内存</div>
+                            <div class="value" id="proc-memory">{{ metrics.process.memory|filesizeformat }}</div>
+                        </div>
+                        <div class="process-item">
+                            <div class="label">线程数</div>
+                            <div class="value" id="proc-threads">{{ metrics.process.threads }}</div>
+                        </div>
+                        <div class="process-item">
+                            <div class="label">运行时长</div>
+                            <div class="value" id="proc-uptime">{{ metrics.process.uptime_text }}</div>
+                        </div>
+                        <div class="process-item">
+                            <div class="label">Python</div>
+                            <div class="value">{{ metrics.system.python }}</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 small text-muted" id="proc-cmdline" style="word-break: break-all;">{{ metrics.process.cmdline }}</div>
+                    {% else %}
+                    <div class="text-muted small">psutil 未安装</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="card card-flat h-100">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h6 class="mb-0" id="log-title">{{ current_log|default:"暂无日志" }}</h6>
+                        <div class="log-toolbar">
+                            <button type="button" class="log-level-btn active" data-filter="all">全部</button>
+                            <button type="button" class="log-level-btn" data-filter="info">INFO</button>
+                            <button type="button" class="log-level-btn" data-filter="warning">WARNING</button>
+                            <button type="button" class="log-level-btn" data-filter="error">ERROR</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="refresh-log" title="刷新日志">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="row g-0">
+                        <div class="col-md-4 border-end">
+                            <div class="log-file-list p-2" id="log-file-list">
+                                {% for f in log_files %}
+                                <button type="button" class="log-file-btn{% if f.name == current_log %} active{% endif %}" data-file="{{ f.name }}">
+                                    <span class="log-file-name"><i class="bi bi-file-earmark-text me-1"></i>{{ f.name }}</span>
+                                    <span class="log-file-meta">{{ f.size|filesizeformat }}<br>{{ f.mtime_text }}</span>
+                                </button>
+                                {% empty %}
+                                <div class="text-muted small p-3">暂无日志文件</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="log-content m-2" id="log-content">
+                                {% for line in log_lines %}
+                                <span class="log-line {% if "ERROR" in line or "CRITICAL" in line or "Traceback" in line %}log-error{% elif "WARNING" in line or "WARN" in line %}log-warning{% else %}log-info{% endif %}">{{ line }}</span>
+                                {% empty %}
+                                <div class="log-empty">暂无日志内容</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ metrics|json_script:"initial-metrics" }}
+{{ log_lines|json_script:"initial-log-lines" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/echarts.min.js' %}" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js';document.head.appendChild(s);"></script>
+<script>
+(function () {
+    var MAX_POINTS = 60;
+    var metricsTimer = null;
+    var logsTimer = null;
+    var history = [];
+    var lastLogLines = [];
+    var logFilter = 'all';
+
+    function initChart(id) {
+        var el = document.getElementById(id);
+        if (!el || typeof echarts === 'undefined') return null;
+        var chart = echarts.init(el);
+        return chart;
+    }
+
+    var trendChart = initChart('trendChart');
+    var coresChart = initChart('coresChart');
+    var diskChart = initChart('diskChart');
+
+    function escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function fmtBytes(value) {
+        if (value == null) return '-';
+        var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        var i = 0;
+        var v = Number(value);
+        while (v >= 1024 && i < units.length - 1) {
+            v /= 1024;
+            i++;
+        }
+        return (i === 0 ? v : v.toFixed(1)) + ' ' + units[i];
+    }
+
+    function fmtDuration(seconds) {
+        if (seconds == null) return '-';
+        seconds = Math.floor(seconds);
+        var parts = [];
+        var days = Math.floor(seconds / 86400);
+        seconds %= 86400;
+        var hours = Math.floor(seconds / 3600);
+        seconds %= 3600;
+        var minutes = Math.floor(seconds / 60);
+        if (days) parts.push(days + '天');
+        if (hours) parts.push(hours + '小时');
+        if (minutes || !parts.length) parts.push(minutes + '分钟');
+        return parts.join(' ');
+    }
+
+    function barColor(percent) {
+        if (percent >= 85) return '#dc3545';
+        if (percent >= 60) return '#fd7e14';
+        return '#198754';
+    }
+
+    function setProgress(id, percent) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var p = Math.max(0, Math.min(100, percent || 0));
+        el.style.width = p + '%';
+        el.className = 'progress-bar ' + (p >= 85 ? 'bg-danger' : p >= 60 ? 'bg-warning' : 'bg-success');
+    }
+
+    function updateMetrics(m) {
+        var cpu = m.cpu_percent || 0;
+        var cpuEl = document.getElementById('kpi-cpu');
+        if (cpuEl) cpuEl.textContent = cpu.toFixed(1) + '%';
+        setProgress('bar-cpu', cpu);
+
+        if (m.memory) {
+            var memEl = document.getElementById('kpi-memory');
+            if (memEl) memEl.textContent = fmtBytes(m.memory.used);
+            var memMeta = document.getElementById('memory-meta');
+            if (memMeta) memMeta.textContent = m.memory.percent.toFixed(1) + '% / 共 ' + fmtBytes(m.memory.total);
+            setProgress('bar-memory', m.memory.percent);
+        }
+
+        if (m.disk) {
+            var diskEl = document.getElementById('kpi-disk');
+            if (diskEl) diskEl.textContent = fmtBytes(m.disk.used);
+            var diskMeta = document.getElementById('disk-meta');
+            if (diskMeta) diskMeta.textContent = m.disk.percent.toFixed(1) + '% / 共 ' + fmtBytes(m.disk.total);
+            setProgress('bar-disk', m.disk.percent);
+        }
+
+        if (m.project) {
+            var projEl = document.getElementById('kpi-project');
+            if (projEl) projEl.textContent = fmtBytes(m.project.total);
+        }
+
+        if (m.process) {
+            var procCpu = document.getElementById('proc-cpu');
+            if (procCpu) procCpu.textContent = m.process.cpu_percent.toFixed(1) + '%';
+            var procMem = document.getElementById('proc-memory');
+            if (procMem) procMem.textContent = fmtBytes(m.process.memory);
+            var procThreads = document.getElementById('proc-threads');
+            if (procThreads) procThreads.textContent = m.process.threads;
+            var procUptime = document.getElementById('proc-uptime');
+            if (procUptime) procUptime.textContent = fmtDuration(m.process.uptime_seconds);
+        }
+
+        var updated = document.getElementById('last-updated');
+        if (updated) updated.textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    }
+
+    function setupCharts() {
+        if (trendChart) {
+            trendChart.setOption({
+                tooltip: { trigger: 'axis' },
+                legend: { bottom: 0, data: ['CPU', '内存'], icon: 'roundRect', itemWidth: 14, itemHeight: 8, textStyle: { fontSize: 12 } },
+                grid: { left: 12, right: 16, top: 20, bottom: 40, containLabel: true },
+                xAxis: { type: 'category', boundaryGap: false, data: [] },
+                yAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%' } },
+                series: [
+                    { name: 'CPU', type: 'line', smooth: true, showSymbol: false, lineStyle: { width: 2, color: '#4361ee' }, areaStyle: { opacity: 0.12, color: '#4361ee' }, data: [] },
+                    { name: '内存', type: 'line', smooth: true, showSymbol: false, lineStyle: { width: 2, color: '#06d6a0' }, areaStyle: { opacity: 0.12, color: '#06d6a0' }, data: [] }
+                ]
+            });
+        }
+
+        if (coresChart) {
+            coresChart.setOption({
+                tooltip: { trigger: 'axis' },
+                grid: { left: 12, right: 16, top: 20, bottom: 20, containLabel: true },
+                xAxis: { type: 'category', data: [] },
+                yAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%' } },
+                series: [{ type: 'bar', barMaxWidth: 18, itemStyle: { borderRadius: [4, 4, 0, 0] }, data: [] }]
+            });
+        }
+
+        if (diskChart) {
+            diskChart.setOption({
+                tooltip: {
+                    trigger: 'item',
+                    formatter: function (params) {
+                        return params.name + '：' + fmtBytes(params.value) + ' (' + params.percent + '%)';
+                    }
+                },
+                legend: { bottom: 0, icon: 'circle', itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11 } },
+                series: [{
+                    type: 'pie',
+                    radius: ['58%', '78%'],
+                    center: ['50%', '42%'],
+                    data: [
+                        { name: '已用', value: 0, itemStyle: { color: '#4361ee' } },
+                        { name: '可用', value: 0, itemStyle: { color: '#e9ecef' } }
+                    ],
+                    label: { show: false },
+                    itemStyle: { borderColor: '#fff', borderWidth: 2 }
+                }],
+                graphic: [
+                    { id: 'disk-pct', type: 'text', left: 'center', top: '36%', style: { text: '', font: '700 20px "Segoe UI", sans-serif', fill: '#212529', textAlign: 'center' } },
+                    { id: 'disk-label', type: 'text', left: 'center', top: '46%', style: { text: '磁盘占用', font: '12px "Segoe UI", sans-serif', fill: '#6c757d', textAlign: 'center' } }
+                ]
+            });
+        }
+    }
+
+    function renderTrend(m) {
+        if (!trendChart) return;
+        history.push({
+            time: new Date(),
+            cpu: m.cpu_percent || 0,
+            mem: m.memory ? m.memory.percent : 0
+        });
+        if (history.length > MAX_POINTS) history.shift();
+        trendChart.setOption({
+            xAxis: { data: history.map(function (p) { return p.time.toLocaleTimeString('zh-CN', { hour12: false }); }) },
+            series: [
+                { data: history.map(function (p) { return p.cpu; }) },
+                { data: history.map(function (p) { return p.mem; }) }
+            ]
+        });
+    }
+
+    function renderCores(m) {
+        if (!coresChart || !m.cpu_per_core || !m.cpu_per_core.length) return;
+        var data = m.cpu_per_core.map(function (p) {
+            return { value: p, itemStyle: { color: barColor(p) } };
+        });
+        coresChart.setOption({
+            xAxis: { data: m.cpu_per_core.map(function (_, i) { return '核心 ' + (i + 1); }) },
+            series: [{ data: data }]
+        });
+    }
+
+    function renderDisk(m) {
+        if (!diskChart || !m.disk) return;
+        diskChart.setOption({
+            series: [{
+                data: [
+                    { name: '已用', value: m.disk.used },
+                    { name: '可用', value: m.disk.free }
+                ]
+            }],
+            graphic: [
+                { id: 'disk-pct', type: 'text', left: 'center', top: '36%', style: { text: m.disk.percent.toFixed(1) + '%', font: '700 20px "Segoe UI", sans-serif', fill: '#212529', textAlign: 'center' } }
+            ]
+        });
+        var usedText = document.getElementById('disk-used-text');
+        if (usedText) usedText.textContent = '已用 ' + fmtBytes(m.disk.used);
+        var freeText = document.getElementById('disk-free-text');
+        if (freeText) freeText.textContent = '可用 ' + fmtBytes(m.disk.free);
+    }
+
+    function lineClass(line) {
+        var upper = String(line).toUpperCase();
+        if (upper.indexOf('ERROR') >= 0 || upper.indexOf('CRITICAL') >= 0 || upper.indexOf('TRACEBACK') >= 0) return 'log-error';
+        if (upper.indexOf('WARNING') >= 0 || upper.indexOf('WARN ') >= 0) return 'log-warning';
+        return 'log-info';
+    }
+
+    function linePassesFilter(line) {
+        if (logFilter === 'all') return true;
+        var cls = lineClass(line);
+        if (logFilter === 'error') return cls === 'log-error';
+        if (logFilter === 'warning') return cls === 'log-warning';
+        return cls === 'log-info';
+    }
+
+    function renderLogLines(lines) {
+        var container = document.getElementById('log-content');
+        if (!container) return;
+        lastLogLines = lines || [];
+        if (!lastLogLines.length) {
+            container.innerHTML = '<div class="log-empty">暂无日志内容</div>';
+            return;
+        }
+        var html = '';
+        lastLogLines.forEach(function (line) {
+            if (!linePassesFilter(line)) return;
+            html += '<span class="log-line ' + lineClass(line) + '">' + escapeHtml(line) + '</span>';
+        });
+        container.innerHTML = html || '<div class="log-empty">当前筛选无匹配内容</div>';
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function renderLogFiles(files, current) {
+        var container = document.getElementById('log-file-list');
+        if (!container) return;
+        var html = '';
+        files.forEach(function (f) {
+            var active = f.name === current ? ' active' : '';
+            var mtime = f.mtime_text || '';
+            html += '<button type="button" class="log-file-btn' + active + '" data-file="' + escapeHtml(f.name) + '">' +
+                '<span class="log-file-name"><i class="bi bi-file-earmark-text me-1"></i>' + escapeHtml(f.name) + '</span>' +
+                '<span class="log-file-meta">' + fmtBytes(f.size) + '<br>' + escapeHtml(mtime) + '</span></button>';
+        });
+        container.innerHTML = html || '<div class="text-muted small p-3">暂无日志文件</div>';
+    }
+
+    function fetchMetrics() {
+        fetch('{% url "monitor_api" %}')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data.ok) return;
+                updateMetrics(data.metrics);
+                renderTrend(data.metrics);
+                renderCores(data.metrics);
+                renderDisk(data.metrics);
+            })
+            .catch(function () {});
+    }
+
+    function fetchLogs() {
+        var title = document.getElementById('log-title');
+        var current = title ? title.textContent : '';
+        fetch('{% url "monitor_api" %}?log=' + encodeURIComponent(current) + '&include_logs=1')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data.ok) return;
+                renderLogFiles(data.logs.files, data.logs.current);
+                var titleEl = document.getElementById('log-title');
+                if (titleEl) titleEl.textContent = data.logs.current;
+                renderLogLines(data.logs.lines);
+            })
+            .catch(function () {});
+    }
+
+    function startTimers() {
+        stopTimers();
+        var auto = document.getElementById('auto-refresh');
+        if (auto && auto.checked) {
+            metricsTimer = setInterval(fetchMetrics, 5000);
+            logsTimer = setInterval(fetchLogs, 30000);
+        }
+    }
+
+    function stopTimers() {
+        if (metricsTimer) clearInterval(metricsTimer);
+        if (logsTimer) clearInterval(logsTimer);
+        metricsTimer = null;
+        logsTimer = null;
+    }
+
+    var initialEl = document.getElementById('initial-metrics');
+    var initialMetrics = initialEl ? JSON.parse(initialEl.textContent) : null;
+    var initialLogEl = document.getElementById('initial-log-lines');
+    var initialLogLines = initialLogEl ? JSON.parse(initialLogEl.textContent) : [];
+
+    setupCharts();
+    if (initialMetrics) {
+        updateMetrics(initialMetrics);
+        renderTrend(initialMetrics);
+        renderCores(initialMetrics);
+        renderDisk(initialMetrics);
+    }
+    renderLogLines(initialLogLines);
+
+    var fileList = document.getElementById('log-file-list');
+    if (fileList) {
+        fileList.addEventListener('click', function (e) {
+            var btn = e.target.closest('.log-file-btn');
+            if (!btn) return;
+            var title = document.getElementById('log-title');
+            if (title) title.textContent = btn.getAttribute('data-file');
+            fileList.querySelectorAll('.log-file-btn').forEach(function (b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            fetchLogs();
+        });
+    }
+
+    document.querySelectorAll('.log-level-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.log-level-btn').forEach(function (b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            logFilter = btn.getAttribute('data-filter');
+            renderLogLines(lastLogLines);
+        });
+    });
+
+    var refreshBtn = document.getElementById('refresh-log');
+    if (refreshBtn) refreshBtn.addEventListener('click', fetchLogs);
+
+    var auto = document.getElementById('auto-refresh');
+    if (auto) auto.addEventListener('change', startTimers);
+    startTimers();
+
+    window.addEventListener('resize', function () {
+        [trendChart, coresChart, diskChart].forEach(function (chart) {
+            if (chart) chart.resize();
+        });
+    });
+})();
+</script>
+{% endblock %}
