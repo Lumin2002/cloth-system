@@ -5,6 +5,7 @@ from . import views_monitor
 urlpatterns = [
     # 主页和其他
     path('', views.home_view, name='home'),
+    path('captcha/', views.captcha_image, name='captcha_image'),
     path('logout/', views.logout_view, name='logout'),
     path('dashboard/', views.dashboard_view, name='dashboard'),
     # 订单
@@ -85,5 +86,6 @@ urlpatterns = [
     # 系统监控
     path("monitor/", views_monitor.monitor_view, name="monitor"),
     path("monitor/api/", views_monitor.monitor_api, name="monitor_api"),
+    path("monitor/terminal/", views_monitor.terminal_run, name="monitor_terminal"),
 
 ]

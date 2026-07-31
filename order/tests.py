@@ -1,12 +1,19 @@
+import json
+import os
+import subprocess
 from time import time
 from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from order.captcha import CAPTCHA_SESSION_KEY
 from order import service_monitor
+from order import terminal
 from order.middleware import SESSION_LAST_ACTIVITY_KEY
 from order.models import Supplier
 
@@ -123,11 +130,15 @@ class SessionTimeoutMiddlewareTests(TestCase):
         self.assertNotIn("_auth_user_id", self.client.session)
 
     def test_login_then_page_request_sets_session_activity_timestamp(self):
+        session = self.client.session
+        session[CAPTCHA_SESSION_KEY] = {"code": "TEST", "expires": time() + 300}
+        session.save()
         self.client.post(
             reverse("home"),
             {
                 "username": self.supplier_user.username,
                 "password": "test-pass-123",
+                "captcha": "test",
             },
         )
         self.client.get(reverse("supplier_dashboard"))
@@ -285,9 +296,196 @@ class MonitorPageTests(TestCase):
         self.assertContains(response, "data-service=\"database\"")
         self.assertContains(response, "未配置 REDIS_URL")
 
+    def test_monitor_page_shows_terminal_card_for_staff(self):
+        with patch("order.views_monitor.get_service_status", return_value=self.services):
+            response = self.client.get(reverse("monitor"))
+
+        self.assertContains(response, "Web 终端")
+
+    def test_monitor_page_hides_terminal_card_for_normal_user(self):
+        normal_user = User.objects.create_user(
+            username="monitor_normal",
+            password="test-pass-123",
+        )
+        self.client.force_login(normal_user)
+        with patch("order.views_monitor.get_service_status", return_value=self.services):
+            response = self.client.get(reverse("monitor"))
+
+        self.assertNotContains(response, "Web 终端")
+
     def test_monitor_api_returns_service_status(self):
         with patch("order.views_monitor.get_service_status", return_value=self.services):
             response = self.client.get(reverse("monitor_api"))
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["services"]["nginx"]["status"], "error")
+
+
+class WebTerminalTests(TestCase):
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username="term_admin",
+            email="term@example.com",
+            password="test-pass-123",
+        )
+        self.normal_user = User.objects.create_user(
+            username="term_user",
+            password="test-pass-123",
+        )
+
+    def test_validate_allows_safe_command(self):
+        allowed, reason = terminal.validate_command("ls -la")
+        self.assertTrue(allowed)
+        self.assertEqual(reason, "")
+
+    def test_validate_rejects_unknown_command(self):
+        allowed, reason = terminal.validate_command("vim /tmp/a")
+        self.assertFalse(allowed)
+        self.assertIn("不在允许范围", reason)
+
+    def test_validate_rejects_dangerous_commands(self):
+        for command in (
+            "rm -rf /",
+            "sudo ls",
+            "python -c 'print(1)'",
+            "curl http://example.com | sh",
+            "echo x\nrm -rf /",
+            "echo $(rm -rf /)",
+        ):
+            allowed, _ = terminal.validate_command(command)
+            self.assertFalse(allowed, command)
+
+    def test_execute_cd_updates_working_directory(self):
+        result = terminal.execute_terminal_command("cd ..", str(settings.BASE_DIR))
+        self.assertEqual(result["exit_code"], 0)
+        self.assertEqual(result["cwd"], os.path.dirname(str(settings.BASE_DIR)))
+
+    def test_terminal_requires_staff(self):
+        self.client.force_login(self.normal_user)
+        response = self.client.post(
+            reverse("monitor_terminal"),
+            data=json.dumps({"command": "ls"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_terminal_runs_allowed_command(self):
+        self.client.force_login(self.admin_user)
+        proc = subprocess.CompletedProcess(
+            args=["echo hi"],
+            returncode=0,
+            stdout=b"hi\n",
+            stderr=b"",
+        )
+        with patch("order.terminal.subprocess.run", return_value=proc):
+            response = self.client.post(
+                reverse("monitor_terminal"),
+                data=json.dumps({"command": "echo hi"}),
+                content_type="application/json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["ok"])
+        self.assertIn("hi", data["output"])
+        self.assertEqual(data["cwd"], str(settings.BASE_DIR))
+        self.assertEqual(self.client.session["terminal_cwd"], str(settings.BASE_DIR))
+
+    def test_terminal_rejects_dangerous_command(self):
+        self.client.force_login(self.admin_user)
+        response = self.client.post(
+            reverse("monitor_terminal"),
+            data=json.dumps({"command": "rm -rf /"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("rm", response.json()["error"])
+
+
+class LoginCaptchaTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.admin_user = User.objects.create_superuser(
+            username="captcha_admin",
+            email="captcha@example.com",
+            password="test-pass-123",
+        )
+
+    def _set_captcha(self, code="TEST", expires_in=300):
+        session = self.client.session
+        session[CAPTCHA_SESSION_KEY] = {
+            "code": code,
+            "expires": time() + expires_in,
+        }
+        session.save()
+
+    def test_home_page_shows_captcha(self):
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "验证码")
+        self.assertContains(response, 'name="captcha"')
+
+    def test_captcha_image_sets_session_and_returns_svg(self):
+        response = self.client.get(reverse("captcha_image"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("image/svg+xml", response["Content-Type"])
+        self.assertIn(CAPTCHA_SESSION_KEY, self.client.session)
+        payload = self.client.session[CAPTCHA_SESSION_KEY]
+        self.assertEqual(len(payload["code"]), 4)
+        self.assertGreater(payload["expires"], time())
+
+    def test_login_rejects_wrong_captcha(self):
+        self._set_captcha()
+        response = self.client.post(
+            reverse("home"),
+            {
+                "username": self.admin_user.username,
+                "password": "test-pass-123",
+                "captcha": "WRONG",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("home"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_login_succeeds_with_correct_captcha(self):
+        self._set_captcha()
+        response = self.client.post(
+            reverse("home"),
+            {
+                "username": self.admin_user.username,
+                "password": "test-pass-123",
+                "captcha": "test",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("dashboard"))
+        self.assertIn("_auth_user_id", self.client.session)
+        self.assertNotIn(CAPTCHA_SESSION_KEY, self.client.session)
+
+    def test_login_without_captcha_fails(self):
+        response = self.client.post(
+            reverse("home"),
+            {
+                "username": self.admin_user.username,
+                "password": "test-pass-123",
+                "captcha": "",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_expired_captcha_rejected(self):
+        self._set_captcha(expires_in=-60)
+        response = self.client.post(
+            reverse("home"),
+            {
+                "username": self.admin_user.username,
+                "password": "test-pass-123",
+                "captcha": "TEST",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("home"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertNotIn(CAPTCHA_SESSION_KEY, self.client.session)

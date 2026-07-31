@@ -113,6 +113,22 @@
                                         </div>
                                     </div>
 
+                                    <div class="mb-4">
+                                        <label for="captcha" class="form-label fw-bold">验证码</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-light border-end-0">
+                                                <i class="bi bi-shield-lock text-primary"></i>
+                                            </span>
+                                            <input type="text" class="form-control border-start-0" id="captcha" name="captcha"
+                                                   placeholder="请输入验证码" maxlength="6" autocomplete="off" required>
+                                            <button type="button" class="btn btn-outline-secondary p-0 overflow-hidden" id="captcha-refresh"
+                                                    title="点击刷新验证码" style="width: 118px; border-left: 0;">
+                                                <img src="{% url 'captcha_image' %}" id="captcha-image" alt="验证码"
+                                                     class="d-block w-100" style="height: 38px; object-fit: cover;">
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     {% if messages %}
                                         {% for message in messages %}
                                             {% if message.tags == 'error' %}
@@ -183,4 +199,16 @@
     box-shadow: 0 3px 10px rgba(13, 110, 255, 0.25);
 }
 </style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var img = document.getElementById('captcha-image');
+    var btn = document.getElementById('captcha-refresh');
+    if (img && btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            img.src = "{% url 'captcha_image' %}?t=" + Date.now();
+        });
+    }
+});
+</script>
 {% endblock %}

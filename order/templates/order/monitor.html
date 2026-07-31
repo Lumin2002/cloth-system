@@ -11,6 +11,7 @@
     .monitor-page .metric-progress .progress-bar { transition: width .6s ease, background-color .3s ease; }
     .monitor-page .disk-table { font-size: .875rem; }
     .monitor-page .disk-table .progress { height: 6px; }
+    .monitor-page .project-table-wrap { max-height: calc(230px + 3.75rem); overflow-y: auto; }
     .monitor-page .process-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem 1rem; }
     .monitor-page .process-item .label { font-size: .75rem; color: #6c757d; }
     .monitor-page .process-item .value { font-size: 1rem; font-weight: 600; word-break: break-all; }
@@ -29,6 +30,47 @@
     .monitor-page .log-line.log-warning { color: #fcd34d; background: rgba(245, 158, 11, .1); }
     .monitor-page .log-empty { color: #64748b; text-align: center; padding: 2rem 0; }
     .monitor-page .status-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #22c55e; }
+    .monitor-page .terminal-content {
+        background: #0f172a;
+        color: #d1d5db;
+        font-family: Consolas, "Courier New", monospace;
+        font-size: .8rem;
+        line-height: 1.55;
+        height: 360px;
+        overflow-y: auto;
+        padding: .75rem .9rem;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+    .monitor-page .terminal-line { display: block; padding: .1rem 0; }
+    .monitor-page .terminal-line.terminal-command { color: #7dd3fc; }
+    .monitor-page .terminal-line.terminal-error { color: #fca5a5; }
+    .monitor-page .terminal-input-row {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        background: #0b1220;
+        border-top: 1px solid #1e293b;
+        padding: .55rem .9rem;
+    }
+    .monitor-page .terminal-prompt {
+        color: #38bdf8;
+        font-family: Consolas, "Courier New", monospace;
+        font-size: .85rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .monitor-page .terminal-input {
+        flex: 1;
+        min-width: 0;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: #e2e8f0;
+        font-family: Consolas, "Courier New", monospace;
+        font-size: .85rem;
+    }
+    .monitor-page .terminal-input::placeholder { color: #64748b; }
     .monitor-page .service-item { height: 100%; border: 1px solid #e9ecef; border-radius: 10px; padding: .9rem 1rem; background: #fff; }
     .monitor-page .service-name { font-weight: 600; }
     .monitor-page .service-detail { font-size: .8rem; color: #6c757d; margin-top: .25rem; word-break: break-all; }
@@ -36,6 +78,8 @@
 
     @media (max-width: 767.98px) {
         .monitor-page .chart-box, .monitor-page .chart-box-sm { height: 220px; }
+        .monitor-page .project-table-wrap { max-height: calc(220px + 3.75rem); }
+        .monitor-page .terminal-content { height: 320px; }
         .monitor-page .process-grid { grid-template-columns: 1fr; }
         .monitor-page .log-file-list { max-height: 240px; }
         .monitor-page .log-content { max-height: 340px; }
@@ -172,7 +216,7 @@
                 </div>
                 {% if metrics.project.items %}
                 <div class="card-body p-0">
-                    <div class="table-responsive">
+                    <div class="table-responsive project-table-wrap">
                         <table class="table table-sm table-hover data-table disk-table mb-0 align-middle">
                             <thead>
                                 <tr>
@@ -330,6 +374,30 @@
             </div>
         </div>
     </div>
+    {% if request.user.is_staff %}
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card card-flat h-100">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h6 class="mb-0"><i class="bi bi-terminal me-2 text-primary"></i>Web 终端</h6>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="terminal-clear" title="清空">
+                        <i class="bi bi-eraser"></i>
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="terminal-content" id="terminal-output" aria-label="终端输出"></div>
+                    <div class="terminal-input-row">
+                        <span class="terminal-prompt" id="terminal-prompt">$</span>
+                        <input type="text" id="terminal-input" class="terminal-input" placeholder="输入命令" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="终端输入">
+                        <button type="button" class="btn btn-sm btn-primary" id="terminal-send" title="执行">
+                            <i class="bi bi-play-fill"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 {{ metrics|json_script:"initial-metrics" }}
@@ -725,6 +793,126 @@
             if (chart) chart.resize();
         });
     });
+
+    var termOutput = document.getElementById('terminal-output');
+    var termInput = document.getElementById('terminal-input');
+    var termSend = document.getElementById('terminal-send');
+    var termClear = document.getElementById('terminal-clear');
+    var termPrompt = document.getElementById('terminal-prompt');
+    var termRunning = false;
+    var termHistory = [];
+    var termHistoryIndex = 0;
+    var termCwd = '';
+    var termPathEl = document.getElementById('project-path');
+    if (termPathEl) termCwd = termPathEl.textContent.trim();
+
+    function renderTermPrompt() {
+        if (!termPrompt) return;
+        termPrompt.textContent = (termCwd ? termCwd + ' ' : '') + '$';
+    }
+
+    function termAppend(text, cls) {
+        if (!termOutput || !text) return;
+        var line = document.createElement('span');
+        line.className = 'terminal-line' + (cls ? ' ' + cls : '');
+        line.textContent = text;
+        termOutput.appendChild(line);
+        termOutput.scrollTop = termOutput.scrollHeight;
+    }
+
+    function termSetRunning(running) {
+        termRunning = running;
+        if (termInput) termInput.disabled = running;
+        if (termSend) {
+            termSend.disabled = running;
+            var icon = termSend.querySelector('i');
+            if (icon) icon.className = running ? 'bi bi-hourglass-split' : 'bi bi-play-fill';
+        }
+    }
+
+    function termRun() {
+        if (termRunning || !termInput) return;
+        var command = termInput.value.trim();
+        if (!command) return;
+        var lower = command.toLowerCase();
+        if (lower === 'clear' || lower === 'cls') {
+            if (termOutput) termOutput.innerHTML = '';
+            termInput.value = '';
+            termInput.focus();
+            return;
+        }
+        termHistory.push(command);
+        termHistoryIndex = termHistory.length;
+        termInput.value = '';
+        termAppend((termCwd ? termCwd + ' ' : '') + '$ ' + command, 'terminal-command');
+        termSetRunning(true);
+        fetch('{% url "monitor_terminal" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({command: command})
+        })
+            .then(function (res) {
+                return res.json().then(function (data) {
+                    return {status: res.status, data: data};
+                });
+            })
+            .then(function (r) {
+                if (r.status >= 400) {
+                    termAppend(r.data.error || '请求失败：' + r.status, 'terminal-error');
+                    return;
+                }
+                if (r.data.clear && termOutput) termOutput.innerHTML = '';
+                if (r.data.cwd) {
+                    termCwd = r.data.cwd;
+                    renderTermPrompt();
+                }
+                if (r.data.output) {
+                    termAppend(r.data.output, r.data.exit_code === 0 ? '' : 'terminal-error');
+                }
+            })
+            .catch(function () {
+                termAppend('请求失败，请稍后重试', 'terminal-error');
+            })
+            .then(function () {
+                termSetRunning(false);
+                if (termInput) termInput.focus();
+            });
+    }
+
+    if (termInput) {
+        termInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                termRun();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (!termHistory.length) return;
+                if (termHistoryIndex > 0) termHistoryIndex--;
+                termInput.value = termHistory[termHistoryIndex];
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (termHistoryIndex < termHistory.length - 1) {
+                    termHistoryIndex++;
+                    termInput.value = termHistory[termHistoryIndex];
+                } else {
+                    termHistoryIndex = termHistory.length;
+                    termInput.value = '';
+                }
+            }
+        });
+    }
+    if (termSend) termSend.addEventListener('click', termRun);
+    if (termClear) {
+        termClear.addEventListener('click', function () {
+            if (termOutput) termOutput.innerHTML = '';
+        });
+    }
+    renderTermPrompt();
+    if (termInput && !termInput.disabled) termInput.focus();
 })();
 </script>
 {% endblock %}

@@ -46,6 +46,7 @@ from .dashboard_stats import (
 from .decorators import admin_required, validate_file_upload
 # 会话超时功能已注释停用，后续需要时恢复本行
 # from .middleware import mark_session_activity
+from .captcha import clear_captcha, render_captcha_svg, set_captcha, verify_captcha
 from .forms import (
     CREATE_DEFAULTS,
     ORDER_CREATE_PRIMARY_COUNT,
@@ -130,6 +131,10 @@ def home_view(request):
             return redirect("home")
         cache.set(rate_key, attempts + 1, 60)
 
+        if not verify_captcha(request, request.POST.get("captcha")):
+            messages.error(request, "验证码错误或已过期，请重新输入")
+            return redirect("home")
+
         user = authenticate(
             request,
             username=request.POST.get("username"),
@@ -140,6 +145,7 @@ def home_view(request):
                 messages.error(request, t("auth.supplier_disabled"))
                 return redirect("home")
             login(request, user)
+            clear_captcha(request)
             # mark_session_activity(request)  # 会话超时功能已注释停用
             logger.info(t("log.login", username=request.POST.get("username")))
             if hasattr(user, "supplier_profile"):
@@ -168,6 +174,18 @@ def home_view(request):
         return redirect("dashboard")
 
     return render(request, "order/home.html")
+
+
+@require_GET
+def captcha_image(request):
+    code = set_captcha(request)
+    response = HttpResponse(
+        render_captcha_svg(code),
+        content_type="image/svg+xml; charset=utf-8",
+    )
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    return response
 
 
 @login_required

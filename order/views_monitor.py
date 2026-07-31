@@ -1,11 +1,15 @@
 """系统监控页面与数据接口。"""
+import json
+import os
+import subprocess
 from datetime import datetime
 from datetime import timezone as std_timezone
 
+from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 
 from .decorators import admin_required
 from .monitor import (
@@ -16,6 +20,7 @@ from .monitor import (
     resolve_log_file,
 )
 from .service_monitor import get_service_status
+from .terminal import COMMAND_TIMEOUT, execute_terminal_command, validate_command
 
 
 def _log_payload(log_name="", limit=200, include_content=True):
@@ -68,4 +73,45 @@ def monitor_api(request):
         "metrics": get_metrics(blocking=False),
         "logs": logs,
         "services": get_service_status(),
+    })
+
+
+@admin_required
+@require_POST
+def terminal_run(request):
+    """管理员 Web 终端：执行受限命令并返回输出。"""
+    if not request.user.is_staff:
+        return JsonResponse({"ok": False, "error": "需要管理员权限"}, status=403)
+
+    try:
+        payload = json.loads(request.body or b"{}")
+    except (TypeError, ValueError):
+        return JsonResponse({"ok": False, "error": "请求格式错误"}, status=400)
+
+    command = str(payload.get("command") or "").strip()
+    allowed, reason = validate_command(command)
+    if not allowed:
+        return JsonResponse({"ok": False, "error": reason}, status=400)
+
+    cwd = request.session.get("terminal_cwd") or str(settings.BASE_DIR)
+    if not os.path.isdir(cwd):
+        cwd = str(settings.BASE_DIR)
+
+    try:
+        result = execute_terminal_command(command, cwd)
+    except subprocess.TimeoutExpired:
+        return JsonResponse(
+            {"ok": False, "error": f"命令执行超时（{COMMAND_TIMEOUT} 秒）"},
+            status=408,
+        )
+    except OSError as exc:
+        return JsonResponse({"ok": False, "error": f"命令执行失败：{exc}"}, status=500)
+
+    request.session["terminal_cwd"] = result["cwd"]
+    return JsonResponse({
+        "ok": True,
+        "output": result.get("output", ""),
+        "exit_code": result.get("exit_code", 0),
+        "cwd": result["cwd"],
+        "clear": bool(result.get("clear")),
     })
