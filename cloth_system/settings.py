@@ -33,19 +33,13 @@ LOG_DIR.mkdir(exist_ok=True)
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-l-4zrti7cld8ye2v@%yitl5g($p#=ty+fta)r!zgs$ygc$az%p')
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-replace-me-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
-# FRP穿透主机放行
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    # "192.168.*",  # removed wildcard - too permissive for Host header validation
-    "your-nginx.example.com",
-    "your-nginx.example.com:40614"
-]
+# 允许访问的主机（生产环境通过 .env 的 DJANGO_ALLOWED_HOSTS 配置公网域名）
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 
 
 # Application definition
@@ -244,16 +238,13 @@ SUPPLIER_SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SUPPLIER_SESSION_IDL
 SUPERUSER_SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SUPERUSER_SESSION_IDLE_TIMEOUT_MINUTES", "15"))
 SESSION_TIMEOUT_WARNING_SECONDS = int(os.environ.get("SESSION_TIMEOUT_WARNING_SECONDS", "60"))
 
-# Nginx 健康探测地址（生产使用 FRP 公网地址；本地可改成 http://127.0.0.1:8233/）
-NGINX_CHECK_URL = os.environ.get("NGINX_CHECK_URL", "https://your-nginx.example.com:40614")
+# Nginx 健康探测地址（生产环境通过 .env 的 NGINX_CHECK_URL 配置公网地址；未配置时监控页显示"未配置"）
+NGINX_CHECK_URL = os.environ.get("NGINX_CHECK_URL", "")
 
 # ===================== FRP HTTPS穿透兼容 =====================
 # 信任FRP外网HTTPS地址，提交表单不报400/403
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    # "http://your-nginx.example.com:40614",  # removed - insecure HTTP, use HTTPS only
-    "https://your-nginx.example.com:40614",
+    *[o.strip() for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()],
 ]
 
 # 代理转发请求头兼容

@@ -241,5 +241,5 @@ python manage.py runserver
 
 - 监控页新增数据库、Redis、Nginx 状态卡片，展示正常 / 异常 / 未配置及响应延迟
 - 数据库按 Django 当前配置探测（MySQL 或 SQLite 均可），Redis 仅在配置 `REDIS_URL` 时探测
-- Nginx 通过 `NGINX_CHECK_URL` 探测，生产默认使用 `https://your-nginx.example.com:40614`，使用 GET 请求并兼容自签名证书
+- Nginx 通过 `NGINX_CHECK_URL` 探测，生产使用 FRP 公网地址（如 `https://your-nginx.example.com:40614`），使用 GET 请求并兼容自签名证书
 - 服务未配置时显示“未配置”，不会导致监控页报错

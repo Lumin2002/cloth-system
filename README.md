@@ -151,7 +151,7 @@ python manage.py fix_progress_stages
 
 - 数据库使用 Django 当前配置探测，MySQL 或 SQLite 均可
 - Redis 仅在配置 `REDIS_URL` 时探测
-- Nginx 使用 `NGINX_CHECK_URL`，生产默认通过 FRP 公网地址探测
+- Nginx 使用 `NGINX_CHECK_URL`，生产通过 FRP 公网地址探测
 - 未配置的服务显示“未配置”，不会影响监控页
 
 ## 部署上线
