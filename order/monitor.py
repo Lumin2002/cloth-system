@@ -1,6 +1,7 @@
 """系统监控数据采集工具。"""
 import os
 import platform
+import re
 import time
 from pathlib import Path
 
@@ -16,6 +17,9 @@ except ImportError:  # pragma: no cover - psutil 在 requirements 中
 
 PROJECT_SIZE_CACHE_KEY = "monitor:project_size:v1"
 PROJECT_SIZE_CACHE_TTL = 60
+
+# 系统监控只展示应用日志（django-info.log / django-error.log 及其轮转备份）
+APP_LOG_RE = re.compile(r"^django-.*\.log(\.\d+)?$")
 
 # 统计项目磁盘占用时跳过的环境/版本库目录
 SKIP_DIRS = {".venv", ".git", "node_modules", "__pycache__", ".idea", ".vscode"}
@@ -192,6 +196,8 @@ def get_log_files():
     for entry in entries:
         try:
             if not entry.is_file():
+                continue
+            if not APP_LOG_RE.match(entry.name):
                 continue
             stat = entry.stat()
             files.append({

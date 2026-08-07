@@ -26,6 +26,9 @@
             </div>
             <div class="col-lg-4 mt-3 mt-lg-0">
                 <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                    <a href="{{ request.get_full_path }}" class="btn btn-outline-secondary btn-sm" title="刷新列表（保留当前筛选）">
+                        <i class="bi bi-arrow-clockwise me-1"></i> 刷新
+                    </a>
                     <a href="{% url 'order_create' %}" class="btn btn-primary btn-sm">
                         <i class="bi bi-plus-lg me-1"></i> 新增订单
                     </a>
@@ -125,58 +128,48 @@
         </div>
     </div>
 
-    <!-- 筛选条件 -->
-    <div class="card card-flat mb-4">
-        <div class="card-header">
+    <!-- 搜索框（明细上方） -->
+    <form method="get" id="order-search-bar" class="card card-flat mb-3">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-5">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" name="search" class="form-control"
+                               placeholder="搜索序号、客户、布种、订单号、款号、供应商、跟单员…"
+                               value="{{ request.GET.search }}">
+                    </div>
+                </div>
+                <div class="col-auto d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-search me-1"></i>搜索
+                    </button>
+                    {% if request.GET.search %}
+                    <a href="{% url 'order_list' %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-x-lg me-1"></i>清空
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- 筛选条件（搜索框下方） -->
+    <div class="card card-flat mb-3">
+        <div class="card-header py-2">
             <button class="btn btn-link text-decoration-none text-dark p-0 fw-bold w-100 text-start d-flex align-items-center justify-content-between"
-                    type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse"
-                    aria-expanded="{% if active_filters %}true{% else %}false{% endif %}"
-                    aria-controls="filterCollapse">
+                    type="button" data-bs-toggle="collapse" data-bs-target="#orderFilterCollapse"
+                    aria-expanded="{% if filter_panel_open %}true{% else %}false{% endif %}"
+                    aria-controls="orderFilterCollapse">
                 <span><i class="bi bi-funnel me-2 text-primary"></i>筛选条件</span>
                 <i class="bi bi-chevron-down"></i>
             </button>
         </div>
-        <div id="filterCollapse" class="collapse {% if active_filters %}show{% endif %}">
+        <div id="orderFilterCollapse" class="collapse {% if filter_panel_open %}show{% endif %}">
             <div class="card-body">
                 <form method="get" id="order-filter-form">
                     <div class="row g-3">
-                        <div class="col-lg-4 col-md-6">
-                            <label class="form-label small text-muted mb-1">关键字</label>
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text"><i class="bi bi-search"></i></span>
-                                <input type="text" name="search" class="form-control"
-                                       placeholder="序号、客户、布种、订单号、款号、供应商"
-                                       value="{{ request.GET.search }}">
-                            </div>
-                        </div>
-                        <div class="col-lg-2 col-md-3 col-6">
-                            <label class="form-label small text-muted mb-1">客户</label>
-                            <select name="customer" class="form-select form-select-sm">
-                                <option value="">全部客户</option>
-                                {% for c in customers %}
-                                <option value="{{ c }}" {% if request.GET.customer == c %}selected{% endif %}>{{ c }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-lg-2 col-md-3 col-6">
-                            <label class="form-label small text-muted mb-1">成品供应商</label>
-                            <select name="supplier" class="form-select form-select-sm">
-                                <option value="">全部供应商</option>
-                                {% for s in suppliers %}
-                                <option value="{{ s }}" {% if request.GET.supplier == s %}selected{% endif %}>{{ s }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-lg-2 col-md-3 col-6">
-                            <label class="form-label small text-muted mb-1">订单状态</label>
-                            <select name="order_status" class="form-select form-select-sm">
-                                <option value="">全部状态</option>
-                                {% for value, label in order_status_choices %}
-                                <option value="{{ value }}" {% if request.GET.order_status == value %}selected{% endif %}>{{ label }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-lg-2 col-md-3 col-6">
+                        <div class="col-lg-2 col-md-4">
                             <label class="form-label small text-muted mb-1">订单类型</label>
                             <select name="order_type" class="form-select form-select-sm">
                                 <option value="">全部类型</option>
@@ -185,8 +178,8 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-lg-2 col-md-3 col-6">
-                            <label class="form-label small text-muted mb-1">客户是否付款</label>
+                        <div class="col-lg-2 col-md-4">
+                            <label class="form-label small text-muted mb-1">客户付款</label>
                             <select name="payment_status" class="form-select form-select-sm">
                                 <option value="">全部</option>
                                 {% for value, label in payment_status_choices %}
@@ -194,7 +187,7 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-lg-2 col-md-3 col-6">
+                        <div class="col-lg-2 col-md-4">
                             <label class="form-label small text-muted mb-1">是否逾期</label>
                             <select name="overdue_status" class="form-select form-select-sm">
                                 <option value="">全部</option>
@@ -203,29 +196,41 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-lg-2 col-md-3 col-6">
-                            <label class="form-label small text-muted mb-1">供应商是否付款</label>
+                        <div class="col-lg-2 col-md-4">
+                            <label class="form-label small text-muted mb-1">供应商付款</label>
                             <select name="supplier_paid" class="form-select form-select-sm">
                                 <option value="">全部</option>
-                                <option value="True" {% if request.GET.supplier_paid == "True" %}selected{% endif %}>已付款</option>
-                                <option value="False" {% if request.GET.supplier_paid == "False" %}selected{% endif %}>未付款</option>
+                                {% for value, label in supplier_paid_choices %}
+                                <option value="{{ value }}" {% if request.GET.supplier_paid == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
                             </select>
                         </div>
-                        <div class="col-lg-2 col-md-3 col-6">
-                            <label class="form-label small text-muted mb-1">下单日期从</label>
-                            <input type="date" name="start_date" class="form-control form-control-sm"
-                                   value="{{ request.GET.start_date }}">
+                        <div class="col-lg-2 col-md-4">
+                            <label class="form-label small text-muted mb-1">订单状态</label>
+                            <select name="order_status" class="form-select form-select-sm">
+                                <option value="">全部状态</option>
+                                {% for value, label in order_status_choices %}
+                                <option value="{{ value }}" {% if request.GET.order_status == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
-                        <div class="col-lg-2 col-md-3 col-6">
-                            <label class="form-label small text-muted mb-1">下单日期至</label>
-                            <input type="date" name="end_date" class="form-control form-control-sm"
-                                   value="{{ request.GET.end_date }}">
+                        <div class="col-lg-3 col-md-6">
+                            <label class="form-label small text-muted mb-1">下单日期</label>
+                            <div class="d-flex align-items-center gap-1">
+                                <input type="date" name="start_date" class="form-control form-control-sm"
+                                       value="{{ request.GET.start_date }}" title="从">
+                                <span class="text-muted small">~</span>
+                                <input type="date" name="end_date" class="form-control form-control-sm"
+                                       value="{{ request.GET.end_date }}" title="至">
+                            </div>
                         </div>
-                        <div class="col-lg-2 col-md-3 col-6">
-                            <label class="form-label small text-muted mb-1">每页条数</label>
-                            <select name="per_page" class="form-select form-select-sm">
-                                {% for size in per_page_options %}
-                                <option value="{{ size }}" {% if per_page == size %}selected{% endif %}>{{ size }} 条/页</option>
+                        <div class="col-lg-3 col-md-6">
+                            <label class="form-label small text-muted mb-1">排序</label>
+                            <select name="order_sort" class="form-select form-select-sm">
+                                <option value="">默认排序</option>
+                                {% for sort_key, dir_key, label in sort_options %}
+                                <option value="{{ sort_key }}_{{ dir_key }}"
+                                        {% if request.GET.sort == sort_key and request.GET.dir == dir_key %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -239,39 +244,6 @@
                         </div>
                     </div>
                 </form>
-
-                {% if active_filters %}
-                <div class="mt-3 pt-3 border-top">
-                    <span class="small text-muted me-2">当前筛选：</span>
-                    {% if request.GET.search %}
-                    <span class="badge bg-light text-dark border me-1">关键字: {{ request.GET.search }}</span>
-                    {% endif %}
-                    {% if request.GET.customer %}
-                    <span class="badge bg-light text-dark border me-1">客户: {{ request.GET.customer }}</span>
-                    {% endif %}
-                    {% if request.GET.supplier %}
-                    <span class="badge bg-light text-dark border me-1">供应商: {{ request.GET.supplier }}</span>
-                    {% endif %}
-                    {% if request.GET.order_status %}
-                    <span class="badge bg-light text-dark border me-1">状态: {{ request.GET.order_status }}</span>
-                    {% endif %}
-                    {% if request.GET.order_type %}
-                    <span class="badge bg-light text-dark border me-1">类型: {{ request.GET.order_type }}</span>
-                    {% endif %}
-                    {% if request.GET.payment_status %}
-                    <span class="badge bg-light text-dark border me-1">付款状态: {{ request.GET.payment_status }}</span>
-                    {% endif %}
-                    {% if request.GET.overdue_status %}
-                    <span class="badge bg-light text-dark border me-1">逾期状态: {{ request.GET.overdue_status }}</span>
-                    {% endif %}
-                    {% if request.GET.supplier_paid %}
-                    <span class="badge bg-light text-dark border me-1">供应商付款: {{ request.GET.supplier_paid }}</span>
-                    {% endif %}
-                    {% if request.GET.start_date or request.GET.end_date %}
-                    <span class="badge bg-light text-dark border me-1">日期: {{ request.GET.start_date|default:"起" }} ~ {{ request.GET.end_date|default:"今" }}</span>
-                    {% endif %}
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
@@ -322,10 +294,29 @@
         </div>
 
         <div class="card card-flat">
-            <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <h6 class="mb-0 fw-bold"><i class="bi bi-table me-2"></i>订单明细</h6>
-                {% if page_obj %}
-                <span class="small text-muted">本页 {{ page_obj|length }} 条</span>
+            <div class="card-header">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-table me-2"></i>订单明细
+                        {% if active_filters %}<span class="badge bg-primary-subtle text-primary ms-2">已筛选</span>{% endif %}
+                    </h6>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        {% if page_obj %}
+                        <span class="small text-muted">本页 {{ page_obj|length }} 条</span>
+                        {% endif %}
+                        {% if active_filters %}
+                        <a href="{% url 'order_list' %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i>清空筛选
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if active_filter_badges %}
+                <div class="d-flex flex-wrap align-items-center gap-1 mt-2 pt-2 border-top">
+                    <span class="small text-muted me-1"><i class="bi bi-funnel me-1"></i>当前筛选：</span>
+                    {% for label, value in active_filter_badges %}
+                    <span class="badge bg-light text-dark border fw-normal">{{ label }}: {{ value }}</span>
+                    {% endfor %}
+                </div>
                 {% endif %}
             </div>
             <div class="card-body p-0">
@@ -606,6 +597,64 @@ function doStatement() {
     btn.addEventListener('click', function () {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
+})();
+
+// 搜索框 + 筛选表单（保留其他参数，仅重置页码）
+(function () {
+    function currentParams() {
+        return new URLSearchParams(window.location.search);
+    }
+
+    function go(params) {
+        params.delete('page');
+        if (params.toString() === currentParams().toString()) return;
+        window.location.search = params.toString();
+    }
+
+    function setParam(name, value) {
+        var params = currentParams();
+        if (value) { params.set(name, value); } else { params.delete(name); }
+        go(params);
+    }
+
+    // 上方搜索框：提交时合并当前 URL 参数（保留表头筛选/排序）
+    var searchBar = document.getElementById('order-search-bar');
+    if (searchBar) {
+        searchBar.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var params = currentParams();
+            var el = searchBar.querySelector('[name="search"]');
+            var v = (el ? el.value : '').trim();
+            if (v) { params.set('search', v); } else { params.delete('search'); }
+            go(params);
+        });
+    }
+
+    // 筛选表单：提交时合并当前 URL 参数（保留搜索词等）
+    var filterForm = document.getElementById('order-filter-form');
+    if (filterForm) {
+        filterForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var params = currentParams();
+            var fd = new FormData(filterForm);
+            var fields = ['order_type', 'payment_status', 'overdue_status', 'supplier_paid',
+                          'order_status', 'start_date', 'end_date'];
+            fields.forEach(function (name) {
+                var v = (fd.get(name) || '').trim();
+                if (v) { params.set(name, v); } else { params.delete(name); }
+            });
+            var sortVal = (fd.get('order_sort') || '').trim();
+            if (sortVal) {
+                var parts = sortVal.split('_');
+                params.set('sort', parts[0]);
+                params.set('dir', parts[1] || 'asc');
+            } else {
+                params.delete('sort');
+                params.delete('dir');
+            }
+            go(params);
+        });
+    }
 })();
 
 document.addEventListener("click", function(e){

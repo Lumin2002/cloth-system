@@ -71,7 +71,12 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><strong>订单列表</strong></span>
-        <span class="text-muted small">{{ total_count }} 条记录</span>
+        <span class="d-flex align-items-center gap-2">
+            <a href="{{ request.get_full_path }}" class="btn btn-sm btn-outline-secondary" title="刷新列表（保留当前筛选）">
+                <i class="bi bi-arrow-clockwise me-1"></i>刷新
+            </a>
+            <span class="text-muted small">{{ total_count }} 条记录</span>
+        </span>
     </div>
     <div class="table-responsive">
         <table class="table table-hover mb-0">

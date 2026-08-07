@@ -1,0 +1,22 @@
+{% extends 'order/settings_base.html' %}
+
+{% block title %}管理员账号设置 - 系统设置{% endblock %}
+
+{% block settings_content %}
+<h5 class="fw-bold mb-1"><i class="bi bi-person-gear me-2 text-primary"></i>管理员账号设置</h5>
+<p class="text-muted small mb-3">管理后台登录账号、密码修改与权限分配。</p>
+
+<div class="alert alert-light border small">
+    <i class="bi bi-info-circle me-1 text-primary"></i>
+    账号、密码与权限管理使用 Django 管理后台完成：可创建管理员、修改密码、分配超级用户/普通管理员权限。
+</div>
+
+<div class="d-flex flex-wrap gap-2">
+    <a href="/admin/auth/user/" class="btn btn-primary btn-sm">
+        <i class="bi bi-people me-1"></i>管理用户账号
+    </a>
+    <a href="/admin/" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-gear-wide-connected me-1"></i>管理后台首页
+    </a>
+</div>
+{% endblock %}

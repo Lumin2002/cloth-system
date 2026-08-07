@@ -8,6 +8,8 @@ from django.contrib.auth import logout
 from django.http import JsonResponse
 from django.shortcuts import redirect
 
+from .logging_context import clear_request, set_request
+
 SESSION_LAST_ACTIVITY_KEY = "_session_last_activity"
 
 # 这些轮询接口不应被当作“用户正在操作”，避免后台请求无限续期会话
@@ -43,6 +45,20 @@ def mark_session_activity(request):
 
 def _is_background_poll(request):
     return any(request.path.startswith(prefix) for prefix in _BACKGROUND_POLL_PATHS)
+
+
+class RequestLogContextMiddleware:
+    """把当前请求放入线程局部变量，供日志过滤器提取用户名与 IP。"""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        set_request(request)
+        try:
+            return self.get_response(request)
+        finally:
+            clear_request()
 
 
 class SessionTimeoutMiddleware:

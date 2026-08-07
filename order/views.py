@@ -16,10 +16,13 @@ from django.db import transaction
 from django.db import models
 from django.db.models import (
     Count,
+    DateField,
+    DecimalField,
     Exists,
     ExpressionWrapper,
     F,
     FloatField,
+    IntegerField,
     OuterRef,
     Prefetch,
     Q,
@@ -127,6 +130,7 @@ def home_view(request):
         rate_key = f"login_rate:{ip}"
         attempts = cache.get(rate_key, 0)
         if attempts >= 5:
+            logger.warning(t("log.login_rate_limited", ip=ip))
             messages.error(request, "登录尝试过于频繁，请60秒后再试")
             return redirect("home")
         cache.set(rate_key, attempts + 1, 60)
@@ -163,6 +167,7 @@ def home_view(request):
         except Exception:
             pass
 
+        logger.warning(t("log.login_failed", username=request.POST.get("username", ""), ip=ip))
         messages.error(request, t("auth.login_error"))
 
     if request.user.is_authenticated:
@@ -400,6 +405,14 @@ class OrderListView(LoginRequiredMixin, ListView):
     context_object_name = "orders"
     paginate_by = 20
     per_page_options = (10, 20, 50, 100)
+    SORTABLE_FIELDS = {
+        "serial": "_sort_serial",
+        "date": "_sort_date",
+        "qty": "_sort_qty",
+        "price": "_sort_price",
+        "balance": "_sort_balance_amount",
+        "cost": "_sort_total_cost",
+    }
 
     def get_paginate_by(self, queryset):
         try:
@@ -416,9 +429,32 @@ class OrderListView(LoginRequiredMixin, ListView):
         ).values("order").annotate(
             total=Sum("quantity")
         ).values("total")[:1]
-        return qs.annotate(
+        qs = qs.annotate(
             _ship_qty=Coalesce(Subquery(ship_subq, output_field=FloatField()), Value(0.0), output_field=FloatField())
+        ).annotate(
+            _sort_serial=Coalesce(F("serial_number"), Value(0), output_field=IntegerField()),
+            _sort_date=Coalesce(F("order_date"), Value(date(1970, 1, 1)), output_field=DateField()),
+            _sort_qty=Coalesce(F("order_quantity"), Value(0), output_field=DecimalField(max_digits=15, decimal_places=2)),
+            _sort_price=Coalesce(F("price"), Value(0), output_field=DecimalField(max_digits=15, decimal_places=2)),
+            _sort_balance_amount=ExpressionWrapper(
+                Coalesce(F("price"), Value(0)) * F("_ship_qty"),
+                output_field=FloatField(),
+            ),
+            _sort_total_cost=ExpressionWrapper(
+                Coalesce(F("finished_product_cost_price"), Value(0)) * F("_ship_qty"),
+                output_field=FloatField(),
+            ),
         )
+        # 表头排序：白名单字段，升/降序
+        sort_key = self.request.GET.get("sort", "")
+        direction = str(self.request.GET.get("dir", "desc")).lower()
+        if sort_key in self.SORTABLE_FIELDS:
+            field = self.SORTABLE_FIELDS[sort_key]
+            if direction == "asc":
+                qs = qs.order_by(field, "-order_date", "-serial_number")
+            else:
+                qs = qs.order_by("-" + field, "-order_date", "-serial_number")
+        return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -470,7 +506,9 @@ class OrderListView(LoginRequiredMixin, ListView):
             k in params
             for k in [
                 "search",
+                "serial",
                 "customer",
+                "cloth",
                 "payment_status",
                 "overdue_status",
                 "order_type",
@@ -482,21 +520,94 @@ class OrderListView(LoginRequiredMixin, ListView):
             ]
         )
 
-        # 筛选下拉用的客户列表
-        ctx["customer_list"] = (
-            ClothOrder.objects.values_list("customer", flat=True)
-            .filter(customer__gt="")
-            .distinct()
-            .order_by("customer")
+        # 筛选面板是否自动展开（仅搜索关键词时保持折叠）
+        ctx["filter_panel_open"] = any(
+            k in params
+            for k in [
+                "order_type",
+                "payment_status",
+                "overdue_status",
+                "supplier_paid",
+                "order_status",
+                "start_date",
+                "end_date",
+                "sort",
+                "dir",
+            ]
         )
 
-        # 筛选下拉用的供应商列表
-        ctx["supplier_list"] = (
-            ClothOrder.objects.values_list("finished_product_supplier", flat=True)
-            .filter(finished_product_supplier__gt="")
-            .distinct()
-            .order_by("finished_product_supplier")
-        )
+        # 当前筛选内容（显示在列表表头上方）
+        def _choice_label(choices, value):
+            for v, label in choices:
+                if v == value:
+                    return label
+            return value
+
+        badges = []
+        if search := params.get("search", "").strip():
+            badges.append(("搜索", search))
+        if serial := params.get("serial", "").strip():
+            badges.append(("序号", serial))
+        if customer := params.get("customer", "").strip():
+            badges.append(("客户/跟单员", customer))
+        if cloth := params.get("cloth", "").strip():
+            badges.append(("布种/颜色", cloth))
+        if supplier := params.get("supplier", "").strip():
+            badges.append(("供应商/档口", supplier))
+        if order_type := params.get("order_type", "").strip():
+            badges.append(("类型", _choice_label(ClothOrder.ORDER_TYPE_CHOICES, order_type)))
+        if payment := params.get("payment_status", "").strip():
+            badges.append(("客户付款", _choice_label(ClothOrder.PAYMENT_STATUS_CHOICES, payment)))
+        if overdue := params.get("overdue_status", "").strip():
+            badges.append(("逾期", _choice_label(ClothOrder.OVERDUE_STATUS_CHOICES, overdue)))
+        if paid := params.get("supplier_paid", "").strip():
+            paid_label = "已付款" if paid in ("True", "true", "yes", "1") else (
+                "未付款" if paid in ("False", "false", "no", "0") else paid
+            )
+            badges.append(("供应商付款", paid_label))
+        if status := params.get("order_status", "").strip():
+            badges.append(("订单状态", _choice_label(ClothOrder.ORDER_STATUS_CHOICES, status)))
+        if start := params.get("start_date", "").strip():
+            end = params.get("end_date", "").strip()
+            badges.append(("下单日期", f"{start} ~ {end or '今'}"))
+        elif end := params.get("end_date", "").strip():
+            badges.append(("下单日期", f"起 ~ {end}"))
+        if sort_key := params.get("sort", "").strip():
+            sort_names = {
+                "serial": "序号",
+                "date": "下单日期",
+                "qty": "数量",
+                "price": "价格",
+                "balance": "对账金额",
+                "cost": "总成本",
+            }
+            dir_label = "升序" if params.get("dir", "desc") == "asc" else "降序"
+            badges.append(("排序", f"{sort_names.get(sort_key, sort_key)} {dir_label}"))
+        ctx["active_filter_badges"] = badges
+
+        # 表头筛选下拉的选项
+        ctx["order_status_choices"] = ClothOrder.ORDER_STATUS_CHOICES
+        ctx["order_type_choices"] = ClothOrder.ORDER_TYPE_CHOICES
+        ctx["payment_status_choices"] = ClothOrder.PAYMENT_STATUS_CHOICES
+        ctx["overdue_status_choices"] = ClothOrder.OVERDUE_STATUS_CHOICES
+        ctx["supplier_paid_choices"] = [
+            ("True", "已付款"),
+            ("False", "未付款"),
+        ]
+        ctx["sort_options"] = [
+            ("serial", "asc", "序号 升序"),
+            ("serial", "desc", "序号 降序"),
+            ("date", "asc", "下单日期 升序"),
+            ("date", "desc", "下单日期 降序"),
+            ("qty", "asc", "数量 升序"),
+            ("qty", "desc", "数量 降序"),
+            ("price", "asc", "价格 升序"),
+            ("price", "desc", "价格 降序"),
+            ("balance", "asc", "对账金额 升序"),
+            ("balance", "desc", "对账金额 降序"),
+            ("cost", "asc", "总成本 升序"),
+            ("cost", "desc", "总成本 降序"),
+        ]
 
         return ctx
 
@@ -537,6 +648,7 @@ class OrderDetailView(LoginRequiredMixin, DetailView):
         form = ClothOrderForm(request.POST, instance=order)
         if form.is_valid():
             form.save()
+            logger.info(t("log.order_update", username=request.user.username, serial=order.serial_number))
             messages.success(request, t("msg.order_updated", serial=order.serial_number))
             return redirect("order_detail", pk=order.pk)
         else:
@@ -566,6 +678,20 @@ class OrderCreateView(LoginRequiredMixin, CreateView):
         ctx["form_sections_primary"] = ORDER_FORM_SECTIONS[:ORDER_CREATE_PRIMARY_COUNT]
         ctx["form_sections_extra"] = ORDER_FORM_SECTIONS[ORDER_CREATE_PRIMARY_COUNT:]
         return ctx
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        order = self.object
+        logger.info(
+            t(
+                "log.order_create",
+                username=self.request.user.username,
+                serial=order.serial_number,
+                customer=order.customer or "-",
+                cloth=order.cloth_type or "-",
+            )
+        )
+        return response
 
 
 # ---------------------------------------------------------------------------
@@ -613,10 +739,28 @@ def bulk_orders_action(request):
             "invoice_yes": t("label.invoice_yes"),
             "invoice_no": t("label.invoice_no"),
         }
+        logger.info(
+            t(
+                "log.bulk_action",
+                username=request.user.username,
+                label=action_labels.get(action, action),
+                count=count,
+                ids=",".join(order_ids),
+            )
+        )
         messages.success(request, t("msg.action_done", count=count, label=action_labels.get(action, action)))
 
     elif action == "delete":
         deleted = orders.delete()[0]
+        logger.info(
+            t(
+                "log.bulk_action",
+                username=request.user.username,
+                label="删除",
+                count=deleted,
+                ids=",".join(order_ids),
+            )
+        )
         messages.success(request, t("msg.deleted_count", count=deleted))
 
     elif action == "export":
@@ -635,6 +779,7 @@ def order_delete(request, pk):
     order = get_object_or_404(ClothOrder, pk=pk)
     serial = order.serial_number
     order.delete()
+    logger.info(t("log.order_delete", username=request.user.username, serial=serial))
     messages.success(request, t("msg.order_deleted", serial=serial))
     return redirect("order_list")
 
@@ -644,6 +789,7 @@ def order_delete(request, pk):
 def orders_delete_all(request):
     if request.method == "POST":
         count = ClothOrder.objects.all().delete()[0]
+        logger.info(t("log.orders_delete_all", username=request.user.username, count=count))
         messages.success(request, t("msg.all_orders_cleared", count=count))
         return redirect("order_list")
     order_count = ClothOrder.objects.count()
@@ -659,6 +805,7 @@ def orders_delete_all(request):
 def orders_export(request):
     df = export_orders_dataframe()
     filename = f"orders_backup_{now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    logger.info(t("log.export_orders", username=request.user.username))
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
@@ -678,6 +825,7 @@ def orders_import_page(request):
 @validate_file_upload
 def orders_import_start(request):
     task_id = create_import_task(request.user.id)
+    logger.info(t("log.import_orders_start", username=request.user.username))
     start_import_task(task_id, request.upload_file_bytes)
     return JsonResponse({"task_id": task_id})
 
@@ -724,6 +872,7 @@ def inventory_import_page(request):
 @validate_file_upload
 def inventory_import_start(request):
     task_id = create_inventory_task(request.user.id)
+    logger.info(t("log.import_inventory_start", username=request.user.username))
     start_inventory_task(task_id, request.upload_file_bytes)
     return JsonResponse({"task_id": task_id})
 
@@ -767,6 +916,7 @@ def inventory_export(request):
 @require_POST
 def inventory_delete_all(request):
     count = InventoryItem.objects.all().delete()[0]
+    logger.info(t("log.inventory_delete_all", username=request.user.username, count=count))
     messages.success(request, t("msg.all_inventory_cleared", count=count))
     return redirect("inventory_list")
 
@@ -854,6 +1004,20 @@ class InventoryUpdateView(LoginRequiredMixin, UpdateView):
     template_name = "order/inventory_form.html"
     success_url = "/inventory/"
     context_object_name = "item"
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        item = self.object
+        logger.info(
+            t(
+                "log.inventory_update",
+                username=self.request.user.username,
+                pk=item.pk,
+                name=item.cloth_name or item.unique_id or "-",
+                qty=item.quantity,
+            )
+        )
+        return response
 
 
 @login_required
@@ -952,6 +1116,7 @@ def inventory_log_export(request):
 def inventory_log_delete_all(request):
     """清空全部库存日志"""
     count = InventoryLog.objects.all().delete()[0]
+    logger.info(t("log.inventory_log_delete_all", username=request.user.username, count=count))
     messages.success(request, f"已清空全部 {count} 条库存日志")
     return redirect("inventory_log_list")
 
@@ -1031,6 +1196,18 @@ class ClothCatalogCreateView(LoginRequiredMixin, CreateView):
         ctx["form_title"] = t("label.catalog_add")
         return ctx
 
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        logger.info(
+            t(
+                "log.catalog_create",
+                username=self.request.user.username,
+                code=self.object.cloth_code,
+                name=self.object.cloth_name or "-",
+            )
+        )
+        return response
+
 
 @admin_required
 @login_required
@@ -1100,7 +1277,9 @@ def cloth_catalog_import_progress(request, task_id):
 @require_POST
 def cloth_catalog_delete(request, pk):
     obj = get_object_or_404(ClothCatalog, pk=pk)
+    code = obj.cloth_code
     obj.delete()
+    logger.info(t("log.catalog_delete", username=request.user.username, code=code))
     messages.success(request, t("msg.catalog_deleted", code=obj.cloth_code))
     return redirect("cloth_catalog_list")
 
@@ -1110,6 +1289,7 @@ def cloth_catalog_delete(request, pk):
 @require_POST
 def cloth_catalog_delete_all(request):
     count = ClothCatalog.objects.all().delete()[0]
+    logger.info(t("log.catalog_delete_all", username=request.user.username, count=count))
     messages.success(request, t("msg.all_catalog_cleared", count=count))
     return redirect("cloth_catalog_list")
 
@@ -1158,6 +1338,14 @@ def order_update_progress(request, pk):
         if 0 <= progress < len(stages):
             order.progress_current = progress
             order.save(update_fields=["progress_current"])
+            logger.info(
+                t(
+                    "log.progress_update",
+                    username=request.user.username,
+                    serial=order.serial_number,
+                    stage=order.current_stage_name,
+                )
+            )
             return JsonResponse({"status": "ok", "stage": order.current_stage_name})
         return JsonResponse({"error": t("msg.invalid_progress")}, status=400)
     except (ValueError, TypeError, json.JSONDecodeError) as e:
@@ -1175,6 +1363,7 @@ def order_edit_redirect(request, pk):
 def order_statement(request, pk):
     order = get_object_or_404(ClothOrder, pk=pk)
     output = generate_order_statement(order)
+    logger.info(t("log.statement", username=request.user.username, serial=order.serial_number))
     ts = now().strftime("%Y%m%d_%H%M%S")
     filename = f"statement_{order.serial_number or 'order'}_{ts}.xlsx"
     response = HttpResponse(
@@ -1207,6 +1396,13 @@ def order_statement_bulk(request):
         return redirect("order_list")
 
     output = generate_bulk_statement(list(orders))
+    logger.info(
+        t(
+            "log.statement_bulk",
+            username=request.user.username,
+            count=orders.count(),
+        )
+    )
     ts = now().strftime("%Y%m%d_%H%M%S")
     filename = f"statement_bulk_{ts}.xlsx"
     response = HttpResponse(
@@ -1230,6 +1426,14 @@ def order_toggle_supplier_paid(request, pk):
     order.supplier_paid = not order.supplier_paid
     order.save(update_fields=["supplier_paid"])
     status = t("label.payment_paid") if order.supplier_paid else t("label.payment_unpaid")
+    logger.info(
+        t(
+            "log.toggle_supplier_paid",
+            username=request.user.username,
+            serial=order.serial_number,
+            status=status,
+        )
+    )
     messages.success(request, t("msg.supplier_paid_updated", status=status))
     return redirect("order_detail", pk=pk)
 
@@ -1247,6 +1451,14 @@ def order_toggle_status(request, pk):
     # 注意：原代码用的是 t("label.overdue_no")，明显是复制粘贴错误
     # 这里改为用状态值，如需 i18n 请确认 label.order_active 是否存在
     status = t("label.order_active") if order.order_status == "active" else t("label.order_cancelled")
+    logger.info(
+        t(
+            "log.toggle_order_status",
+            username=request.user.username,
+            serial=order.serial_number,
+            status=status,
+        )
+    )
     messages.success(request, t("msg.order_status_updated", status=status))
     return redirect("order_detail", pk=pk)
 
@@ -1262,6 +1474,14 @@ def order_toggle_payment_status(request, pk):
         order.payment_status = "paid"
     order.save(update_fields=["payment_status"])
     status = t("label.payment_paid") if order.payment_status == "paid" else t("label.payment_unpaid")
+    logger.info(
+        t(
+            "log.toggle_payment_status",
+            username=request.user.username,
+            serial=order.serial_number,
+            status=status,
+        )
+    )
     messages.success(request, t("msg.payment_status_updated", status=status))
     return redirect("order_detail", pk=pk)
 
@@ -1290,6 +1510,15 @@ def order_refresh_calculations(request, pk):
             update_fields.append("supplier_shipped")
 
         order.save(update_fields=update_fields)
+        logger.info(
+            t(
+                "log.refresh_calculations",
+                username=request.user.username,
+                serial=order.serial_number,
+                balance=order.finished_product_total_amount,
+                cost=order.total_amount,
+            )
+        )
         messages.success(request, t("msg.order_updated_hash", serial=order.serial_number))
     else:
         messages.warning(request, t("msg.missing_cost_data"))
@@ -1340,8 +1569,16 @@ class SupplierManageCreateView(AdminRequiredMixin, LoginRequiredMixin, CreateVie
         return ctx
 
     def form_valid(self, form):
+        response = super().form_valid(form)
+        logger.info(
+            t(
+                "log.supplier_create",
+                username=self.request.user.username,
+                company=self.object.company_name,
+            )
+        )
         messages.success(self.request, t("msg.supplier_account_created"))
-        return super().form_valid(form)
+        return response
 
 
 class SupplierManageUpdateView(AdminRequiredMixin, LoginRequiredMixin, UpdateView):
@@ -1357,8 +1594,16 @@ class SupplierManageUpdateView(AdminRequiredMixin, LoginRequiredMixin, UpdateVie
         return ctx
 
     def form_valid(self, form):
+        response = super().form_valid(form)
+        logger.info(
+            t(
+                "log.supplier_update",
+                username=self.request.user.username,
+                company=self.object.company_name,
+            )
+        )
         messages.success(self.request, t("msg.supplier_account_saved"))
-        return super().form_valid(form)
+        return response
 
 
 @admin_required
@@ -1371,6 +1616,7 @@ def supplier_manage_delete(request, pk):
         if hasattr(user, "supplier_profile"):
             supplier.delete()
             user.delete()
+            logger.info(t("log.supplier_delete", username=request.user.username, company=company))
             messages.success(request, t("msg.supplier_deleted", company=company))
         else:
             messages.error(request, t("msg.delete_failed"))
@@ -1389,6 +1635,13 @@ def supplier_manage_reset_password(request, pk):
         else:
             supplier.user.set_password(new_password)
             supplier.user.save()
+            logger.info(
+                t(
+                    "log.supplier_reset_password",
+                    username=request.user.username,
+                    company=supplier.company_name,
+                )
+            )
             messages.success(request, t("msg.supplier_password_reset", name=supplier.company_name))
         return redirect("supplier_manage_list")
     return render(request, "order/supplier_manage_reset_password.html", {"supplier": supplier})
@@ -1738,6 +1991,15 @@ def order_shipment_edit(request, pk, shipment_pk):
         form = ShipmentForm(request.POST, instance=shipment)
         if form.is_valid():
             form.save()
+            logger.info(
+                t(
+                    "log.shipment_edit",
+                    username=request.user.username,
+                    serial=order.serial_number,
+                    batch=shipment.batch_number,
+                    quantity=shipment.quantity,
+                )
+            )
             messages.success(request, t("msg.shipment_updated", batch=shipment.batch_number))
         else:
             for field, errors in form.errors.items():
@@ -1961,6 +2223,17 @@ class QuotationCreateView(LoginRequiredMixin, CreateView):
         ctx["form_title"] = t("label.quotation_add")
         return ctx
 
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        logger.info(
+            t(
+                "log.quotation_create",
+                username=self.request.user.username,
+                article=self.object.article_no,
+            )
+        )
+        return response
+
 
 @admin_required
 @login_required
@@ -1969,6 +2242,7 @@ def quotation_delete(request, pk):
     obj = get_object_or_404(FabricQuotation, pk=pk)
     article = obj.article_no
     obj.delete()
+    logger.info(t("log.quotation_delete", username=request.user.username, article=article))
     messages.success(request, t("msg.quotation_deleted", article=article))
     return redirect("quotation_list")
 
@@ -2104,6 +2378,14 @@ def quotation_import(request):
                 FabricQuotation.objects.bulk_create(batch)
 
             messages.success(request, t("msg.import_complete", imported=imported, skipped=skipped))
+            logger.info(
+                t(
+                    "log.quotation_import_done",
+                    username=request.user.username,
+                    imported=imported,
+                    skipped=skipped,
+                )
+            )
             return redirect("quotation_list")
 
         except Exception as e:
@@ -2119,5 +2401,6 @@ def quotation_import(request):
 @require_POST
 def quotation_delete_all(request):
     count = FabricQuotation.objects.all().delete()[0]
+    logger.info(t("log.quotation_delete_all", username=request.user.username, count=count))
     messages.success(request, t("msg.all_quotation_cleared", count=count))
     return redirect("quotation_list")

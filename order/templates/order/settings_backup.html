@@ -1,0 +1,75 @@
+{% extends 'order/settings_base.html' %}
+
+{% block title %}数据库备份 - 系统设置{% endblock %}
+
+{% block settings_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h5 class="fw-bold mb-1"><i class="bi bi-hdd me-2 text-primary"></i>数据库备份</h5>
+        <p class="text-muted small mb-0">当前数据库：{{ db_info.label }}（{{ db_info.name }}）</p>
+    </div>
+    <form method="post" action="{% url 'backup_create' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-hdd me-1"></i> 立即备份
+        </button>
+    </form>
+</div>
+
+<div class="card card-flat">
+    <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-folder2-open me-2"></i>备份列表</h6>
+        <span class="small text-muted">共 {{ backups|length }} 份备份</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>文件名</th>
+                        <th>大小</th>
+                        <th>创建时间</th>
+                        <th style="width: 9rem;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for b in backups %}
+                    <tr>
+                        <td class="small"><i class="bi bi-file-earmark-lock me-1 text-muted"></i>{{ b.name }}</td>
+                        <td class="small">{{ b.size|filesizeformat }}</td>
+                        <td class="small">{{ b.mtime_text }}</td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <a href="{% url 'backup_download' b.name %}" class="btn btn-sm btn-outline-primary py-0 px-1" title="下载">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                                <form method="post" action="{% url 'backup_delete' b.name %}" class="d-inline"
+                                      onsubmit="return confirm('确定删除备份 {{ b.name }}？此操作不可恢复！')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="删除">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-5">
+                            <i class="bi bi-database-x display-4 d-block mb-2 opacity-50"></i>
+                            暂无备份，点击右上角「立即备份」创建
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-light border small mt-3 mb-0">
+    <i class="bi bi-info-circle me-1 text-primary"></i>
+    说明：SQLite 使用一致性快照备份（应用运行中也可安全备份）；MySQL 使用 mysqldump，环境不可用时自动回退为
+    <code>dumpdata</code> JSON。备份文件保存在项目 <code>backups/</code> 目录，建议下载后转存到其他位置。
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends 'order/settings_base.html' %}
+
+{% block title %}日志清除 - 系统设置{% endblock %}
+
+{% block settings_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h5 class="fw-bold mb-1"><i class="bi bi-trash me-2 text-primary"></i>日志清除</h5>
+        <p class="text-muted small mb-0">查看并清空应用日志文件（django-info.log / django-error.log）</p>
+    </div>
+    <form method="post" action="{% url 'settings_logs_clear' %}"
+          onsubmit="return confirm('确定清空全部 {{ log_files|length }} 个日志文件？此操作不可恢复！')">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger btn-sm">
+            <i class="bi bi-trash me-1"></i> 清空全部日志
+        </button>
+    </form>
+</div>
+
+<div class="card card-flat">
+    <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-file-earmark-text me-2"></i>日志文件</h6>
+        <span class="small text-muted">共 {{ log_files|length }} 个文件</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>文件名</th>
+                        <th>大小</th>
+                        <th>最后写入</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in log_files %}
+                    <tr>
+                        <td class="small"><i class="bi bi-file-earmark-text me-1 text-muted"></i>{{ f.name }}</td>
+                        <td class="small">{{ f.size|filesizeformat }}</td>
+                        <td class="small">{{ f.mtime_text }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-center text-muted py-4">暂无日志文件</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-light border small mt-3 mb-0">
+    <i class="bi bi-info-circle me-1 text-primary"></i>
+    清空后日志文件将从空文件重新开始记录；清除操作本身会写入一条日志。
+</div>
+{% endblock %}

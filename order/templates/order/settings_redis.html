@@ -1,0 +1,61 @@
+{% extends 'order/settings_base.html' %}
+
+{% block title %}Redis 设置 - 系统设置{% endblock %}
+
+{% block settings_content %}
+<h5 class="fw-bold mb-1"><i class="bi bi-hdd-stack me-2 text-primary"></i>Redis 设置</h5>
+<p class="text-muted small mb-3">编辑 Redis 缓存连接配置，保存后写入 .env（重启服务后生效）</p>
+
+{% if redis.configured %}
+<div class="alert alert-success py-2 small">
+    <i class="bi bi-check-circle me-1"></i>已启用 Redis 缓存
+</div>
+{% else %}
+<div class="alert alert-warning py-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>未配置 Redis，当前使用本地内存缓存（进程重启后缓存丢失）。
+</div>
+{% endif %}
+
+<form method="post" action="{% url 'settings_redis_save' %}" class="card card-flat">
+    <div class="card-header py-2"><h6 class="mb-0 fw-bold">连接配置</h6></div>
+    <div class="card-body">
+        {% csrf_token %}
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label small text-muted mb-1">主机</label>
+                <input type="text" name="host" class="form-control form-control-sm"
+                       value="{{ redis.host|default_if_none:'' }}" placeholder="127.0.0.1" required>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">端口</label>
+                <input type="text" name="port" class="form-control form-control-sm"
+                       value="{{ redis.port|default_if_none:'' }}" placeholder="6379">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">库编号</label>
+                <input type="text" name="db" class="form-control form-control-sm"
+                       value="{{ redis.db|default_if_none:'' }}" placeholder="0">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small text-muted mb-1">密码（留空保持不变）</label>
+                <input type="password" name="password" class="form-control form-control-sm"
+                       autocomplete="new-password" placeholder="有密码时填写，否则留空">
+            </div>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-check-lg me-1"></i>保存配置
+            </button>
+            {% if redis.configured %}
+            <span class="small text-muted">当前连接串：<code>{{ redis.masked_url }}</code></span>
+            {% endif %}
+        </div>
+    </div>
+</form>
+
+<div class="alert alert-light border small mt-3 mb-0">
+    <i class="bi bi-info-circle me-1 text-primary"></i>
+    配置保存到项目根目录 <code>.env</code> 的 <code>REDIS_URL</code>（格式如
+    <code>redis://:密码@127.0.0.1:6379/0</code>）。保存后需<strong>重启服务</strong>才会真正切换缓存连接。
+</div>
+{% endblock %}

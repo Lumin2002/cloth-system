@@ -43,3 +43,4 @@ logs/
 # Project specific
 fix_import.py
 start.bat
+backups/

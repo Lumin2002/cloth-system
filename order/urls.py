@@ -1,6 +1,8 @@
 from django.urls import path
 from . import views
+from . import views_backup
 from . import views_monitor
+from . import views_settings
 
 urlpatterns = [
     # 主页和其他
@@ -87,5 +89,22 @@ urlpatterns = [
     path("monitor/", views_monitor.monitor_view, name="monitor"),
     path("monitor/api/", views_monitor.monitor_api, name="monitor_api"),
     path("monitor/terminal/", views_monitor.terminal_run, name="monitor_terminal"),
+
+    # 数据库备份
+    path("backup/", views_backup.backup_list, name="backup_list"),
+    path("backup/create/", views_backup.backup_create, name="backup_create"),
+    path("backup/<str:name>/download/", views_backup.backup_download, name="backup_download"),
+    path("backup/<str:name>/delete/", views_backup.backup_delete, name="backup_delete"),
+
+    # 系统设置
+    path("system/settings/", views_settings.settings_index, name="system_settings"),
+    path("system/settings/redis/", views_settings.settings_redis, name="settings_redis"),
+    path("system/settings/redis/save/", views_settings.settings_redis_save, name="settings_redis_save"),
+    path("system/settings/mysql/", views_settings.settings_mysql, name="settings_mysql"),
+    path("system/settings/mysql/save/", views_settings.settings_mysql_save, name="settings_mysql_save"),
+    path("system/settings/nginx/", views_settings.settings_nginx, name="settings_nginx"),
+    path("system/settings/nginx/save/", views_settings.settings_nginx_save, name="settings_nginx_save"),
+    path("system/settings/logs/", views_settings.settings_logs, name="settings_logs"),
+    path("system/settings/logs/clear/", views_settings.settings_logs_clear, name="settings_logs_clear"),
 
 ]

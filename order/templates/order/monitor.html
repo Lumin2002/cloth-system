@@ -16,8 +16,6 @@
     .monitor-page .process-item .label { font-size: .75rem; color: #6c757d; }
     .monitor-page .process-item .value { font-size: 1rem; font-weight: 600; word-break: break-all; }
     .monitor-page .log-toolbar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-    .monitor-page .log-level-btn { font-size: .75rem; padding: .25rem .6rem; border-radius: 20px; border: 1px solid #dee2e6; background: #fff; color: #495057; }
-    .monitor-page .log-level-btn.active { background: #4361ee; border-color: #4361ee; color: #fff; }
     .monitor-page .log-file-list { max-height: 460px; overflow-y: auto; }
     .monitor-page .log-file-btn { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; text-align: left; border: 1px solid #e9ecef; border-radius: 8px; background: #fff; padding: .55rem .75rem; margin-bottom: .4rem; }
     .monitor-page .log-file-btn:hover { border-color: #4361ee; background: rgba(67, 97, 238, .05); }
@@ -336,10 +334,6 @@
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h6 class="mb-0" id="log-title">{{ current_log|default:"暂无日志" }}</h6>
                         <div class="log-toolbar">
-                            <button type="button" class="log-level-btn active" data-filter="all">全部</button>
-                            <button type="button" class="log-level-btn" data-filter="info">INFO</button>
-                            <button type="button" class="log-level-btn" data-filter="warning">WARNING</button>
-                            <button type="button" class="log-level-btn" data-filter="error">ERROR</button>
                             <button type="button" class="btn btn-sm btn-outline-primary" id="refresh-log" title="刷新日志">
                                 <i class="bi bi-arrow-clockwise"></i>
                             </button>
@@ -414,7 +408,6 @@
     var logsTimer = null;
     var history = [];
     var lastLogLines = [];
-    var logFilter = 'all';
 
     function initChart(id) {
         var el = document.getElementById(id);
@@ -625,14 +618,6 @@
         return 'log-info';
     }
 
-    function linePassesFilter(line) {
-        if (logFilter === 'all') return true;
-        var cls = lineClass(line);
-        if (logFilter === 'error') return cls === 'log-error';
-        if (logFilter === 'warning') return cls === 'log-warning';
-        return cls === 'log-info';
-    }
-
     function renderLogLines(lines) {
         var container = document.getElementById('log-content');
         if (!container) return;
@@ -643,10 +628,9 @@
         }
         var html = '';
         lastLogLines.forEach(function (line) {
-            if (!linePassesFilter(line)) return;
             html += '<span class="log-line ' + lineClass(line) + '">' + escapeHtml(line) + '</span>';
         });
-        container.innerHTML = html || '<div class="log-empty">当前筛选无匹配内容</div>';
+        container.innerHTML = html || '<div class="log-empty">暂无日志内容</div>';
         container.scrollTop = container.scrollHeight;
     }
 
@@ -771,15 +755,6 @@
             fetchLogs();
         });
     }
-
-    document.querySelectorAll('.log-level-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            document.querySelectorAll('.log-level-btn').forEach(function (b) { b.classList.remove('active'); });
-            btn.classList.add('active');
-            logFilter = btn.getAttribute('data-filter');
-            renderLogLines(lastLogLines);
-        });
-    });
 
     var refreshBtn = document.getElementById('refresh-log');
     if (refreshBtn) refreshBtn.addEventListener('click', fetchLogs);
@@ -912,7 +887,6 @@
         });
     }
     renderTermPrompt();
-    if (termInput && !termInput.disabled) termInput.focus();
 })();
 </script>
 {% endblock %}

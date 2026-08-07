@@ -311,6 +311,11 @@ def run_inventory_import_in_background(task_id: str, file_bytes: bytes) -> None:
                 'error_messages': error_messages[:20],
             },
         )
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(
+            f"[导入库存] {username} 导入完成：新增{imported}条 更新{updated}条 失败{errors}条 跳过{skipped}条"
+        )
 
     except Exception as exc:
         update_inventory_task(
@@ -320,6 +325,9 @@ def run_inventory_import_in_background(task_id: str, file_bytes: bytes) -> None:
             message=f'导入失败：{exc}',
             error=str(exc),
         )
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"[导入库存] {username} 导入失败：{exc}", exc_info=True)
 
 def start_inventory_task(task_id: str, file_bytes: bytes) -> None:
     thread = threading.Thread(
@@ -374,11 +382,19 @@ def run_catalog_import_in_background(task_id: str, file_bytes: bytes) -> None:
     import io
     import pandas as pd
     from django.db import close_old_connections
+    from django.contrib.auth.models import User
     from .models import ClothCatalog
 
     close_old_connections()
 
     update_catalog_task(task_id, status="running", percent=5, message="正在读取文件...")
+
+    task = get_catalog_task(task_id)
+    try:
+        user = User.objects.get(id=task.get("user_id"))
+        username = user.username
+    except Exception:
+        username = "系统导入"
 
     try:
         df = pd.read_excel(io.BytesIO(file_bytes), header=None, dtype=str)
@@ -430,6 +446,9 @@ def run_catalog_import_in_background(task_id: str, file_bytes: bytes) -> None:
             message="导入完成",
             result={"imported": imported, "updated": updated},
         )
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[导入布种] {username} 导入完成：新增{imported}条 更新{updated}条")
 
     except Exception as exc:
         update_catalog_task(
@@ -439,6 +458,9 @@ def run_catalog_import_in_background(task_id: str, file_bytes: bytes) -> None:
             message=f"导入失败: {exc}",
             error=str(exc),
         )
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"[导入布种] {username} 导入失败：{exc}", exc_info=True)
 
 def start_catalog_task(task_id: str, file_bytes: bytes) -> None:
     thread = threading.Thread(

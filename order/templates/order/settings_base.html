@@ -1,0 +1,100 @@
+{% extends 'order/base.html' %}
+
+{% block title %}系统设置{% endblock %}
+
+{% block content %}
+<div class="container-fluid main-container">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">仪表板</a></li>
+            <li class="breadcrumb-item active" aria-current="page">系统设置</li>
+        </ol>
+    </nav>
+
+    <div class="settings-window">
+        <div class="settings-window-header">
+            <span class="fw-bold"><i class="bi bi-gear me-2"></i>系统设置</span>
+            <a href="{% url 'dashboard' %}" class="btn-close" title="关闭" aria-label="关闭"></a>
+        </div>
+        <div class="settings-window-body">
+            <div class="settings-nav">
+                <a href="{% url 'system_settings' %}" class="settings-nav-item {% if request.resolver_match.url_name == 'system_settings' %}active{% endif %}">
+                    <i class="bi bi-person-gear me-2"></i>管理员账号设置
+                </a>
+                <a href="{% url 'settings_redis' %}" class="settings-nav-item {% if request.resolver_match.url_name == 'settings_redis' %}active{% endif %}">
+                    <i class="bi bi-hdd-stack me-2"></i>Redis 设置
+                </a>
+                <a href="{% url 'settings_mysql' %}" class="settings-nav-item {% if request.resolver_match.url_name == 'settings_mysql' %}active{% endif %}">
+                    <i class="bi bi-database me-2"></i>MySQL 设置
+                </a>
+                <a href="{% url 'backup_list' %}" class="settings-nav-item {% if request.resolver_match.url_name == 'backup_list' %}active{% endif %}">
+                    <i class="bi bi-hdd me-2"></i>数据库备份
+                </a>
+                <a href="{% url 'settings_nginx' %}" class="settings-nav-item {% if request.resolver_match.url_name == 'settings_nginx' %}active{% endif %}">
+                    <i class="bi bi-server me-2"></i>Nginx 设置
+                </a>
+                <a href="{% url 'settings_logs' %}" class="settings-nav-item {% if request.resolver_match.url_name == 'settings_logs' %}active{% endif %}">
+                    <i class="bi bi-trash me-2"></i>日志清除
+                </a>
+            </div>
+            <div class="settings-content">
+                {% block settings_content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.settings-window {
+    max-width: 1080px;
+    margin: 0 auto;
+    background: #fff;
+    border: 1px solid #e3e8f0;
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(31, 41, 55, .12);
+    overflow: hidden;
+}
+.settings-window-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .85rem 1.25rem;
+    background: linear-gradient(135deg, #4361ee, #3a0ca3);
+    color: #fff;
+}
+.settings-window-header .btn-close { filter: invert(1); opacity: .85; }
+.settings-window-body { display: flex; min-height: 480px; }
+.settings-nav {
+    width: 230px;
+    flex-shrink: 0;
+    border-right: 1px solid #eef1f6;
+    background: #f8f9fc;
+    padding: .75rem 0;
+}
+.settings-nav-item {
+    display: flex;
+    align-items: center;
+    padding: .65rem 1.25rem;
+    color: #495057;
+    text-decoration: none;
+    border-left: 3px solid transparent;
+    font-size: .9rem;
+}
+.settings-nav-item:hover { background: rgba(67, 97, 238, .06); color: #4361ee; }
+.settings-nav-item.active { background: #fff; color: #4361ee; font-weight: 600; border-left-color: #4361ee; }
+.settings-content { flex: 1; min-width: 0; padding: 1.25rem 1.5rem; }
+@media (max-width: 767.98px) {
+    .settings-window-body { flex-direction: column; min-height: 0; }
+    .settings-nav {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #eef1f6;
+        display: flex;
+        overflow-x: auto;
+        padding: .4rem .5rem;
+    }
+    .settings-nav-item { white-space: nowrap; border-left: none; border-bottom: 3px solid transparent; padding: .5rem .8rem; }
+    .settings-nav-item.active { border-bottom-color: #4361ee; }
+}
+</style>
+{% endblock %}

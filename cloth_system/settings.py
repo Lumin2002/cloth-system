@@ -55,6 +55,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'order.middleware.RequestLogContextMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -190,8 +191,13 @@ LOGGING = {
     "disable_existing_loggers": False,
     "formatters": {
         "verbose": {
-            "format": "{levelname} {asctime} {module} {message}",
+            "format": "{asctime} {levelname} {name}:{lineno} [用户:{username} IP:{ip}] {message}",
             "style": "{",
+        },
+    },
+    "filters": {
+        "request_context": {
+            "()": "order.logging_context.RequestContextFilter",
         },
     },
     "handlers": {
@@ -202,11 +208,14 @@ LOGGING = {
             "maxBytes": 5 * 1024 * 1024,
             "backupCount": 5,
             "formatter": "verbose",
+            "encoding": "utf-8",
+            "filters": ["request_context"],
         },
         "console": {
             "level": "INFO",
             "class": "logging.StreamHandler",
             "formatter": "verbose",
+            "filters": ["request_context"],
         },
         "info_file": {
             "level": "INFO",
@@ -215,11 +224,13 @@ LOGGING = {
             "maxBytes": 5 * 1024 * 1024,
             "backupCount": 5,
             "formatter": "verbose",
+            "encoding": "utf-8",
+            "filters": ["request_context"],
         },
     },
     "loggers": {
         "order": {
-            "handlers": ["info_file", "console"],
+            "handlers": ["file", "info_file", "console"],
             "level": "INFO",
             "propagate": True,
         },

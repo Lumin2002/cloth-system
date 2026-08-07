@@ -1,0 +1,35 @@
+{% extends 'order/settings_base.html' %}
+
+{% block title %}Nginx 设置 - 系统设置{% endblock %}
+
+{% block settings_content %}
+<h5 class="fw-bold mb-1"><i class="bi bi-server me-2 text-primary"></i>Nginx 设置</h5>
+<p class="text-muted small mb-3">编辑 nginx.conf，保存时自动执行 <code>nginx -t</code> 语法校验（本机未安装 nginx 时跳过）</p>
+
+<form method="post" action="{% url 'settings_nginx_save' %}" class="card card-flat">
+    <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-file-earmark-code me-2"></i>nginx.conf</h6>
+        <span class="small text-muted">{{ nginx_path }}</span>
+    </div>
+    <div class="card-body p-0">
+        {% csrf_token %}
+        <textarea name="content" rows="22" spellcheck="false"
+                  class="form-control border-0 rounded-0"
+                  style="font-family: Consolas, 'Courier New', monospace; font-size: .78rem; background: #0f172a; color: #d1d5db; resize: vertical;">{{ nginx_content }}</textarea>
+        <div class="card-body border-top py-2">
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-check-lg me-1"></i>保存配置
+            </button>
+            {% if nginx_missing %}
+            <span class="small text-muted ms-2">当前无配置文件，保存后将自动创建</span>
+            {% endif %}
+        </div>
+    </div>
+</form>
+
+{% if check_url %}
+<div class="alert alert-light border small mt-3 mb-0">
+    <i class="bi bi-info-circle me-1 text-primary"></i>监控检查地址：<code>{{ check_url }}</code>
+</div>
+{% endif %}
+{% endblock %}
