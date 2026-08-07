@@ -250,12 +250,15 @@ SUPERUSER_SESSION_IDLE_TIMEOUT_MINUTES = int(os.environ.get("SUPERUSER_SESSION_I
 SESSION_TIMEOUT_WARNING_SECONDS = int(os.environ.get("SESSION_TIMEOUT_WARNING_SECONDS", "60"))
 
 # Nginx 健康探测地址（生产环境通过 .env 的 NGINX_CHECK_URL 配置公网地址；未配置时监控页显示"未配置"）
-NGINX_CHECK_URL = os.environ.get("NGINX_CHECK_URL", "")
+NGINX_CHECK_URL = os.environ.get("NGINX_CHECK_URL", "http://127.0.0.1:8000/")
 
 # ===================== FRP HTTPS穿透兼容 =====================
 # 信任FRP外网HTTPS地址，提交表单不报400/403
+# CSRF 可信来源：写死，不依赖 .env（本地开发 + 生产 FRP 公网地址）
 CSRF_TRUSTED_ORIGINS = [
-    *[o.strip() for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()],
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "https://frp-ski.com:40614",
 ]
 
 # 代理转发请求头兼容
