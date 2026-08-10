@@ -10,7 +10,16 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from .db_backup import create_backup, delete_backup, get_db_info, list_backups, resolve_backup
+from .db_backup import (
+    BACKUP_MODE_LABELS,
+    create_backup,
+    delete_backup,
+    get_backup_config,
+    get_db_info,
+    list_backups,
+    resolve_backup,
+    set_backup_config,
+)
 from .decorators import admin_required
 from .i18n import t
 
@@ -25,12 +34,18 @@ def backup_list(request):
         b["mtime_text"] = timezone.localtime(
             datetime.fromtimestamp(b["mtime"], tz=std_timezone.utc)
         ).strftime("%Y-%m-%d %H:%M:%S")
+    config = get_backup_config()
+    hours = config["interval_hours"]
+    interval_display = int(hours) if hours == int(hours) else hours
     return render(
         request,
         "order/settings_backup.html",
         {
             "backups": backups,
             "db_info": get_db_info(),
+            "backup_mode": config["mode"],
+            "backup_interval_hours": interval_display,
+            "backup_mode_labels": BACKUP_MODE_LABELS,
         },
     )
 
@@ -80,4 +95,28 @@ def backup_delete(request, name):
         messages.success(request, t("msg.backup_deleted", filename=filename))
     else:
         messages.error(request, t("msg.backup_not_found"))
+    return redirect("backup_list")
+
+
+@admin_required
+@require_POST
+def backup_config_save(request):
+    mode = request.POST.get("mode", "").strip()
+    raw_hours = request.POST.get("interval_hours", "").strip()
+    try:
+        data = set_backup_config(mode, raw_hours or None)
+    except (ValueError, OSError) as exc:
+        logger.error(f"[自动备份] 保存配置失败：{exc}", exc_info=True)
+        messages.error(request, t("msg.backup_config_invalid", error=exc))
+        return redirect("backup_list")
+    mode_label = BACKUP_MODE_LABELS.get(mode, mode)
+    logger.info(
+        t(
+            "log.backup_config",
+            username=request.user.username,
+            mode=mode_label,
+            hours=data["interval_hours"],
+        )
+    )
+    messages.success(request, t("msg.backup_config_saved", mode=mode_label))
     return redirect("backup_list")

@@ -1884,10 +1884,8 @@ def order_shipment_create(request, pk):
     # Permission check: admin always allowed, supplier only if assigned
     if not request.user.is_staff:
         if not hasattr(request.user, "supplier_profile") or not order.supplier_id or order.supplier.user_id != request.user.id:
-            from django.contrib import messages
             messages.error(request, "无权访问此订单的出货记录")
             if hasattr(request.user, "supplier_profile"):
-                from django.shortcuts import redirect
                 return redirect("supplier_dashboard")
             return redirect("dashboard")
 
@@ -1938,10 +1936,8 @@ def order_shipment_delete(request, pk, shipment_pk):
     # Permission check: admin always allowed, supplier only if assigned
     if not request.user.is_staff:
         if not hasattr(request.user, "supplier_profile") or not order.supplier_id or order.supplier.user_id != request.user.id:
-            from django.contrib import messages
             messages.error(request, "无权访问此订单的出货记录")
             if hasattr(request.user, "supplier_profile"):
-                from django.shortcuts import redirect
                 return redirect("supplier_dashboard")
             return redirect("dashboard")
 
@@ -1979,10 +1975,8 @@ def order_shipment_edit(request, pk, shipment_pk):
     # Permission check: admin always allowed, supplier only if assigned
     if not request.user.is_staff:
         if not hasattr(request.user, "supplier_profile") or not order.supplier_id or order.supplier.user_id != request.user.id:
-            from django.contrib import messages
             messages.error(request, "无权访问此订单的出货记录")
             if hasattr(request.user, "supplier_profile"):
-                from django.shortcuts import redirect
                 return redirect("supplier_dashboard")
             return redirect("dashboard")
 

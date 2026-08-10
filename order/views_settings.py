@@ -3,6 +3,7 @@ import logging
 import re
 import shutil
 import subprocess
+import time
 from datetime import datetime
 from datetime import timezone as std_timezone
 from pathlib import Path
@@ -192,6 +193,42 @@ def settings_redis_save(request):
     settings.REDIS_URL = url  # 内存同步，页面立即显示新配置；实际连接需重启
     logger.info(t("log.redis_save", username=request.user.username, host=host, port=port, db=db))
     messages.success(request, t("msg.redis_saved"))
+    return redirect("settings_redis")
+
+
+@admin_required
+@require_POST
+def settings_redis_test(request):
+    """测试 Redis 连接（PING）。"""
+    url = getattr(settings, "REDIS_URL", "") or ""
+    if not url:
+        messages.error(request, t("msg.redis_not_configured"))
+        return redirect("settings_redis")
+    try:
+        try:
+            from django_redis import get_redis_connection
+
+            client = get_redis_connection("default")
+        except ImportError:
+            import redis
+
+            client = redis.from_url(url)
+        pool = getattr(client, "connection_pool", None)
+        if pool is not None:
+            pool.connection_kwargs.update(
+                {
+                    "socket_connect_timeout": 2,
+                    "socket_timeout": 2,
+                }
+            )
+        start = time.perf_counter()
+        client.ping()
+        latency = (time.perf_counter() - start) * 1000
+        logger.info(t("log.redis_test", username=request.user.username, result="成功"))
+        messages.success(request, t("msg.redis_test_ok", latency=round(latency, 1)))
+    except Exception as exc:
+        logger.warning(t("log.redis_test", username=request.user.username, result="失败"))
+        messages.error(request, t("msg.redis_test_failed", error=exc))
     return redirect("settings_redis")
 
 

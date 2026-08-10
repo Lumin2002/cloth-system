@@ -16,6 +16,52 @@
     </form>
 </div>
 
+<div class="card card-flat mb-3">
+    <div class="card-header py-2">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2"></i>自动备份设置</h6>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{% url 'backup_config_save' %}" class="d-flex flex-wrap align-items-end gap-2">
+            {% csrf_token %}
+            <div>
+                <label class="form-label small text-muted mb-1">备份模式</label>
+                <select name="mode" id="backup-mode-select" class="form-select form-select-sm" style="width: 11rem;">
+                    {% for key, label in backup_mode_labels.items %}
+                    <option value="{{ key }}" {% if backup_mode == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div id="backup-custom-wrap" style="display: none;">
+                <label class="form-label small text-muted mb-1">自定义间隔（小时）</label>
+                <input type="number" name="interval_hours" class="form-control form-control-sm"
+                       style="width: 10rem;" min="0.1" step="0.5" value="{{ backup_interval_hours }}">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-check-lg me-1"></i>保存设置
+            </button>
+        </form>
+        <div class="small text-muted mt-2">
+            关闭模式下不自动备份；应用每次启动后约 30 秒执行首次备份，之后按所选模式循环。
+            设置 <code>DB_BACKUP_DISABLED=1</code> 可关闭自动备份。
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var sel = document.getElementById('backup-mode-select');
+    var wrap = document.getElementById('backup-custom-wrap');
+    if (!sel || !wrap) return;
+    function sync() {
+        wrap.style.display = sel.value === 'custom' ? '' : 'none';
+        var input = wrap.querySelector('input');
+        if (input) input.required = sel.value === 'custom';
+    }
+    sel.addEventListener('change', sync);
+    sync();
+})();
+</script>
+
 <div class="card card-flat">
     <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
         <h6 class="mb-0 fw-bold"><i class="bi bi-folder2-open me-2"></i>备份列表</h6>
@@ -69,7 +115,9 @@
 
 <div class="alert alert-light border small mt-3 mb-0">
     <i class="bi bi-info-circle me-1 text-primary"></i>
-    说明：SQLite 使用一致性快照备份（应用运行中也可安全备份）；MySQL 使用 mysqldump，环境不可用时自动回退为
-    <code>dumpdata</code> JSON。备份文件保存在项目 <code>backups/</code> 目录，建议下载后转存到其他位置。
+    说明：备份统一为 <code>dumpdata</code> JSON 的 <strong>zip 压缩包</strong>（解压后可用
+    <code>manage.py loaddata</code> 恢复）。应用启动后会自动定时备份（模式可在上方设置），并自动只保留最近
+    <code>DB_BACKUP_KEEP</code>（默认 30）份。备份文件保存在项目 <code>backups/</code> 目录，
+    建议下载后转存到其他位置。
 </div>
 {% endblock %}

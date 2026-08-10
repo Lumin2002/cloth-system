@@ -46,6 +46,9 @@
             <button type="submit" class="btn btn-primary btn-sm">
                 <i class="bi bi-check-lg me-1"></i>保存配置
             </button>
+            <button type="submit" form="redis-test-form" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-plug me-1"></i>测试连接
+            </button>
             {% if redis.configured %}
             <span class="small text-muted">当前连接串：<code>{{ redis.masked_url }}</code></span>
             {% endif %}
@@ -56,6 +59,12 @@
 <div class="alert alert-light border small mt-3 mb-0">
     <i class="bi bi-info-circle me-1 text-primary"></i>
     配置保存到项目根目录 <code>.env</code> 的 <code>REDIS_URL</code>（格式如
-    <code>redis://:密码@127.0.0.1:6379/0</code>）。保存后需<strong>重启服务</strong>才会真正切换缓存连接。
+    <code>redis://:密码@127.0.0.1:6379/0</code>）。Docker 环境下主机名填 <code>redis</code>
+    （容器内网地址，如 <code>redis://redis:6379/1</code>）；本机调试填 <code>127.0.0.1</code>。
+    保存后需<strong>重启服务</strong>才会真正切换缓存连接。
 </div>
+
+<form method="post" action="{% url 'settings_redis_test' %}" id="redis-test-form" class="d-none">
+    {% csrf_token %}
+</form>
 {% endblock %}
