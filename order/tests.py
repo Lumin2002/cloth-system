@@ -711,6 +711,20 @@ class NotificationAccessTests(TestCase):
         self.assertNotIn("订单管理", html)
         self.assertIn(f"/supplier/orders/{self.order.pk}/", html)
 
+    def test_admin_notification_list_uses_admin_base(self):
+        Notification.objects.create(
+            recipient=self.staff_user,
+            title="测试提醒",
+            link=f"/orders/{self.order.pk}/",
+        )
+        self.client.force_login(self.staff_user)
+        response = self.client.get(reverse("notification_list"), HTTP_HOST="localhost")
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        self.assertIn("订单管理", html)
+        self.assertIn(f"/orders/{self.order.pk}/", html)
+        self.assertNotIn("供应商面板", html)
+
     def test_supplier_unread_list_link_rewritten(self):
         Notification.objects.create(
             recipient=self.supplier_user,

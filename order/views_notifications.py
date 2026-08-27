@@ -22,6 +22,11 @@ from .models import (
 
 def notification_list(request):
     is_supplier = hasattr(request.user, "supplier_profile") and not request.user.is_staff
+    template = (
+        "order/notification_list_supplier.html"
+        if is_supplier
+        else "order/notification_list.html"
+    )
     notifications = request.user.notifications.all()
     page = request.GET.get("page", 1)
     paginator = Paginator(notifications, 20)
@@ -30,12 +35,10 @@ def notification_list(request):
         n.display_link = n.link_for(request.user)
     return render(
         request,
-        "order/notification_list.html",
+        template,
         {
             "page_obj": page_obj,
             "unread_count": notifications.filter(is_read=False).count(),
-            "extends_template": "order/supplier_base.html" if is_supplier else "order/base.html",
-            "is_supplier": is_supplier,
             "supplier": request.user.supplier_profile if is_supplier else None,
         },
     )
