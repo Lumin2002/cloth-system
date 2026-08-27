@@ -15,7 +15,7 @@ from order.captcha import CAPTCHA_SESSION_KEY
 from order import service_monitor
 from order import terminal
 from order.middleware import SESSION_LAST_ACTIVITY_KEY
-from order.models import ClothOrder, Supplier
+from order.models import ClothOrder, Notification, Supplier
 
 
 @override_settings(
@@ -648,3 +648,104 @@ class ShipmentProgressTests(TestCase):
         order.refresh_from_db()
         self.assertTrue(order.supplier_shipped)
         self.assertEqual(order.current_stage_name, "通知供应商")
+
+
+class NotificationAccessTests(TestCase):
+    """供应商消息提醒权限拦截：不能经由通知进入管理端页面"""
+
+    def setUp(self):
+        self.supplier_user = User.objects.create_user(
+            username="notif_supplier",
+            email="notif_supplier@example.com",
+            password="test-pass-123",
+        )
+        self.supplier = Supplier.objects.create(
+            user=self.supplier_user,
+            company_name="提醒测试供应商",
+        )
+        self.staff_user = User.objects.create_user(
+            username="notif_staff",
+            email="notif_staff@example.com",
+            password="test-pass-123",
+            is_staff=True,
+        )
+        self.order = ClothOrder.objects.create(
+            order_type="sample",
+            order_status="active",
+            serial_number=10,
+            customer="测试客户",
+            quantity_unit="码",
+            price_unit="元/码",
+            progress_stages='["客户下单","通知供应商","剪版寄出","待收款","已完成"]',
+            progress_current=1,
+            supplier=self.supplier,
+        )
+
+    def test_supplier_blocked_from_admin_dashboard(self):
+        self.client.force_login(self.supplier_user)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("supplier_dashboard"))
+
+    def test_supplier_blocked_from_admin_order_pages(self):
+        self.client.force_login(self.supplier_user)
+        response = self.client.get(reverse("order_list"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("supplier_dashboard"))
+        response = self.client.get(reverse("order_detail", kwargs={"pk": self.order.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("supplier_dashboard"))
+
+    def test_supplier_notification_list_uses_supplier_base(self):
+        Notification.objects.create(
+            recipient=self.supplier_user,
+            title="测试提醒",
+            message="订单测试",
+            link=f"/orders/{self.order.pk}/",
+        )
+        self.client.force_login(self.supplier_user)
+        response = self.client.get(reverse("notification_list"), HTTP_HOST="localhost")
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        self.assertIn("供应商面板", html)
+        self.assertNotIn("订单管理", html)
+        self.assertIn(f"/supplier/orders/{self.order.pk}/", html)
+
+    def test_supplier_unread_list_link_rewritten(self):
+        Notification.objects.create(
+            recipient=self.supplier_user,
+            title="测试提醒",
+            link=f"/orders/{self.order.pk}/",
+        )
+        self.client.force_login(self.supplier_user)
+        response = self.client.get(reverse("notification_unread_list"))
+        data = response.json()
+        self.assertEqual(
+            data["notifications"][0]["link"],
+            f"/supplier/orders/{self.order.pk}/",
+        )
+
+    def test_admin_notification_link_unchanged(self):
+        Notification.objects.create(
+            recipient=self.staff_user,
+            title="测试提醒",
+            link=f"/orders/{self.order.pk}/",
+        )
+        self.client.force_login(self.staff_user)
+        response = self.client.get(reverse("notification_unread_list"))
+        data = response.json()
+        self.assertEqual(data["notifications"][0]["link"], f"/orders/{self.order.pk}/")
+
+    def test_shipment_create_notifies_staff(self):
+        self.order.finished_product_cost_price = "12.50"
+        self.order.save(update_fields=["finished_product_cost_price"])
+        self.client.force_login(self.supplier_user)
+        response = self.client.post(
+            reverse("order_shipment_create", kwargs={"pk": self.order.pk}),
+            {"date": "2026-08-28", "quantity": "50"},
+        )
+        self.assertEqual(response.status_code, 302)
+        notif = self.staff_user.notifications.first()
+        self.assertIsNotNone(notif)
+        self.assertIn("已对订单 #10 提交出货", notif.message)
+        self.assertEqual(notif.link, f"/orders/{self.order.pk}/")

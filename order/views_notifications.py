@@ -21,16 +21,22 @@ from .models import (
 
 
 def notification_list(request):
+    is_supplier = hasattr(request.user, "supplier_profile") and not request.user.is_staff
     notifications = request.user.notifications.all()
     page = request.GET.get("page", 1)
     paginator = Paginator(notifications, 20)
     page_obj = paginator.get_page(page)
+    for n in page_obj:
+        n.display_link = n.link_for(request.user)
     return render(
         request,
         "order/notification_list.html",
         {
             "page_obj": page_obj,
             "unread_count": notifications.filter(is_read=False).count(),
+            "extends_template": "order/supplier_base.html" if is_supplier else "order/base.html",
+            "is_supplier": is_supplier,
+            "supplier": request.user.supplier_profile if is_supplier else None,
         },
     )
 
@@ -61,7 +67,7 @@ def notification_unread_list(request):
                 "id": n.pk,
                 "title": n.title,
                 "message": n.message,
-                "link": n.link,
+                "link": n.link_for(request.user),
                 "created_at": n.created_at.strftime("%m-%d %H:%M"),
             }
         )

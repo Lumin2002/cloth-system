@@ -64,7 +64,7 @@
     "shipment_updated": "出货记录已更新（批次 {batch}）",
     "order_save_failed": "保存失败，请检查填写内容",
     "need_cost_price_first": "请先填写并提交成品成本价格，再安排出货",
-    "supplier_shipped_notify": "供应商 {name} 已对订单 #{serial} 提交出货，出货数量 {qty} 和出货价格 {unit}，请前往查看出货记录",
+    "supplier_shipped_notify": "供应商 {name} 已对订单 #{serial} 提交出货，数量 {qty} {unit}，请前往查看出货记录",
     "supplier_quoted_notify": "供应商 {name} 已对订单 #{serial} 提交报价，请前往查看报价"
   },
   "label": {

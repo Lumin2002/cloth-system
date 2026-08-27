@@ -68,10 +68,10 @@ from .models import (
 from .order_excel import export_orders_dataframe
 from .order_filters import filter_orders_queryset
 from .statement import generate_bulk_statement, generate_order_statement
-from .views_common import logger
+from .views_common import AdminRequiredMixin, logger
 
 
-class OrderListView(LoginRequiredMixin, ListView):
+class OrderListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
     model = ClothOrder
     template_name = "order/order_list.html"
     context_object_name = "orders"
@@ -284,7 +284,7 @@ class OrderListView(LoginRequiredMixin, ListView):
         return ctx
 
 
-class OrderDetailView(LoginRequiredMixin, DetailView):
+class OrderDetailView(AdminRequiredMixin, LoginRequiredMixin, DetailView):
     model = ClothOrder
     template_name = "order/order_detail.html"
     context_object_name = "order"
@@ -330,7 +330,7 @@ class OrderDetailView(LoginRequiredMixin, DetailView):
             return self.get(request, *args, **kwargs)
 
 
-class OrderCreateView(LoginRequiredMixin, CreateView):
+class OrderCreateView(AdminRequiredMixin, LoginRequiredMixin, CreateView):
     model = ClothOrder
     form_class = ClothOrderForm
     template_name = "order/order_create.html"
@@ -366,6 +366,7 @@ class OrderCreateView(LoginRequiredMixin, CreateView):
         return response
 
 
+@admin_required
 def bulk_orders_action(request):
     action = request.POST.get("action", "").strip()
     order_ids = request.POST.getlist("order_ids")
@@ -437,6 +438,7 @@ def bulk_orders_action(request):
     return redirect(next_url)
 
 
+@admin_required
 def order_delete(request, pk):
     order = get_object_or_404(ClothOrder, pk=pk)
     serial = order.serial_number
@@ -446,6 +448,7 @@ def order_delete(request, pk):
     return redirect("order_list")
 
 
+@admin_required
 def orders_delete_all(request):
     if request.method == "POST":
         count = ClothOrder.objects.all().delete()[0]
@@ -456,6 +459,7 @@ def orders_delete_all(request):
     return render(request, "order/delete_all_confirm.html", {"order_count": order_count})
 
 
+@admin_required
 def orders_export(request):
     df = export_orders_dataframe()
     filename = f"orders_backup_{now().strftime('%Y%m%d_%H%M%S')}.xlsx"
@@ -469,10 +473,12 @@ def orders_export(request):
     return response
 
 
+@admin_required
 def orders_import_page(request):
     return render(request, "order/orders_import.html")
 
 
+@admin_required
 def orders_import_start(request):
     task_id = create_import_task(request.user.id)
     logger.info(t("log.import_orders_start", username=request.user.username))
@@ -480,6 +486,7 @@ def orders_import_start(request):
     return JsonResponse({"task_id": task_id})
 
 
+@admin_required
 def orders_import_progress(request, task_id):
     task = get_import_task(str(task_id), request.user.id)
     if not task:
@@ -507,6 +514,7 @@ def orders_import_progress(request, task_id):
     )
 
 
+@admin_required
 def order_update_progress(request, pk):
     order = get_object_or_404(ClothOrder, pk=pk)
     try:
@@ -529,10 +537,12 @@ def order_update_progress(request, pk):
         return JsonResponse({"error": str(e)}, status=400)
 
 
+@admin_required
 def order_edit_redirect(request, pk):
     return redirect(f"{reverse('order_detail', kwargs={'pk': pk})}?edit=1")
 
 
+@admin_required
 def order_statement(request, pk):
     order = get_object_or_404(ClothOrder, pk=pk)
     output = generate_order_statement(order)
@@ -547,6 +557,7 @@ def order_statement(request, pk):
     return response
 
 
+@admin_required
 def order_statement_bulk(request):
     ids_raw = request.GET.get("ids", "").strip()
     if not ids_raw:
@@ -584,6 +595,7 @@ def order_statement_bulk(request):
     return response
 
 
+@admin_required
 def order_toggle_supplier_paid(request, pk):
     order = get_object_or_404(ClothOrder, pk=pk)
     order.supplier_paid = not order.supplier_paid
@@ -601,6 +613,7 @@ def order_toggle_supplier_paid(request, pk):
     return redirect("order_detail", pk=pk)
 
 
+@admin_required
 def order_toggle_status(request, pk):
     order = get_object_or_404(ClothOrder, pk=pk)
     if order.order_status == "active":
@@ -623,6 +636,7 @@ def order_toggle_status(request, pk):
     return redirect("order_detail", pk=pk)
 
 
+@admin_required
 def order_toggle_payment_status(request, pk):
     order = get_object_or_404(ClothOrder, pk=pk)
     if order.payment_status == "paid":
@@ -643,6 +657,7 @@ def order_toggle_payment_status(request, pk):
     return redirect("order_detail", pk=pk)
 
 
+@admin_required
 def order_refresh_calculations(request, pk):
     order = get_object_or_404(ClothOrder, pk=pk)
     qty = float(order.total_shipment_from_shipments() or 0)
@@ -682,6 +697,7 @@ def order_refresh_calculations(request, pk):
     return redirect("order_detail", pk=pk)
 
 
+@admin_required
 def order_list_updated_at(request):
     latest = ClothOrder.objects.order_by("-updated_at").values("updated_at").first()
     ts = latest["updated_at"].isoformat() if latest and latest["updated_at"] else ""

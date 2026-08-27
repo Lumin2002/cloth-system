@@ -1,4 +1,4 @@
-﻿{% extends "order/base.html" %}
+{% extends extends_template %}
 {% block title %}消息通知{% endblock %}
 {% block content %}
 <div class="container py-4">
@@ -29,8 +29,8 @@
                     </div>
                     <p class="mb-1 text-muted small">{{ notification.message }}</p>
                     <div class="mt-1">
-                        {% if notification.link %}
-                        <a href="{{ notification.link }}" class="btn btn-sm btn-outline-primary">查看详情</a>
+                        {% if notification.display_link %}
+                        <a href="{{ notification.display_link }}" class="btn btn-sm btn-outline-primary">查看详情</a>
                         {% endif %}
                         {% if not notification.is_read %}
                         <form method="post" action="{% url 'notification_mark_read' notification.pk %}" style="display:inline;">

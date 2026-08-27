@@ -1,3 +1,5 @@
+import re
+
 from django.db import models
 from django.core.validators import MinValueValidator
 
@@ -490,6 +492,14 @@ class Notification(models.Model):
 
     def __str__(self):
         return self.title
+
+    def link_for(self, user):
+        """供应商查看时，将管理端订单链接改写为供应商端订单链接，避免越权进入管理页"""
+        if self.link and hasattr(user, "supplier_profile") and not user.is_staff:
+            m = re.match(r"^/orders/(\d+)/", self.link)
+            if m:
+                return f"/supplier/orders/{m.group(1)}/"
+        return self.link
 
 
 def notify_user(recipient, title, message="", link=""):

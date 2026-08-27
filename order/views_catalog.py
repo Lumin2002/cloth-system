@@ -48,10 +48,10 @@ from .models import (
     notify_all_staff,
     notify_user,
 )
-from .views_common import logger
+from .views_common import AdminRequiredMixin, logger
 
 
-class ClothCatalogListView(LoginRequiredMixin, ListView):
+class ClothCatalogListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
     model = ClothCatalog
     template_name = "order/cloth_catalog_list.html"
     context_object_name = "items"
@@ -88,13 +88,13 @@ class ClothCatalogListView(LoginRequiredMixin, ListView):
         return ctx
 
 
-class ClothCatalogDetailView(LoginRequiredMixin, DetailView):
+class ClothCatalogDetailView(AdminRequiredMixin, LoginRequiredMixin, DetailView):
     model = ClothCatalog
     template_name = "order/cloth_catalog_detail.html"
     context_object_name = "item"
 
 
-class ClothCatalogCreateView(LoginRequiredMixin, CreateView):
+class ClothCatalogCreateView(AdminRequiredMixin, LoginRequiredMixin, CreateView):
     model = ClothCatalog
     fields = [
         "cloth_code",
@@ -135,10 +135,12 @@ class ClothCatalogCreateView(LoginRequiredMixin, CreateView):
         return response
 
 
+@admin_required
 def cloth_catalog_import(request):
     return render(request, "order/cloth_catalog_import.html")
 
 
+@admin_required
 def cloth_catalog_import_start(request):
     task_id = create_catalog_task(request.user.id)
     logger.info(t("log.catalog_task", task_id=task_id, user_id=request.user.id))
@@ -146,6 +148,7 @@ def cloth_catalog_import_start(request):
     return JsonResponse({"task_id": task_id})
 
 
+@admin_required
 def cloth_catalog_import_progress(request, task_id):
     try:
         task = get_catalog_task(str(task_id), request.user.id)
@@ -190,6 +193,7 @@ def cloth_catalog_import_progress(request, task_id):
         )
 
 
+@admin_required
 def cloth_catalog_delete(request, pk):
     obj = get_object_or_404(ClothCatalog, pk=pk)
     code = obj.cloth_code
@@ -199,6 +203,7 @@ def cloth_catalog_delete(request, pk):
     return redirect("cloth_catalog_list")
 
 
+@admin_required
 def cloth_catalog_delete_all(request):
     count = ClothCatalog.objects.all().delete()[0]
     logger.info(t("log.catalog_delete_all", username=request.user.username, count=count))
@@ -206,6 +211,7 @@ def cloth_catalog_delete_all(request):
     return redirect("cloth_catalog_list")
 
 
+@admin_required
 def cloth_catalog_autocomplete(request):
     q = request.GET.get("q", "").strip()
     if len(q) < 1:

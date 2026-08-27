@@ -423,6 +423,24 @@ def order_shipment_create(request, pk):
             ]
         )
 
+        if order.supplier:
+            supplier_name = order.supplier.company_name
+        elif hasattr(request.user, "supplier_profile"):
+            supplier_name = request.user.supplier_profile.company_name
+        else:
+            supplier_name = "管理员"
+        notify_all_staff(
+            title=t("label.supplier_shipped"),
+            message=t(
+                "msg.supplier_shipped_notify",
+                name=supplier_name,
+                serial=order.serial_number,
+                qty=shipment.quantity,
+                unit=order.quantity_unit or "",
+            ),
+            link=reverse("order_detail", kwargs={"pk": order.pk}),
+        )
+
         if progress_changed:
             logger.info(
                 t(

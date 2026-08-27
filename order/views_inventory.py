@@ -61,13 +61,15 @@ from .models import (
     notify_all_staff,
     notify_user,
 )
-from .views_common import logger
+from .views_common import AdminRequiredMixin, logger
 
 
+@admin_required
 def inventory_import_page(request):
     return render(request, "order/inventory_import.html")
 
 
+@admin_required
 def inventory_import_start(request):
     task_id = create_inventory_task(request.user.id)
     logger.info(t("log.import_inventory_start", username=request.user.username))
@@ -75,6 +77,7 @@ def inventory_import_start(request):
     return JsonResponse({"task_id": task_id})
 
 
+@admin_required
 def inventory_import_progress(request, task_id):
     task = get_inventory_task(str(task_id), request.user.id)
     if not task:
@@ -103,10 +106,12 @@ def inventory_import_progress(request, task_id):
     )
 
 
+@admin_required
 def inventory_export(request):
     return redirect("inventory_list")
 
 
+@admin_required
 def inventory_delete_all(request):
     count = InventoryItem.objects.all().delete()[0]
     logger.info(t("log.inventory_delete_all", username=request.user.username, count=count))
@@ -114,7 +119,7 @@ def inventory_delete_all(request):
     return redirect("inventory_list")
 
 
-class InventoryListView(LoginRequiredMixin, ListView):
+class InventoryListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
     model = InventoryItem
     template_name = 'order/inventory_list.html'
     context_object_name = 'items'
@@ -184,13 +189,13 @@ class InventoryListView(LoginRequiredMixin, ListView):
         return context
 
 
-class InventoryDetailView(LoginRequiredMixin, DetailView):
+class InventoryDetailView(AdminRequiredMixin, LoginRequiredMixin, DetailView):
     model = InventoryItem
     template_name = "order/inventory_detail.html"
     context_object_name = "item"
 
 
-class InventoryUpdateView(LoginRequiredMixin, UpdateView):
+class InventoryUpdateView(AdminRequiredMixin, LoginRequiredMixin, UpdateView):
     model = InventoryItem
     form_class = InventoryItemForm
     template_name = "order/inventory_form.html"
@@ -212,11 +217,12 @@ class InventoryUpdateView(LoginRequiredMixin, UpdateView):
         return response
 
 
+@admin_required
 def inventory_bulk_action(request):
     return redirect("inventory_list")
 
 
-class InventoryLogListView(LoginRequiredMixin, ListView):
+class InventoryLogListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
     model = InventoryLog
     template_name = "order/inventory_log_list.html"
     context_object_name = "items"
@@ -272,6 +278,7 @@ class InventoryLogListView(LoginRequiredMixin, ListView):
         return ctx
 
 
+@admin_required
 def inventory_log_export(request):
     """导出全部库存日志到 Excel"""
     qs = InventoryLog.objects.select_related('item').order_by('-created_at')
@@ -296,6 +303,7 @@ def inventory_log_export(request):
     return response
 
 
+@admin_required
 def inventory_log_delete_all(request):
     """清空全部库存日志"""
     count = InventoryLog.objects.all().delete()[0]

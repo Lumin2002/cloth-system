@@ -40,9 +40,10 @@ from .models import (
     notify_all_staff,
     notify_user,
 )
-from .views_common import logger
+from .views_common import AdminRequiredMixin, logger
 
 
+@admin_required
 def quotation_lookup(request):
     article_no = request.GET.get("q", "").strip()
     if not article_no:
@@ -79,7 +80,7 @@ def quotation_lookup(request):
     return JsonResponse(data)
 
 
-class QuotationListView(LoginRequiredMixin, ListView):
+class QuotationListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
     model = FabricQuotation
     template_name = "order/quotation_list.html"
     context_object_name = "items"
@@ -115,13 +116,13 @@ class QuotationListView(LoginRequiredMixin, ListView):
         return ctx
 
 
-class QuotationDetailView(LoginRequiredMixin, DetailView):
+class QuotationDetailView(AdminRequiredMixin, LoginRequiredMixin, DetailView):
     model = FabricQuotation
     template_name = "order/quotation_detail.html"
     context_object_name = "item"
 
 
-class QuotationCreateView(LoginRequiredMixin, CreateView):
+class QuotationCreateView(AdminRequiredMixin, LoginRequiredMixin, CreateView):
     model = FabricQuotation
     fields = [
         "article_no",
@@ -171,6 +172,7 @@ class QuotationCreateView(LoginRequiredMixin, CreateView):
         return response
 
 
+@admin_required
 def quotation_delete(request, pk):
     obj = get_object_or_404(FabricQuotation, pk=pk)
     article = obj.article_no
@@ -217,6 +219,7 @@ def _parse_price(text):
     return solid_val, print_val, unit
 
 
+@admin_required
 def quotation_import(request):
     if request.method == "POST":
         excel_file = request.FILES.get("excel_file")
@@ -327,6 +330,7 @@ def quotation_import(request):
     return render(request, "order/quotation_import.html")
 
 
+@admin_required
 def quotation_delete_all(request):
     count = FabricQuotation.objects.all().delete()[0]
     logger.info(t("log.quotation_delete_all", username=request.user.username, count=count))

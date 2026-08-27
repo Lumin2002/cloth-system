@@ -44,6 +44,7 @@ from .models import (
 
 
 
+@admin_required
 def dashboard_view(request):
     # ===== Financial totals: single Shipment join query (replaces N+1 Python loop) =====
     ship_base = Shipment.objects.filter(is_deleted=False, order__order_status="active")
