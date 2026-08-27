@@ -15,7 +15,7 @@ from order.captcha import CAPTCHA_SESSION_KEY
 from order import service_monitor
 from order import terminal
 from order.middleware import SESSION_LAST_ACTIVITY_KEY
-from order.models import Supplier
+from order.models import ClothOrder, Supplier
 
 
 @override_settings(
@@ -489,3 +489,146 @@ class LoginCaptchaTests(TestCase):
         self.assertEqual(response.url, reverse("home"))
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertNotIn(CAPTCHA_SESSION_KEY, self.client.session)
+
+
+class ShipmentProgressTests(TestCase):
+    """供应商出货后，订单进度自动调整为「剪版寄出」"""
+
+    def setUp(self):
+        self.supplier_user = User.objects.create_user(
+            username="supplier_ship",
+            email="supplier_ship@example.com",
+            password="test-pass-123",
+        )
+        self.supplier = Supplier.objects.create(
+            user=self.supplier_user,
+            company_name="出货测试供应商",
+        )
+        self.admin_user = User.objects.create_superuser(
+            username="admin_ship",
+            email="admin_ship@example.com",
+            password="test-pass-123",
+        )
+
+    def _create_order(self, order_type="sample", serial_number=1, progress_current=1):
+        if order_type == "sample":
+            stages = '["客户下单","通知供应商","剪版寄出","待收款","已完成"]'
+        else:
+            stages = '["客户下单","通知供应商","大货样","批色","查布","发货","待收款","已完成"]'
+        return ClothOrder.objects.create(
+            order_type=order_type,
+            order_status="active",
+            serial_number=serial_number,
+            customer="测试客户",
+            quantity_unit="码",
+            price_unit="元/码",
+            progress_stages=stages,
+            progress_current=progress_current,
+            supplier=self.supplier,
+        )
+
+    def test_model_helper_sets_sample_stage(self):
+        order = self._create_order()
+        self.assertTrue(order.set_progress_stage("剪版寄出"))
+        order.refresh_from_db()
+        self.assertEqual(order.progress_current, 2)
+        self.assertEqual(order.current_stage_name, "剪版寄出")
+
+    def test_model_helper_ignores_missing_stage(self):
+        order = self._create_order(order_type="bulk", serial_number=2)
+        self.assertFalse(order.set_progress_stage("剪版寄出"))
+        order.refresh_from_db()
+        self.assertEqual(order.progress_current, 1)
+
+    def test_supplier_submit_shipment_advances_progress(self):
+        order = self._create_order()
+        self.client.force_login(self.supplier_user)
+        response = self.client.post(
+            reverse("supplier_order_detail", kwargs={"pk": order.pk}),
+            {
+                "finished_product_cost_price": "12.50",
+                "cost_price_unit": "元/码",
+                "address": "",
+                "remark": "",
+                "shipment_date": "2026-08-28",
+                "shipment_quantity": "50",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertTrue(order.supplier_shipped)
+        self.assertEqual(order.current_stage_name, "剪版寄出")
+
+    def test_supplier_ajax_submit_price_and_first_shipment(self):
+        order = self._create_order()
+        self.client.force_login(self.supplier_user)
+        response = self.client.post(
+            reverse("supplier_order_detail", kwargs={"pk": order.pk}),
+            {
+                "finished_product_cost_price": "12.50",
+                "cost_price_unit": "元/码",
+                "address": "",
+                "remark": "",
+                "shipment_date": "2026-08-28",
+                "shipment_quantity": "50",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "ok")
+        self.assertTrue(data["shipment_created"])
+        self.assertEqual(data["cost_price"], "12.50")
+        self.assertEqual(data["shipment"]["batch_number"], 1)
+        self.assertEqual(data["shipment"]["total"], 625.0)
+        order.refresh_from_db()
+        self.assertTrue(order.supplier_shipped)
+        self.assertEqual(order.current_stage_name, "剪版寄出")
+        self.assertEqual(order.total_shipment_quantity, 50)
+        shipment = order.shipments.get()
+        self.assertEqual(shipment.batch_number, 1)
+
+    def test_supplier_ajax_submit_price_only_no_shipment(self):
+        order = self._create_order()
+        self.client.force_login(self.supplier_user)
+        response = self.client.post(
+            reverse("supplier_order_detail", kwargs={"pk": order.pk}),
+            {
+                "finished_product_cost_price": "12.50",
+                "cost_price_unit": "元/码",
+                "address": "",
+                "remark": "",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "ok")
+        self.assertFalse(data["shipment_created"])
+        order.refresh_from_db()
+        self.assertFalse(order.supplier_shipped)
+        self.assertEqual(str(order.finished_product_cost_price), "12.50")
+
+    def test_shipment_create_endpoint_advances_progress(self):
+        order = self._create_order()
+        self.client.force_login(self.admin_user)
+        response = self.client.post(
+            reverse("order_shipment_create", kwargs={"pk": order.pk}),
+            {"date": "2026-08-28", "quantity": "30"},
+        )
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertTrue(order.supplier_shipped)
+        self.assertEqual(order.current_stage_name, "剪版寄出")
+
+    def test_bulk_shipment_keeps_existing_progress(self):
+        order = self._create_order(order_type="bulk", serial_number=2)
+        self.client.force_login(self.admin_user)
+        response = self.client.post(
+            reverse("order_shipment_create", kwargs={"pk": order.pk}),
+            {"date": "2026-08-28", "quantity": "30"},
+        )
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertTrue(order.supplier_shipped)
+        self.assertEqual(order.current_stage_name, "通知供应商")

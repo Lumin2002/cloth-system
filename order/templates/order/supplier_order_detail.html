@@ -135,7 +135,7 @@
         <div class="card mb-3">
             <div class="card-header"><strong>成本与出货</strong></div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" id="priceForm">
                     {% csrf_token %}
                     <div class="row g-2 mb-3">
                         <div class="col-6">
@@ -172,6 +172,19 @@
                         {{ price_form.remark }}
                         {% if price_form.remark.errors %}<div class="text-danger small mt-1">{{ price_form.remark.errors }}</div>{% endif %}
                     </div>
+                    <hr>
+                    <h6 class="fw-bold small mb-2"><i class="bi bi-truck me-1"></i>批次{{ next_batch_number }}出货（选填）</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small">出货日期</label>
+                            <input type="date" name="shipment_date" class="form-control form-control-sm" id="id_shipment_date">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">出货数量</label>
+                            <input type="number" name="shipment_quantity" step="0.01" min="0.01" class="form-control form-control-sm" placeholder="例如 100.00" id="id_shipment_quantity">
+                        </div>
+                    </div>
+                    <div class="text-muted small mb-3">填写后随单价一起提交，自动记为批次 {{ next_batch_number }}，按上方成品单价计价，无需跳转页面。</div>
                     <button type="submit" class="btn btn-primary w-100 mb-2">
                         <i class="bi bi-check-lg me-1"></i>{% if order.finished_product_cost_price %}更新{% else %}提交{% endif %}
                     </button>
@@ -264,6 +277,147 @@
 .edit-inline .btn { white-space: nowrap; }
 </style>
 <script>
+function showFlash(tag, text) {
+    var container = document.querySelector(".main-container");
+    if (!container) return;
+    var div = document.createElement("div");
+    div.className = "alert alert-" + tag + " alert-dismissible fade show";
+    div.setAttribute("role", "alert");
+    div.innerHTML = text + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    container.insertBefore(div, container.firstChild);
+    setTimeout(function () {
+        div.classList.remove("show");
+        setTimeout(function () { div.remove(); }, 300);
+    }, 6000);
+}
+
+function addShipmentRow(ship, costPrice) {
+    var tbody = document.querySelector("#shipmentTable tbody");
+    if (!tbody) return;
+    var emptyRow = tbody.querySelector("td[colspan='5']");
+    if (emptyRow) { emptyRow.parentNode.remove(); }
+    var tr = document.createElement("tr");
+    tr.id = "ship-row-" + ship.pk;
+    var total = ship.total != null ? ship.total : ((parseFloat(ship.quantity) || 0) * (parseFloat(costPrice) || 0));
+    tr.innerHTML =
+        '<td class="text-center batch-num">' + ship.batch_number + '</td>' +
+        '<td class="ship-date">' + ship.date + '</td>' +
+        '<td class="text-end ship-qty">' + (parseFloat(ship.quantity) || 0).toFixed(2) + '</td>' +
+        '<td class="text-end"><strong class="text-primary">' + (total).toFixed(2) + '</strong></td>' +
+        '<td class="text-center">' +
+            '<button class="btn btn-sm btn-outline-primary py-0 px-1" onclick="editShipment(' + ship.pk + ')" title="编辑"><i class="bi bi-pencil"></i></button> ' +
+            '<form method="post" action="/orders/{{ order.pk }}/shipments/' + ship.pk + '/delete/" style="display:inline" onsubmit="return confirm(\'确定删除此出货记录？\')">' +
+                '<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">' +
+                '<button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="删除"><i class="bi bi-trash"></i></button>' +
+            '</form>' +
+        '</td>';
+    tbody.insertBefore(tr, tbody.firstChild);
+}
+
+function applyPriceSaveResult(data) {
+    var costPrice = data.cost_price;
+    var costUnit = data.cost_price_unit || "";
+    var hasPrice = costPrice !== "";
+    var stepDescs = document.querySelectorAll(".step-desc");
+    if (stepDescs.length > 1 && hasPrice) {
+        stepDescs[1].textContent = costPrice + " " + costUnit;
+    }
+    if (data.shipment_created && stepDescs.length > 2) {
+        stepDescs[2].textContent = (parseFloat(data.total_quantity) || 0).toFixed(2) + " {{ order.quantity_unit|default:'' }}";
+    }
+    var badges = document.querySelectorAll(".card-header .badge");
+    if (badges.length > 1) {
+        var stateBadge = badges[1];
+        if (data.supplier_shipped) {
+            stateBadge.className = "badge bg-success fs-6";
+            stateBadge.textContent = "已出货";
+        } else if (hasPrice) {
+            stateBadge.className = "badge bg-info fs-6";
+            stateBadge.textContent = "已提交待出货";
+        }
+    }
+    var steps = document.querySelectorAll(".step");
+    var connectors = document.querySelectorAll(".step-connector");
+    if (steps.length >= 4 && connectors.length >= 3) {
+        if (hasPrice) {
+            steps[1].classList.add("active");
+            connectors[0].classList.add("completed");
+            steps[2].classList.remove("disabled");
+        }
+        if (data.supplier_shipped) {
+            steps[2].classList.add("active", "completed");
+            steps[3].classList.add("active", "completed");
+            steps[3].classList.remove("disabled");
+            connectors[1].classList.add("completed");
+            connectors[2].classList.add("completed");
+        }
+    }
+    var price = parseFloat(costPrice) || 0;
+    document.querySelectorAll("#shipmentTable tbody tr[id^='ship-row-']").forEach(function (row) {
+        if (row.classList.contains("editing")) return;
+        var qtyCell = row.querySelector("td.ship-qty");
+        var totalCell = row.querySelectorAll("td")[3];
+        var strong = totalCell ? totalCell.querySelector("strong") : null;
+        if (qtyCell && strong) {
+            var qty = parseFloat(qtyCell.textContent) || 0;
+            strong.textContent = (qty * price).toFixed(2);
+        }
+    });
+    if (data.shipment_created && data.shipment) {
+        addShipmentRow(data.shipment, costPrice);
+    }
+    var footCells = document.querySelectorAll("#shipmentTable tfoot td");
+    if (footCells.length >= 3) {
+        var qtySuffix = footCells[1].textContent.trim().replace(/^[\d.]+/, "");
+        footCells[1].textContent = (parseFloat(data.total_quantity) || 0).toFixed(2) + qtySuffix;
+        footCells[2].textContent = (parseFloat(data.shipment_total_sum) || 0).toFixed(2) + " 元";
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    var priceForm = document.getElementById("priceForm");
+    if (!priceForm) return;
+    priceForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var submitBtn = priceForm.querySelector("button[type='submit']");
+        var oldHtml = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+        fetch(priceForm.action || window.location.href, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": "{{ csrf_token }}",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: new FormData(priceForm)
+        })
+        .then(function (r) {
+            return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+        })
+        .then(function (res) {
+            var data = res.data || {};
+            submitBtn.disabled = false;
+            if (data.status === "ok") {
+                submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>更新';
+                applyPriceSaveResult(data);
+                showFlash("success", data.message || "保存成功");
+                var dateInput = priceForm.querySelector("input[name='shipment_date']");
+                var qtyInput = priceForm.querySelector("input[name='shipment_quantity']");
+                if (dateInput) dateInput.value = "";
+                if (qtyInput) qtyInput.value = "";
+            } else {
+                submitBtn.innerHTML = oldHtml;
+                showFlash("danger", data.message || "保存失败，请检查填写内容");
+            }
+        })
+        .catch(function () {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = oldHtml;
+            showFlash("danger", "网络异常，请稍后重试");
+        });
+    });
+});
+
 function editShipment(shipmentPk) {
     var row = document.getElementById('ship-row-' + shipmentPk);
     if (!row) return;

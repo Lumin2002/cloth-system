@@ -264,6 +264,23 @@ class ClothOrder(ClothCatalogMixin, ProgressStageMixin, models.Model):
             return json.loads(self.progress_stages) if self.progress_stages else []
         except Exception:
             return []
+
+    def set_progress_stage(self, stage_name, save=True):
+        """将订单进度调整为指定阶段（仅当该阶段存在于进度阶段列表中时生效）"""
+        import json
+        try:
+            stages = json.loads(self.progress_stages) if self.progress_stages else []
+            if stage_name in stages:
+                index = stages.index(stage_name)
+                if self.progress_current != index:
+                    self.progress_current = index
+                    if save:
+                        self.save(update_fields=["progress_current"])
+                    return True
+        except Exception:
+            pass
+        return False
+
     @property
     def is_overdue(self):
         """检查是否逾期（货款支付时间空且出货超过账期）"""
