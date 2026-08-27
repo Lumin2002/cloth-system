@@ -110,11 +110,14 @@
                     <ul class="dropdown-menu dropdown-menu-end" style="width:320px;max-height:400px;overflow-y:auto;">
                         <li><h6 class="dropdown-header">消息通知</h6></li>
                         <li><div id="notif-dropdown-list"><div class="text-center text-muted small py-2">加载中...</div></div></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li class="d-flex justify-content-between px-3 py-1">
-                            <a href="{% url 'notification_list' %}" class="small">查看全部</a>
-                            <a href="#" class="small" id="notif-mark-all-read">全部标为已读</a>
-                        </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li class="d-flex justify-content-between px-3 py-1">
+                                <a href="{% url 'notification_list' %}" class="small">查看全部</a>
+                                <form method="post" action="{% url 'notification_mark_all_read' %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="small btn btn-link p-0 border-0" style="box-shadow:none;">全部标为已读</button>
+                                </form>
+                            </li>
                     </ul>
                 </div>
                 <a class="nav-link" href="{% url 'supplier_logout' %}"><i class="bi bi-box-arrow-right me-1"></i>退出登录</a>
@@ -182,14 +185,6 @@ function fetchNotifList() {
         .catch(function(){});
 }
 document.addEventListener("DOMContentLoaded", function() {
-    var markAllBtn = document.getElementById("notif-mark-all-read");
-    if (markAllBtn) {
-        markAllBtn.addEventListener("click", function(e) {
-            e.preventDefault();
-            fetch("/notifications/mark-all-read/", {method:"POST",headers:{"X-CSRFToken":"{{ csrf_token }}","X-Requested-With":"XMLHttpRequest"}})
-                .then(function(){ fetchNotifCount(); fetchNotifList(); });
-        });
-    }
     fetchNotifCount();
     fetchNotifList();
     setInterval(fetchNotifCount, 15000);

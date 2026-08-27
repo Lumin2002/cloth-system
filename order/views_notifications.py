@@ -4,6 +4,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 from .models import (
     ClothCatalog,
@@ -53,12 +55,14 @@ def notification_mark_read(request, pk):
     notification = get_object_or_404(Notification, pk=pk, recipient=request.user)
     notification.is_read = True
     notification.save(update_fields=["is_read"])
-    return JsonResponse({"ok": True})
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse({"ok": True})
+    return _redirect_back(request)
 
 
 def notification_mark_all_read(request):
     request.user.notifications.filter(is_read=False).update(is_read=True)
-    return JsonResponse({"ok": True})
+    return _redirect_back(request)
 
 
 def notification_unread_list(request):
@@ -75,3 +79,11 @@ def notification_unread_list(request):
             }
         )
     return JsonResponse({"notifications": data})
+
+
+def _redirect_back(request):
+    """POST 后跳回来源页面，避免表单提交后直接展示 JSON"""
+    referer = request.META.get("HTTP_REFERER", "")
+    if referer and url_has_allowed_host_and_scheme(referer, allowed_hosts={request.get_host()}):
+        return redirect(referer)
+    return redirect(reverse("notification_list"))

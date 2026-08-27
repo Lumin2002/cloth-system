@@ -763,3 +763,50 @@ class NotificationAccessTests(TestCase):
         self.assertIsNotNone(notif)
         self.assertIn("已对订单 #10 提交出货", notif.message)
         self.assertEqual(notif.link, f"/orders/{self.order.pk}/")
+
+    def test_mark_all_read_redirects_instead_of_json(self):
+        for i in range(2):
+            Notification.objects.create(
+                recipient=self.staff_user,
+                title=f"测试{i}",
+                link=f"/orders/{self.order.pk}/",
+            )
+        self.client.force_login(self.staff_user)
+        list_url = reverse("notification_list")
+        response = self.client.post(
+            reverse("notification_mark_all_read"),
+            HTTP_REFERER=list_url,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, list_url)
+        self.assertEqual(self.staff_user.notifications.filter(is_read=False).count(), 0)
+
+    def test_mark_read_form_redirects_ajax_returns_json(self):
+        n = Notification.objects.create(
+            recipient=self.staff_user,
+            title="测试提醒",
+            link=f"/orders/{self.order.pk}/",
+        )
+        self.client.force_login(self.staff_user)
+        # 表单提交：刷新回来源页
+        response = self.client.post(
+            reverse("notification_mark_read", kwargs={"pk": n.pk}),
+            HTTP_REFERER=reverse("notification_list"),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("notification_list"))
+        n.refresh_from_db()
+        self.assertTrue(n.is_read)
+        # AJAX：返回 JSON
+        n2 = Notification.objects.create(
+            recipient=self.staff_user,
+            title="测试提醒2",
+        )
+        response = self.client.post(
+            reverse("notification_mark_read", kwargs={"pk": n2.pk}),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ok": True})
+        n2.refresh_from_db()
+        self.assertTrue(n2.is_read)

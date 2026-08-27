@@ -553,7 +553,10 @@
                             <li><hr class="dropdown-divider"></li>
                             <li class="d-flex justify-content-between px-3 py-1">
                                 <a href="{% url 'notification_list' %}" class="small">查看全部</a>
-                                <a href="#" class="small" id="notif-mark-all-read">全部标为已读</a>
+                                <form method="post" action="{% url 'notification_mark_all_read' %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="small btn btn-link p-0 border-0" style="box-shadow:none;">全部标为已读</button>
+                                </form>
                             </li>
                         </ul>
                     </div>
@@ -649,16 +652,7 @@ function fetchNotifList() {
         .catch(function(){});
 }
 
-// Mark all as read
 document.addEventListener("DOMContentLoaded", function() {
-    var markAllBtn = document.getElementById("notif-mark-all-read");
-    if (markAllBtn) {
-        markAllBtn.addEventListener("click", function(e) {
-            e.preventDefault();
-            fetch("/notifications/mark-all-read/", {method:"POST", headers:{"X-CSRFToken":"{{ csrf_token }}","X-Requested-With":"XMLHttpRequest"}})
-                .then(function() { fetchNotifCount(); fetchNotifList(); });
-        });
-    }
     // Initial fetch
     fetchNotifCount();
     fetchNotifList();
