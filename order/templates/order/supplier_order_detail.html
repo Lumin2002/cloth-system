@@ -132,10 +132,11 @@
     </div>
 
     <div class="col-md-4">
-        <!-- 新增出货 -->
+        <!-- 成本与出货 -->
         <div class="card mb-3">
-            <div class="card-header"><strong>新增出货</strong></div>
+            <div class="card-header"><strong>成本与出货</strong></div>
             <div class="card-body">
+                <h6 class="fw-bold small mb-2"><i class="bi bi-truck me-1"></i>新增出货</h6>
                 <form method="post" action="{% url 'order_shipment_create' order.pk %}" id="shipmentForm">
                     {% csrf_token %}
                     <div class="mb-2">
@@ -151,13 +152,9 @@
                     </button>
                 </form>
                 <div class="text-muted small mt-2" id="shipmentHint"></div>
-            </div>
-        </div>
 
-        <!-- 成本与出货 -->
-        <div class="card mb-3">
-            <div class="card-header"><strong>成本与出货</strong></div>
-            <div class="card-body">
+                <hr>
+
                 <form method="post" id="priceForm">
                     {% csrf_token %}
                     <div class="mb-3">
