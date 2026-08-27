@@ -188,12 +188,22 @@
                     {% endif %}
                     <div class="mb-3">
                         <label class="form-label fw-bold small">{{ price_form.address.label }}</label>
-                        {{ price_form.address }}
+                        <div id="addressEditWrap" class="{% if order.finished_product_cost_price %}d-none{% endif %}">
+                            {{ price_form.address }}
+                        </div>
+                        <div id="addressTextView" class="{% if order.finished_product_cost_price %}{% else %}d-none{% endif %}">
+                            <div class="p-2 bg-light rounded small" style="white-space:pre-wrap;">{{ order.address|default:"—" }}</div>
+                        </div>
                         {% if price_form.address.errors %}<div class="text-danger small mt-1">{{ price_form.address.errors }}</div>{% endif %}
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold small">{{ price_form.remark.label }}</label>
-                        {{ price_form.remark }}
+                        <div id="remarkEditWrap" class="{% if order.finished_product_cost_price %}d-none{% endif %}">
+                            {{ price_form.remark }}
+                        </div>
+                        <div id="remarkTextView" class="{% if order.finished_product_cost_price %}{% else %}d-none{% endif %}">
+                            <div class="p-2 bg-light rounded small" style="white-space:pre-wrap;">{{ order.remark|default:"—" }}</div>
+                        </div>
                         {% if price_form.remark.errors %}<div class="text-danger small mt-1">{{ price_form.remark.errors }}</div>{% endif %}
                     </div>
                 </form>
@@ -301,7 +311,18 @@ function updateShipmentButton() {
     }
 }
 
-function setPriceLocked(value, unit) {
+function fillFieldText(id, value) {
+    var wrap = document.getElementById(id);
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    var div = document.createElement('div');
+    div.className = 'p-2 bg-light rounded small';
+    div.style.whiteSpace = 'pre-wrap';
+    div.textContent = value || '';
+    wrap.appendChild(div);
+}
+
+function setPriceLocked(value, unit, address, remark) {
     var editWrap = document.getElementById("priceEditWrap");
     var textView = document.getElementById("priceTextView");
     var btn = document.getElementById("priceSubmitBtn");
@@ -311,6 +332,20 @@ function setPriceLocked(value, unit) {
         textView.innerHTML = '<span class="fs-5 fw-bold text-primary">' + value + ' ' + unit + '</span>';
     }
     if (btn) btn.innerHTML = '<i class="bi bi-pencil me-1"></i>修改';
+    var addressEdit = document.getElementById("addressEditWrap");
+    var remarkEdit = document.getElementById("remarkEditWrap");
+    if (addressEdit) addressEdit.classList.add("d-none");
+    if (remarkEdit) remarkEdit.classList.add("d-none");
+    fillFieldText("addressTextView", address);
+    fillFieldText("remarkTextView", remark);
+    var priceInput = document.getElementById("id_finished_product_cost_price");
+    if (priceInput) priceInput.value = value || "";
+    var unitInput = document.getElementById("id_cost_price_unit");
+    if (unitInput) unitInput.value = unit || "";
+    var addressInput = document.getElementById("id_address");
+    if (addressInput) addressInput.value = address || "";
+    var remarkInput = document.getElementById("id_remark");
+    if (remarkInput) remarkInput.value = remark || "";
     priceLocked = true;
     editing = false;
     updateShipmentButton();
@@ -323,6 +358,14 @@ function enterEditMode() {
     if (editWrap) editWrap.classList.remove("d-none");
     if (textView) textView.classList.add("d-none");
     if (btn) btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>提交';
+    var addressEdit = document.getElementById("addressEditWrap");
+    var remarkEdit = document.getElementById("remarkEditWrap");
+    if (addressEdit) addressEdit.classList.remove("d-none");
+    if (remarkEdit) remarkEdit.classList.remove("d-none");
+    var addressText = document.getElementById("addressTextView");
+    var remarkText = document.getElementById("remarkTextView");
+    if (addressText) addressText.classList.add("d-none");
+    if (remarkText) remarkText.classList.add("d-none");
     priceLocked = false;
     editing = true;
     updateShipmentButton();
@@ -418,7 +461,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 var data = res.data || {};
                 submitBtn.disabled = false;
                 if (data.status === "ok") {
-                    setPriceLocked(data.cost_price, data.cost_price_unit || "");
+                    setPriceLocked(
+                        data.cost_price,
+                        data.cost_price_unit || "",
+                        data.address || "",
+                        data.remark || ""
+                    );
                     recomputeShipmentTotals(parseFloat(data.cost_price) || 0);
                     updateProgressUI(data);
                     showFlash("success", data.message || "保存成功");

@@ -358,6 +358,8 @@ class SupplierOrderDetailView(SupplierRequiredMixin, DetailView):
                         "serial": order.serial_number,
                         "cost_price": str(order.finished_product_cost_price or ""),
                         "cost_price_unit": order.cost_price_unit or "",
+                        "address": order.address or "",
+                        "remark": order.remark or "",
                         "supplier_shipped": order.supplier_shipped,
                     }
                 )

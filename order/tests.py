@@ -566,8 +566,8 @@ class ShipmentProgressTests(TestCase):
             {
                 "finished_product_cost_price": "12.50",
                 "cost_price_unit": "元/码",
-                "address": "",
-                "remark": "",
+                "address": "广州市海珠区测试路 1 号",
+                "remark": "请尽快安排剪版",
             },
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
@@ -575,9 +575,13 @@ class ShipmentProgressTests(TestCase):
         data = response.json()
         self.assertEqual(data["status"], "ok")
         self.assertEqual(data["cost_price"], "12.50")
+        self.assertEqual(data["address"], "广州市海珠区测试路 1 号")
+        self.assertEqual(data["remark"], "请尽快安排剪版")
         order.refresh_from_db()
         self.assertFalse(order.supplier_shipped)
         self.assertEqual(str(order.finished_product_cost_price), "12.50")
+        self.assertEqual(order.address, "广州市海珠区测试路 1 号")
+        self.assertEqual(order.remark, "请尽快安排剪版")
         self.assertFalse(order.shipments.exists())
 
     def test_shipment_create_blocked_without_cost_price(self):
