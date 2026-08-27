@@ -6,9 +6,9 @@ from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AnonymousUser, User
 from django.core.cache import cache
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
 from order.captcha import CAPTCHA_SESSION_KEY
@@ -16,6 +16,7 @@ from order import service_monitor
 from order import terminal
 from order.middleware import SESSION_LAST_ACTIVITY_KEY
 from order.models import ClothOrder, Notification, Supplier
+from order.views_common import handler400, handler403, handler404, handler500
 
 
 @override_settings(
@@ -814,3 +815,73 @@ class NotificationAccessTests(TestCase):
         self.assertEqual(response.json(), {"ok": True})
         n2.refresh_from_db()
         self.assertTrue(n2.is_read)
+
+
+class ErrorPageTests(TestCase):
+    """统一错误/异常提示页"""
+
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username="error_admin",
+            email="error_admin@example.com",
+            password="test-pass-123",
+        )
+        self.supplier_user = User.objects.create_user(
+            username="error_supplier",
+            email="error_supplier@example.com",
+            password="test-pass-123",
+        )
+        self.supplier = Supplier.objects.create(
+            user=self.supplier_user,
+            company_name="错误页测试供应商",
+        )
+        self.factory = RequestFactory()
+
+    def _request(self, user=None, ajax=False):
+        kwargs = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"} if ajax else {}
+        req = self.factory.get("/some/error/path/", **kwargs)
+        req.user = user if user is not None else AnonymousUser()
+        return req
+
+    def test_handlers_return_expected_status(self):
+        self.assertEqual(handler400(self._request()).status_code, 400)
+        self.assertEqual(handler403(self._request()).status_code, 403)
+        self.assertEqual(handler404(self._request()).status_code, 404)
+        self.assertEqual(handler500(self._request()).status_code, 500)
+
+    def test_supplier_error_page_uses_supplier_base(self):
+        response = handler404(self._request(user=self.supplier_user))
+        self.assertEqual(response.status_code, 404)
+        html = response.content.decode("utf-8")
+        self.assertIn("供应商面板", html)
+        self.assertIn("404", html)
+        self.assertIn("您访问的页面不存在或已被移除。", html)
+        self.assertNotIn("订单管理", html)
+
+    def test_admin_error_page_uses_admin_base(self):
+        response = handler404(self._request(user=self.admin_user))
+        self.assertEqual(response.status_code, 404)
+        html = response.content.decode("utf-8")
+        self.assertIn("订单管理", html)
+        self.assertNotIn("供应商面板", html)
+
+    def test_anonymous_error_page_renders(self):
+        response = handler403(self._request())
+        self.assertEqual(response.status_code, 403)
+        html = response.content.decode("utf-8")
+        self.assertIn("403", html)
+
+    def test_ajax_error_returns_json(self):
+        response = handler404(self._request(user=self.admin_user, ajax=True))
+        self.assertEqual(response.status_code, 404)
+        data = json.loads(response.content)
+        self.assertEqual(data["code"], "404")
+        self.assertIn("页面不存在", data["error"])
+
+    @override_settings(DEBUG=False, ALLOWED_HOSTS=["testserver"])
+    def test_urlconf_404_wiring(self):
+        self.client.force_login(self.admin_user)
+        response = self.client.get("/this-page-does-not-exist/")
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "404", status_code=404)
+        self.assertContains(response, "您访问的页面不存在或已被移除。", status_code=404)

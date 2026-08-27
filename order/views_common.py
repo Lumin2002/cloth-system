@@ -30,3 +30,43 @@ class SupplierRequiredMixin(LoginRequiredMixin):
             messages.error(request, t("auth.supplier_no_access"))
             return redirect("dashboard")
         return super().dispatch(request, *args, **kwargs)
+
+
+def _error_response(request, status, code, title, message):
+    """统一错误/异常提示页：AJAX 请求返回 JSON，其余按角色渲染统一页面"""
+    from django.http import JsonResponse
+    from django.shortcuts import render
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse({"code": code, "error": message}, status=status)
+
+    try:
+        is_supplier = hasattr(request.user, "supplier_profile") and not request.user.is_staff
+    except Exception:
+        is_supplier = False
+
+    context = {
+        "error_code": code,
+        "error_title": title,
+        "error_message": message,
+        "is_supplier": is_supplier,
+        "extends_template": "order/supplier_base.html" if is_supplier else "order/base.html",
+        "supplier": request.user.supplier_profile if is_supplier else None,
+    }
+    return render(request, "order/error_page.html", context, status=status)
+
+
+def handler400(request, exception=None):
+    return _error_response(request, 400, "400", "请求无效", "您的请求无法被服务器处理，请检查后重试。")
+
+
+def handler403(request, exception=None):
+    return _error_response(request, 403, "403", "无权访问", "您没有权限访问该页面，如有疑问请联系管理员。")
+
+
+def handler404(request, exception=None):
+    return _error_response(request, 404, "404", "页面不存在", "您访问的页面不存在或已被移除。")
+
+
+def handler500(request):
+    return _error_response(request, 500, "500", "服务器异常", "服务器开小差了，请稍后重试或联系管理员。")
