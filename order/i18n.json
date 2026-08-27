@@ -62,9 +62,8 @@
     "shipment_added": "出货记录已添加（批次 {batch}）",
     "shipment_deleted": "出货记录已删除（批次 {batch}）",
     "shipment_updated": "出货记录已更新（批次 {batch}）",
-    "shipment_data_invalid": "出货日期或数量格式无效，未创建出货记录",
     "order_save_failed": "保存失败，请检查填写内容",
-    "price_and_shipment_saved": "订单 #{serial} 已更新，批次 {batch} 已按单价 {price} {unit} 计价",
+    "need_cost_price_first": "请先填写并提交成品成本价格，再安排出货",
     "supplier_shipped_notify": "供应商 {name} 已对订单 #{serial} 提交出货，出货数量 {qty} 和出货价格 {unit}，请前往查看出货记录",
     "supplier_quoted_notify": "供应商 {name} 已对订单 #{serial} 提交报价，请前往查看报价"
   },

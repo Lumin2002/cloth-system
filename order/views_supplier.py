@@ -24,7 +24,6 @@ from django.db.models.functions import Coalesce, TruncMonth
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 from .decorators import admin_required, validate_file_upload
@@ -291,9 +290,6 @@ class SupplierOrderDetailView(SupplierRequiredMixin, DetailView):
         ctx["form_sections"] = ORDER_FORM_SECTIONS
         ctx["price_form"] = SupplierPriceForm(instance=order)
         ctx["shipment_form"] = ShipmentForm()
-        ctx["next_batch_number"] = (
-            order.shipments.aggregate(m=models.Max("batch_number"))["m"] or 0
-        ) + 1
 
         shipments_qs = order.shipments.all().order_by("batch_number")
         cost_price = Coalesce("order__finished_product_cost_price", Value(0))
@@ -317,59 +313,6 @@ class SupplierOrderDetailView(SupplierRequiredMixin, DetailView):
         if form.is_valid():
             order = form.save()
             supplier_name = request.user.supplier_profile.company_name
-
-            ship_date = request.POST.get("shipment_date", "").strip()
-            ship_qty = request.POST.get("shipment_quantity", "").strip()
-            shipment_created = False
-            shipment_info = None
-
-            if ship_date and ship_qty:
-                try:
-                    parsed_date = parse_date(ship_date)
-                    qty = float(ship_qty)
-                    max_batch = order.shipments.aggregate(m=models.Max("batch_number"))["m"] or 0
-                    shipment = Shipment.objects.create(
-                        order=order,
-                        batch_number=max_batch + 1,
-                        date=parsed_date,
-                        quantity=qty,
-                        created_by=request.user if request.user.is_authenticated else None,
-                    )
-                    shipment_created = True
-                    shipment_info = {
-                        "pk": shipment.pk,
-                        "batch_number": shipment.batch_number,
-                        "date": shipment.date.isoformat() if shipment.date else "",
-                        "quantity": float(shipment.quantity),
-                        "total": round(float(qty) * float(order.finished_product_cost_price or 0), 2),
-                    }
-                    if order.set_progress_stage("剪版寄出"):
-                        logger.info(
-                            t(
-                                "log.progress_update",
-                                username=request.user.username,
-                                serial=order.serial_number,
-                                stage=order.current_stage_name,
-                            )
-                        )
-                    notify_all_staff(
-                        title=t("label.supplier_shipped"),
-                        message=t(
-                            "msg.supplier_shipped_notify",
-                            name=supplier_name,
-                            serial=order.serial_number,
-                            qty=qty,
-                            unit=order.quantity_unit or "",
-                        ),
-                        link=reverse("order_detail", kwargs={"pk": order.pk}),
-                    )
-                except (ValueError, TypeError):
-                    if is_ajax:
-                        return JsonResponse(
-                            {"status": "warning", "message": t("msg.shipment_data_invalid")},
-                            status=400,
-                        )
-                    messages.warning(request, t("msg.shipment_data_invalid"))
 
             total_qty = float(order.total_shipment_from_shipments() or 0)
             order.total_shipment_quantity = total_qty
@@ -408,31 +351,14 @@ class SupplierOrderDetailView(SupplierRequiredMixin, DetailView):
             )
 
             if is_ajax:
-                shipment_total_sum = order.shipments.filter(is_deleted=False).aggregate(
-                    total=Sum(F("quantity") * F("order__finished_product_cost_price"))
-                )["total"] or 0
-                if shipment_created:
-                    message = t(
-                        "msg.price_and_shipment_saved",
-                        serial=order.serial_number,
-                        batch=shipment_info["batch_number"],
-                        price=order.finished_product_cost_price,
-                        unit=order.cost_price_unit or "",
-                    )
-                else:
-                    message = t("msg.order_updated_hash", serial=order.serial_number)
                 return JsonResponse(
                     {
                         "status": "ok",
-                        "message": message,
+                        "message": t("msg.order_updated_hash", serial=order.serial_number),
                         "serial": order.serial_number,
                         "cost_price": str(order.finished_product_cost_price or ""),
                         "cost_price_unit": order.cost_price_unit or "",
                         "supplier_shipped": order.supplier_shipped,
-                        "total_quantity": str(total_qty),
-                        "shipment_total_sum": str(shipment_total_sum),
-                        "shipment_created": shipment_created,
-                        "shipment": shipment_info,
                     }
                 )
 
@@ -460,6 +386,10 @@ def order_shipment_create(request, pk):
             if hasattr(request.user, "supplier_profile"):
                 return redirect("supplier_dashboard")
             return redirect("dashboard")
+        # 供应商出货前必须已提交有效的成品成本价格
+        if not order.finished_product_cost_price or float(order.finished_product_cost_price) <= 0:
+            messages.error(request, t("msg.need_cost_price_first"))
+            return redirect(reverse("supplier_order_detail", kwargs={"pk": pk}))
 
     form = ShipmentForm(request.POST)
     if form.is_valid():
@@ -475,8 +405,23 @@ def order_shipment_create(request, pk):
 
         shipment.save()
         order.supplier_shipped = True
+        total_qty = float(order.total_shipment_from_shipments() or 0)
+        order.total_shipment_quantity = total_qty
+        order.total_amount = order.computed_total_amount
+        order.finished_product_total_amount = order.computed_finished_product_total_amount
+        if not order.shipment_quantity_unit and order.quantity_unit:
+            order.shipment_quantity_unit = order.quantity_unit
         progress_changed = order.set_progress_stage("剪版寄出", save=False)
-        order.save(update_fields=["supplier_shipped", "progress_current"])
+        order.save(
+            update_fields=[
+                "supplier_shipped",
+                "total_shipment_quantity",
+                "total_amount",
+                "finished_product_total_amount",
+                "shipment_quantity_unit",
+                "progress_current",
+            ]
+        )
 
         if progress_changed:
             logger.info(

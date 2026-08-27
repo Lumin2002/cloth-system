@@ -540,7 +540,7 @@ class ShipmentProgressTests(TestCase):
         order.refresh_from_db()
         self.assertEqual(order.progress_current, 1)
 
-    def test_supplier_submit_shipment_advances_progress(self):
+    def test_supplier_submit_price_redirects_no_shipment(self):
         order = self._create_order()
         self.client.force_login(self.supplier_user)
         response = self.client.post(
@@ -550,16 +550,15 @@ class ShipmentProgressTests(TestCase):
                 "cost_price_unit": "元/码",
                 "address": "",
                 "remark": "",
-                "shipment_date": "2026-08-28",
-                "shipment_quantity": "50",
             },
         )
         self.assertEqual(response.status_code, 302)
         order.refresh_from_db()
-        self.assertTrue(order.supplier_shipped)
-        self.assertEqual(order.current_stage_name, "剪版寄出")
+        self.assertFalse(order.supplier_shipped)
+        self.assertEqual(str(order.finished_product_cost_price), "12.50")
+        self.assertFalse(order.shipments.exists())
 
-    def test_supplier_ajax_submit_price_and_first_shipment(self):
+    def test_supplier_ajax_submit_price_only(self):
         order = self._create_order()
         self.client.force_login(self.supplier_user)
         response = self.client.post(
@@ -569,45 +568,62 @@ class ShipmentProgressTests(TestCase):
                 "cost_price_unit": "元/码",
                 "address": "",
                 "remark": "",
-                "shipment_date": "2026-08-28",
-                "shipment_quantity": "50",
             },
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "ok")
-        self.assertTrue(data["shipment_created"])
         self.assertEqual(data["cost_price"], "12.50")
-        self.assertEqual(data["shipment"]["batch_number"], 1)
-        self.assertEqual(data["shipment"]["total"], 625.0)
+        order.refresh_from_db()
+        self.assertFalse(order.supplier_shipped)
+        self.assertEqual(str(order.finished_product_cost_price), "12.50")
+        self.assertFalse(order.shipments.exists())
+
+    def test_shipment_create_blocked_without_cost_price(self):
+        order = self._create_order()
+        self.client.force_login(self.supplier_user)
+        response = self.client.post(
+            reverse("order_shipment_create", kwargs={"pk": order.pk}),
+            {"date": "2026-08-28", "quantity": "30"},
+        )
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertFalse(order.supplier_shipped)
+        self.assertFalse(order.shipments.exists())
+
+    def test_supplier_price_then_shipment_advances_progress(self):
+        order = self._create_order()
+        self.client.force_login(self.supplier_user)
+        # 先提交成品成本价格
+        response = self.client.post(
+            reverse("supplier_order_detail", kwargs={"pk": order.pk}),
+            {
+                "finished_product_cost_price": "12.50",
+                "cost_price_unit": "元/码",
+                "address": "",
+                "remark": "",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ok")
+        # 再新增出货（批次 1）
+        response = self.client.post(
+            reverse("order_shipment_create", kwargs={"pk": order.pk}),
+            {"date": "2026-08-28", "quantity": "50"},
+        )
+        self.assertEqual(response.status_code, 302)
         order.refresh_from_db()
         self.assertTrue(order.supplier_shipped)
         self.assertEqual(order.current_stage_name, "剪版寄出")
         self.assertEqual(order.total_shipment_quantity, 50)
         shipment = order.shipments.get()
         self.assertEqual(shipment.batch_number, 1)
-
-    def test_supplier_ajax_submit_price_only_no_shipment(self):
-        order = self._create_order()
-        self.client.force_login(self.supplier_user)
-        response = self.client.post(
-            reverse("supplier_order_detail", kwargs={"pk": order.pk}),
-            {
-                "finished_product_cost_price": "12.50",
-                "cost_price_unit": "元/码",
-                "address": "",
-                "remark": "",
-            },
-            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        self.assertEqual(
+            float(shipment.quantity) * float(order.finished_product_cost_price),
+            625.0,
         )
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(data["status"], "ok")
-        self.assertFalse(data["shipment_created"])
-        order.refresh_from_db()
-        self.assertFalse(order.supplier_shipped)
-        self.assertEqual(str(order.finished_product_cost_price), "12.50")
 
     def test_shipment_create_endpoint_advances_progress(self):
         order = self._create_order()
