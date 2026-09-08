@@ -8,7 +8,7 @@
     var items = [];
     try { items = JSON.parse(dataElement.textContent); } catch (e) { items = []; }
 
-    Vue.createApp({
+    var app = Vue.createApp({
         delimiters: ['[[', ']]'],
         data: function () {
             return {
@@ -107,6 +107,8 @@
                 <pagination-bar :current-page="currentPage" :total-pages="totalPages" @page-change="goPage"></pagination-bar>
             </div>
         `
-    }).mount('#cloth-catalog-vue');
+    });
+    app.component('pagination-bar', window.__paginationBarComponent);
+    app.mount('#cloth-catalog-vue');
 })();
 </script>
