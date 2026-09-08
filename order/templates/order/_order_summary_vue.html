@@ -15,6 +15,9 @@
         methods: {
             money: function (value) {
                 return '¥' + Number(value || 0).toLocaleString('zh-CN', { maximumFractionDigits: 0 });
+            },
+            percent: function (value) {
+                return Number(value || 0).toFixed(1);
             }
         },
         template: `
@@ -47,7 +50,7 @@
                     <div class="kpi-card kpi-info">
                         <div class="kpi-label">利润合计</div>
                         <div class="kpi-value">[[ money(summary.total_profit) ]]</div>
-                        <div class="kpi-meta">利润率约 [[ summary.profit_margin ]]%</div>
+                        <div class="kpi-meta">利润率约 [[ percent(summary.profit_margin) ]]%</div>
                         <i class="bi bi-piggy-bank kpi-icon"></i>
                     </div>
                 </div>
