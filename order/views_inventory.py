@@ -174,12 +174,22 @@ class InventoryListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         qs = self.get_queryset()
+        chip_zero = InventoryItem.objects.filter(quantity=0).count()
+        chip_low = InventoryItem.objects.filter(quantity__gt=0, quantity__lt=50).count()
+        chip_normal = InventoryItem.objects.filter(quantity__gte=50).count()
+        context['inventory_summary_json'] = {
+            'total_count': qs.count(),
+            'total_quantity': qs.aggregate(total=models.Sum('quantity'))['total'] or 0,
+            'chip_zero': chip_zero,
+            'chip_low': chip_low,
+            'chip_normal': chip_normal,
+        }
         context.update({
             'total_count': qs.count(),
             'total_quantity': qs.aggregate(total=models.Sum('quantity'))['total'] or 0,
-            'chip_zero': InventoryItem.objects.filter(quantity=0).count(),
-            'chip_low': InventoryItem.objects.filter(quantity__gt=0, quantity__lt=50).count(),
-            'chip_normal': InventoryItem.objects.filter(quantity__gte=50).count(),
+            'chip_zero': chip_zero,
+            'chip_low': chip_low,
+            'chip_normal': chip_normal,
             'customers': InventoryItem.objects.exclude(customer='').values_list('customer', flat=True).distinct().order_by('customer'),
             'positions': InventoryItem.objects.exclude(position='').values_list('position', flat=True).distinct().order_by('position'),
             'per_page': self.get_paginate_by(qs),

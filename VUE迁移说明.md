@@ -22,6 +22,7 @@
 - 供应商账号列表：`order/templates/order/supplier_manage_list.html`
 - 库存日志列表：`order/templates/order/inventory_log_list.html`
 - 供应商端仪表盘汇总卡片：`order/templates/order/supplier_dashboard.html`
+- 库存列表汇总卡片：`order/templates/order/inventory_list.html`
 
 ### Vue 组件文件
 
@@ -34,6 +35,7 @@
 - `order/templates/order/_vue_pagination_component.html`
 - `order/templates/order/_inventory_log_list_vue.html`
 - `order/templates/order/_supplier_dashboard_summary_vue.html`
+- `order/templates/order/_inventory_summary_vue.html`
 
 ### Vue 负责的内容
 
@@ -78,6 +80,10 @@
 8. 供应商端仪表盘汇总卡片
    - Vue 负责顶部统计卡片渲染
    - 订单表格和筛选暂保留 Django 服务端渲染，避免影响供应商报价/出货流程
+
+9. 库存列表汇总卡片
+   - Vue 负责顶部四个统计卡片
+   - 筛选、表格、批量操作暂保留服务端渲染，避免影响批量功能
 
 ---
 
