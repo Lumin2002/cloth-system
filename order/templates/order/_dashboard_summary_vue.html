@@ -1,0 +1,123 @@
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+(function () {
+    if (typeof Vue === 'undefined') return;
+
+    var dataElement = document.getElementById('dashboard-summary-data');
+    if (!dataElement) return;
+
+    var summary = {};
+    try {
+        summary = JSON.parse(dataElement.textContent);
+    } catch (error) {
+        summary = {};
+    }
+
+    Vue.createApp({
+        delimiters: ['[[', ']]'],
+        data: function () {
+            return { summary: summary };
+        },
+        methods: {
+            money: function (value) {
+                return '¥' + Number(value || 0).toLocaleString('zh-CN', {
+                    maximumFractionDigits: 0
+                });
+            },
+            deltaClass: function (value) {
+                return value >= 0 ? 'text-success' : 'text-danger';
+            },
+            deltaText: function (value) {
+                if (value === null || value === undefined) return '';
+                return '(' + Number(value).toFixed(1) + '%)';
+            }
+        },
+        template: `
+            <div>
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-xl-3">
+                        <a href="/orders/" class="kpi-card kpi-primary text-decoration-none">
+                            <div class="kpi-label">订单总数</div>
+                            <div class="kpi-value">[[ summary.kpi.total_orders ]]</div>
+                            <div class="kpi-meta">
+                                正常 [[ summary.kpi.active_orders_count ]] · 已取消 [[ summary.kpi.cancelled_orders ]]
+                                · [[ summary.kpi.total_customers ]] 客户
+                            </div>
+                            <i class="bi bi-clipboard-data kpi-icon"></i>
+                        </a>
+                    </div>
+                    <div class="col-6 col-xl-3">
+                        <div class="kpi-card kpi-success">
+                            <div class="kpi-label">总营收</div>
+                            <div class="kpi-value">[[ money(summary.kpi.total_revenue) ]]</div>
+                            <div class="kpi-meta">仅统计正常订单</div>
+                            <i class="bi bi-graph-up-arrow kpi-icon"></i>
+                        </div>
+                    </div>
+                    <div class="col-6 col-xl-3">
+                        <div class="kpi-card kpi-warning">
+                            <div class="kpi-label">总成本</div>
+                            <div class="kpi-value">[[ money(summary.kpi.total_cost) ]]</div>
+                            <div class="kpi-meta">采购/成本金额合计</div>
+                            <i class="bi bi-wallet2 kpi-icon"></i>
+                        </div>
+                    </div>
+                    <div class="col-6 col-xl-3">
+                        <div class="kpi-card kpi-info">
+                            <div class="kpi-label">总利润</div>
+                            <div class="kpi-value">[[ money(summary.kpi.total_profit) ]]</div>
+                            <div class="kpi-meta">利润率约 [[ summary.kpi.profit_margin ]]%</div>
+                            <i class="bi bi-piggy-bank kpi-icon"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-4">
+                    <div v-for="item in summary.status" :key="item.label" class="col-6 col-md-4 col-lg">
+                        <a :href="item.url" class="status-chip" :class="item.cls">
+                            <span class="chip-num">
+                                <i v-if="item.icon" :class="item.icon"></i>
+                                [[ item.count ]]
+                            </span>
+                            <span class="chip-text">[[ item.label ]]</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="mini-stat-card stat-primary">
+                            <div class="mini-stat-label">本月订单 · [[ summary.month_compare.this_label ]]</div>
+                            <div class="mini-stat-value">[[ summary.month_compare.this.order_count ]]</div>
+                            <div class="mini-stat-meta">
+                                上月 [[ summary.month_compare.last.order_count ]]
+                                <span :class="deltaClass(summary.month_compare.order_delta)">[[ deltaText(summary.month_compare.order_delta) ]]</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mini-stat-card stat-success">
+                            <div class="mini-stat-label">本月营收</div>
+                            <div class="mini-stat-value text-success">[[ money(summary.month_compare.this.revenue) ]]</div>
+                            <div class="mini-stat-meta">
+                                上月 [[ money(summary.month_compare.last.revenue) ]]
+                                <span :class="deltaClass(summary.month_compare.revenue_delta)">[[ deltaText(summary.month_compare.revenue_delta) ]]</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mini-stat-card stat-info">
+                            <div class="mini-stat-label">本月利润</div>
+                            <div class="mini-stat-value text-info">[[ money(summary.month_compare.this.profit) ]]</div>
+                            <div class="mini-stat-meta">
+                                上月 [[ money(summary.month_compare.last.profit) ]]
+                                <span :class="deltaClass(summary.month_compare.profit_delta)">[[ deltaText(summary.month_compare.profit_delta) ]]</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `
+    }).mount('#dashboard-summary-vue');
+})();
+</script>

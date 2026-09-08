@@ -2,6 +2,7 @@
 
 import re
 from datetime import date, datetime
+from urllib.parse import urlencode
 from django.contrib.auth.decorators import login_required
 from django.db.models import (
     Count,
@@ -21,6 +22,7 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, TruncMonth
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from .dashboard_stats import (
     build_current_month_finance,
     build_current_month_orders,
@@ -200,7 +202,32 @@ def dashboard_view(request):
         .order_by("-order_date")[:5]
     )
 
+    def make_filter_url(**params):
+        return reverse("order_list") + "?" + urlencode(params)
+
+    dashboard_summary = {
+        "kpi": {
+            "total_orders": total_orders,
+            "active_orders_count": active_cnt["active_total"],
+            "cancelled_orders": cancelled_orders,
+            "total_customers": distinct_cnt["total_customers"],
+            "total_revenue": total_revenue,
+            "total_cost": total_cost,
+            "total_profit": total_profit,
+            "profit_margin": round(profit_margin, 1),
+        },
+        "status": [
+            {"label": "未付款", "count": active_cnt["unpaid"], "url": make_filter_url(payment_status="unpaid"), "cls": "chip-danger"},
+            {"label": "逾期", "count": active_cnt["overdue"], "url": make_filter_url(overdue_status="overdue"), "cls": "chip-warning"},
+            {"label": "已付款", "count": active_cnt["paid"], "url": make_filter_url(payment_status="paid"), "cls": "chip-success"},
+            {"label": "已取消", "count": cancelled_orders, "url": make_filter_url(order_status="cancelled"), "cls": "chip-secondary"},
+            {"label": "大货", "count": "", "icon": "bi bi-box-seam", "url": make_filter_url(order_type="bulk"), "cls": "chip-primary"},
+        ],
+        "month_compare": month_compare,
+    }
+
     context = {
+        "dashboard_summary_json": dashboard_summary,
         "total_orders": total_orders,
         "cancelled_orders": cancelled_orders,
         "active_orders_count": active_cnt["active_total"],

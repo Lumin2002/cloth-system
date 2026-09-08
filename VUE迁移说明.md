@@ -16,11 +16,13 @@
 - 编辑订单页：`order/templates/order/order_form.html`
 - 订单详情编辑态：`order/templates/order/order_detail.html`
 - 客户管理列表：`order/templates/order/customer_list.html`
+- 仪表盘汇总区：`order/templates/order/dashboard.html`
 
 ### Vue 组件文件
 
 - `order/templates/order/_order_interactions_vue.html`
 - `order/templates/order/_customer_list_vue.html`
+- `order/templates/order/_dashboard_summary_vue.html`
 
 ### Vue 负责的内容
 
@@ -46,6 +48,10 @@
    - Django 只负责输出初始客户 JSON
    - Vue 负责搜索、状态筛选和卡片渲染
    - 编辑、删除仍走原有 Django 接口
+
+5. 仪表盘汇总区
+   - Vue 负责核心指标卡片、状态快捷入口、本月对比卡片
+   - 图表仍保留 ECharts，后续再单独评估是否 Vue 化
 
 ---
 

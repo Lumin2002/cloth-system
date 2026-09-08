@@ -45,124 +45,7 @@
         </div>
     </div>
 
-    <!-- 核心指标 -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-xl-3">
-            <a href="{% url 'order_list' %}" class="kpi-card kpi-primary text-decoration-none">
-                <div class="kpi-label">订单总数</div>
-                <div class="kpi-value">{{ total_orders }}</div>
-                <div class="kpi-meta">
-                    正常 {{ active_orders_count }} · 已取消 {{ cancelled_orders }}
-                    · {{ total_customers }} 客户
-                </div>
-                <i class="bi bi-clipboard-data kpi-icon"></i>
-            </a>
-        </div>
-        <div class="col-6 col-xl-3">
-            <div class="kpi-card kpi-success">
-                <div class="kpi-label">总营收</div>
-                <div class="kpi-value">¥{{ total_revenue|floatformat:0 }}</div>
-                <div class="kpi-meta">仅统计正常订单</div>
-                <i class="bi bi-graph-up-arrow kpi-icon"></i>
-            </div>
-        </div>
-        <div class="col-6 col-xl-3">
-            <div class="kpi-card kpi-warning">
-                <div class="kpi-label">总成本</div>
-                <div class="kpi-value">¥{{ total_cost|floatformat:0 }}</div>
-                <div class="kpi-meta">采购/成本金额合计</div>
-                <i class="bi bi-wallet2 kpi-icon"></i>
-            </div>
-        </div>
-        <div class="col-6 col-xl-3">
-            <div class="kpi-card kpi-info">
-                <div class="kpi-label">总利润</div>
-                <div class="kpi-value">¥{{ total_profit|floatformat:0 }}</div>
-                <div class="kpi-meta">利润率约 {{ profit_margin|floatformat:1 }}%</div>
-                <i class="bi bi-piggy-bank kpi-icon"></i>
-            </div>
-        </div>
-    </div>
-
-    <!-- 状态快捷入口 -->
-    <div class="row g-2 mb-4">
-        <div class="col-6 col-md-4 col-lg">
-            <a href="{% filter_url payment_status='unpaid' %}" class="status-chip chip-danger">
-                <span class="chip-num">{{ unpaid_orders }}</span>
-                <span class="chip-text">未付款</span>
-            </a>
-        </div>
-        <div class="col-6 col-md-4 col-lg">
-            <a href="{% filter_url overdue_status='overdue' %}" class="status-chip chip-warning">
-                <span class="chip-num">{{ overdue_orders }}</span>
-                <span class="chip-text">逾期</span>
-            </a>
-        </div>
-        <div class="col-6 col-md-4 col-lg">
-            <a href="{% filter_url payment_status='paid' %}" class="status-chip chip-success">
-                <span class="chip-num">{{ paid_orders }}</span>
-                <span class="chip-text">已付款</span>
-            </a>
-        </div>
-        <div class="col-6 col-md-4 col-lg">
-            <a href="{% filter_url order_status='cancelled' %}" class="status-chip chip-secondary">
-                <span class="chip-num">{{ cancelled_orders }}</span>
-                <span class="chip-text">已取消</span>
-            </a>
-        </div>
-        <div class="col-6 col-md-4 col-lg">
-            <a href="{% filter_url order_type='bulk' %}" class="status-chip chip-primary">
-                <span class="chip-num"><i class="bi bi-box-seam"></i></span>
-                <span class="chip-text">大货</span>
-            </a>
-        </div>
-    </div>
-
-    <!-- 本月对比 -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <div class="mini-stat-card stat-primary">
-                <div class="mini-stat-label">本月订单 · {{ month_compare.this_label }}</div>
-                <div class="mini-stat-value">{{ month_compare.this.order_count }}</div>
-                <div class="mini-stat-meta">
-                    上月 {{ month_compare.last.order_count }}
-                    {% if month_compare.order_delta is not None %}
-                    <span class="{% if month_compare.order_delta >= 0 %}text-success{% else %}text-danger{% endif %}">
-                        ({{ month_compare.order_delta|floatformat:1 }}%)
-                    </span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="mini-stat-card stat-success">
-                <div class="mini-stat-label">本月营收</div>
-                <div class="mini-stat-value text-success">¥{{ month_compare.this.revenue|floatformat:0 }}</div>
-                <div class="mini-stat-meta">
-                    上月 ¥{{ month_compare.last.revenue|floatformat:0 }}
-                    {% if month_compare.revenue_delta is not None %}
-                    <span class="{% if month_compare.revenue_delta >= 0 %}text-success{% else %}text-danger{% endif %}">
-                        ({{ month_compare.revenue_delta|floatformat:1 }}%)
-                    </span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="mini-stat-card stat-info">
-                <div class="mini-stat-label">本月利润</div>
-                <div class="mini-stat-value text-info">¥{{ month_compare.this.profit|floatformat:0 }}</div>
-                <div class="mini-stat-meta">
-                    上月 ¥{{ month_compare.last.profit|floatformat:0 }}
-                    {% if month_compare.profit_delta is not None %}
-                    <span class="{% if month_compare.profit_delta >= 0 %}text-success{% else %}text-danger{% endif %}">
-                        ({{ month_compare.profit_delta|floatformat:1 }}%)
-                    </span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
+    <div id="dashboard-summary-vue"></div>
 
     <!-- 按月图表 -->
     <div class="row g-4 mb-4">
@@ -533,6 +416,8 @@
 
 {{ month_chart_data|json_script:"month-chart-data" }}
 {{ order_type_stats|json_script:"order-type-stats-data" }}
+{{ dashboard_summary_json|json_script:"dashboard-summary-data" }}
+{% include 'order/_dashboard_summary_vue.html' %}
 <style>
 .dashboard-page .collapse-toggle .bi-chevron-down {
     transition: transform .2s ease;
