@@ -417,7 +417,7 @@
 {{ month_chart_data|json_script:"month-chart-data" }}
 {{ order_type_stats|json_script:"order-type-stats-data" }}
 {{ dashboard_summary_json|json_script:"dashboard-summary-data" }}
-{% include 'order/_dashboard_summary_vue.html' %}
+{% include 'order/vue/_dashboard_summary_vue.html' %}
 <style>
 .dashboard-page .collapse-toggle .bi-chevron-down {
     transition: transform .2s ease;

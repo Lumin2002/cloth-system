@@ -45,7 +45,7 @@
 
     <div id="inventory-summary-vue"></div>
     {{ inventory_summary_json|json_script:"inventory-summary-data" }}
-    {% include 'order/_inventory_summary_vue.html' %}
+    {% include 'order/vue/_inventory_summary_vue.html' %}
 
     <!-- 快捷筛选 -->
     <div class="row g-2 mb-4">
@@ -283,7 +283,7 @@
 
     <div id="inventory-pagination-vue"></div>
     {{ inventory_pagination_json|json_script:"inventory-pagination-data" }}
-    {% include 'order/_inventory_pagination_vue.html' %}
+    {% include 'order/vue/_inventory_pagination_vue.html' %}
 	
 <!-- 回到顶部 -->
 <button id="back-to-top" title="回到顶部" aria-label="回到顶部">

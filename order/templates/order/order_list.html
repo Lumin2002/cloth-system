@@ -48,7 +48,7 @@
 
     <div id="order-summary-vue"></div>
     {{ order_summary_json|json_script:"order-summary-data" }}
-    {% include 'order/_order_summary_vue.html' %}
+    {% include 'order/vue/_order_summary_vue.html' %}
 
     <!-- 快捷筛选 -->
     <div class="row g-2 mb-4">
@@ -422,7 +422,7 @@
 	
     <div id="order-pagination-vue"></div>
     {{ order_pagination_json|json_script:"order-pagination-data" }}
-    {% include 'order/_order_pagination_vue.html' %}
+    {% include 'order/vue/_order_pagination_vue.html' %}
 
 </div>
 
