@@ -1,7 +1,5 @@
 """视图模块：内部客户资料管理。"""
 
-import json
-
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
@@ -30,25 +28,22 @@ class CustomerListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
         customers = list(Customer.objects.all().order_by("name"))
         ctx["total"] = len(customers)
         ctx["active_count"] = sum(1 for c in customers if c.is_active)
-        ctx["customers_json"] = json.dumps(
-            [
-                {
-                    "id": customer.pk,
-                    "name": customer.name,
-                    "code": customer.code or "",
-                    "contact_person": customer.contact_person or "",
-                    "phone": customer.phone or "",
-                    "email": customer.email or "",
-                    "address": customer.address or "",
-                    "remark": customer.remark or "",
-                    "is_active": customer.is_active,
-                    "edit_url": reverse("customer_edit", kwargs={"pk": customer.pk}),
-                    "delete_url": reverse("customer_delete", kwargs={"pk": customer.pk}),
-                }
-                for customer in customers
-            ],
-            ensure_ascii=False,
-        )
+        ctx["customers_json"] = [
+            {
+                "id": customer.pk,
+                "name": customer.name,
+                "code": customer.code or "",
+                "contact_person": customer.contact_person or "",
+                "phone": customer.phone or "",
+                "email": customer.email or "",
+                "address": customer.address or "",
+                "remark": customer.remark or "",
+                "is_active": customer.is_active,
+                "edit_url": reverse("customer_edit", kwargs={"pk": customer.pk}),
+                "delete_url": reverse("customer_delete", kwargs={"pk": customer.pk}),
+            }
+            for customer in customers
+        ]
         return ctx
 
 
