@@ -1,9 +1,8 @@
 """视图模块：仪表板（由 views.py 拆分而来）。"""
 
 import re
-from datetime import date, datetime
+from datetime import date
 from urllib.parse import urlencode
-from django.contrib.auth.decorators import login_required
 from django.db.models import (
     Count,
     DateField,
@@ -21,7 +20,7 @@ from django.db.models import (
     Value,
 )
 from django.db.models.functions import Coalesce, TruncMonth
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import render
 from django.urls import reverse
 from .dashboard_stats import (
     build_current_month_finance,
@@ -29,7 +28,7 @@ from .dashboard_stats import (
     build_month_compare,
     build_monthly_chart_data,
 )
-from .decorators import admin_required, validate_file_upload
+from .decorators import admin_required
 from .i18n import t
 from .models import (
     ClothCatalog,

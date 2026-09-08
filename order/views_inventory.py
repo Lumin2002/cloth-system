@@ -2,7 +2,6 @@
 
 import pandas as pd
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import models
 from django.db.models import (
@@ -22,11 +21,10 @@ from django.db.models import (
     Value,
 )
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.utils.timezone import now
-from django.views.decorators.http import require_GET, require_POST
-from django.views.generic import CreateView, DetailView, ListView, UpdateView
-from .decorators import admin_required, validate_file_upload
+from django.views.generic import DetailView, ListView, UpdateView
+from .decorators import admin_required
 from .forms import (
     CREATE_DEFAULTS,
     ORDER_CREATE_PRIMARY_COUNT,

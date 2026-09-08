@@ -1,7 +1,6 @@
 """视图模块：布种编号（由 views.py 拆分而来）。"""
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import (
     Count,
@@ -19,12 +18,11 @@ from django.db.models import (
     Sum,
     Value,
 )
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_GET, require_POST
-from django.views.generic import CreateView, DetailView, ListView, UpdateView
-from .decorators import admin_required, validate_file_upload
+from django.views.generic import CreateView, DetailView, ListView
+from .decorators import admin_required
 from .i18n import t
 from .import_progress import (
     create_catalog_task,

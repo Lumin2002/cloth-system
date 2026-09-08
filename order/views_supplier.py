@@ -1,7 +1,6 @@
 """视图模块：供应商管理/供应商端/出货（由 views.py 拆分而来）。"""
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import models
 from django.db.models import (
@@ -20,13 +19,11 @@ from django.db.models import (
     Sum,
     Value,
 )
-from django.db.models.functions import Coalesce, TruncMonth
-from django.http import HttpResponse, JsonResponse
+from django.db.models.functions import Coalesce
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
-from .decorators import admin_required, validate_file_upload
 from .forms import (
     CREATE_DEFAULTS,
     ORDER_CREATE_PRIMARY_COUNT,

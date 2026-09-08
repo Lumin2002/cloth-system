@@ -35,6 +35,3 @@ def filter_url(context, **overrides):
             params[key] = value
     encoded = params.urlencode()
     return '?' + encoded if encoded else '?'
-@register.filter
-def get_item(d, k):
-    return d.get(str(k))
