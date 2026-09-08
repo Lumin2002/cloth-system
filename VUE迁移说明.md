@@ -20,6 +20,7 @@
 - 布种编号列表：`order/templates/order/cloth_catalog_list.html`
 - 面料报价列表：`order/templates/order/quotation_list.html`
 - 供应商账号列表：`order/templates/order/supplier_manage_list.html`
+- 库存日志列表：`order/templates/order/inventory_log_list.html`
 
 ### Vue 组件文件
 
@@ -30,6 +31,7 @@
 - `order/templates/order/_quotation_list_vue.html`
 - `order/templates/order/_supplier_manage_list_vue.html`
 - `order/templates/order/_vue_pagination_component.html`
+- `order/templates/order/_inventory_log_list_vue.html`
 
 ### Vue 负责的内容
 
@@ -67,6 +69,9 @@
    - 布种编号、面料报价带客户端分页
    - 供应商账号已改为卡片展示
    - 分页组件已抽成通用 `pagination-bar`，供各列表页复用
+
+7. 库存日志列表
+   - Vue 负责搜索、类型筛选、表格渲染和分页
 
 ---
 

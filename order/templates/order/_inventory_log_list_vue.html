@@ -1,0 +1,115 @@
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+{% include 'order/_vue_pagination_component.html' %}
+<script>
+(function () {
+    if (typeof Vue === 'undefined') return;
+    var dataElement = document.getElementById('inventory-log-data');
+    if (!dataElement) return;
+    var logs = [];
+    try { logs = JSON.parse(dataElement.textContent); } catch (e) { logs = []; }
+
+    var app = Vue.createApp({
+        delimiters: ['[[', ']]'],
+        data: function () {
+            return {
+                logs: logs,
+                search: '',
+                logType: 'all',
+                currentPage: 1,
+                pageSize: 20
+            };
+        },
+        computed: {
+            filteredLogs: function () {
+                var keyword = this.search.trim().toLowerCase();
+                return this.logs.filter(function (log) {
+                    var typeMatched = this.logType === 'all' || log.log_type === this.logType;
+                    var textMatched = true;
+                    if (keyword) {
+                        textMatched = [
+                            log.cloth_name,
+                            log.unique_id,
+                            log.customer,
+                            log.created_by,
+                            log.remark
+                        ].join(' ').toLowerCase().indexOf(keyword) !== -1;
+                    }
+                    return typeMatched && textMatched;
+                }, this);
+            },
+            totalPages: function () {
+                return Math.max(1, Math.ceil(this.filteredLogs.length / this.pageSize));
+            },
+            pagedLogs: function () {
+                var start = (this.currentPage - 1) * this.pageSize;
+                return this.filteredLogs.slice(start, start + this.pageSize);
+            }
+        },
+        watch: {
+            search: function () { this.currentPage = 1; },
+            logType: function () { this.currentPage = 1; }
+        },
+        methods: {
+            goPage: function (page) {
+                if (page >= 1 && page <= this.totalPages) this.currentPage = page;
+            }
+        },
+        template: `
+            <div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <input v-model="search" type="text" class="form-control form-control-sm" placeholder="搜索布料名称、客户、操作人、备注...">
+                    </div>
+                    <div class="col-auto">
+                        <select v-model="logType" class="form-select form-select-sm">
+                            <option value="all">全部类型</option>
+                            <option value="in">入库</option>
+                            <option value="out">出库</option>
+                            <option value="adjust">调整</option>
+                        </select>
+                    </div>
+                    <div class="col-auto text-muted small d-flex align-items-center">显示 [[ filteredLogs.length ]] 条日志</div>
+                </div>
+
+                <div class="card card-flat">
+                    <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-table me-2"></i>库存变动明细</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover data-table mb-0 align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>操作时间</th><th>布料信息</th><th>客户</th><th>变动类型</th><th class="text-end">变动数量</th><th>操作人</th><th>备注</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="log in pagedLogs" :key="log.id">
+                                        <td class="text-nowrap small">[[ log.created_at ]]</td>
+                                        <td>
+                                            <div class="fw-semibold">[[ log.cloth_name || '-' ]]</div>
+                                            <small class="text-muted">[[ log.unique_id ]]</small>
+                                        </td>
+                                        <td class="small text-nowrap">[[ log.customer || '-' ]]</td>
+                                        <td>
+                                            <span class="badge" :class="log.log_type === 'in' ? 'bg-success' : (log.log_type === 'out' ? 'bg-danger' : 'bg-warning text-dark')">[[ log.log_type_label ]]</span>
+                                        </td>
+                                        <td class="text-end fw-bold" :class="log.log_type === 'out' ? 'text-danger' : 'text-success'">[[ log.quantity ]]</td>
+                                        <td class="small">[[ log.created_by ]]</td>
+                                        <td class="small text-muted" style="max-width:180px;">[[ log.remark || '-' ]]</td>
+                                    </tr>
+                                    <tr v-if="!pagedLogs.length"><td colspan="7" class="text-center py-5 text-muted">暂无库存变动日志</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <pagination-bar :current-page="currentPage" :total-pages="totalPages" @page-change="goPage"></pagination-bar>
+            </div>
+        `
+    });
+    app.component('pagination-bar', window.__paginationBarComponent);
+    app.mount('#inventory-log-vue');
+})();
+</script>
