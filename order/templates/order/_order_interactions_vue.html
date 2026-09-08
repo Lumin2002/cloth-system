@@ -76,12 +76,8 @@
 
                 var params = new URLSearchParams({order_type: type});
                 var clothType = valueOf('id_cloth_type');
-                var customer = valueOf('id_customer');
-                var color = valueOf('id_color');
                 var exclude = host.dataset.exclude || '';
                 if (clothType) params.set('cloth_type', clothType);
-                if (customer) params.set('customer', customer);
-                if (color) params.set('color', color);
                 if (exclude) params.set('exclude', exclude);
 
                 fetch("{% url 'order_price_history' %}?" + params.toString())
