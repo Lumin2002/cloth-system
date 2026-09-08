@@ -1,0 +1,127 @@
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+(function () {
+    if (typeof Vue === 'undefined') return;
+
+    var priceInput = document.getElementById('id_price');
+    if (!priceInput) return;
+
+    var host = document.createElement('div');
+    host.id = 'vue-order-interactions';
+    priceInput.parentNode.insertBefore(host, priceInput.nextSibling);
+
+    function valueOf(id) {
+        var el = document.getElementById(id);
+        return el ? el.value.trim() : '';
+    }
+
+    Vue.createApp({
+        delimiters: ['[[', ']]'],
+        data: function () {
+            return {
+                customers: [],
+                history: [],
+                orderType: ''
+            };
+        },
+        template: `
+            <datalist id="customer-options">
+                <option v-for="customer in customers" :value="customer"></option>
+            </datalist>
+            <div v-if="orderType" class="mt-2 small">
+                <div class="card border-info">
+                    <div class="card-header bg-info bg-opacity-10 py-1 px-2 small fw-bold">
+                        <i class="bi bi-clock-history me-1"></i>历史价格参考（最近5次）
+                    </div>
+                    <div class="card-body p-1">
+                        <div
+                            v-for="item in history"
+                            :key="item.id"
+                            class="d-flex justify-content-between align-items-center border rounded px-2 py-1 mb-1"
+                            style="cursor:pointer;background:#f8f9fa;"
+                            @click="applyHistory(item)"
+                        >
+                            <span class="text-muted text-truncate me-2">
+                                <span class="badge bg-secondary me-1">[[ item.order_type ]]</span>
+                                <strong>#[[ item.serial_number ]]</strong>
+                                [[ [item.order_date, item.customer, item.cloth_type, item.color].filter(Boolean).join(' / ') ]]
+                            </span>
+                            <span class="text-primary fw-bold text-nowrap">
+                                [[ item.price ]] [[ item.price_unit ]]
+                            </span>
+                        </div>
+                        <div v-if="!history.length" class="text-muted p-2">该布种暂无历史订单价格</div>
+                    </div>
+                </div>
+            </div>
+        `,
+        methods: {
+            loadCustomers: function () {
+                var self = this;
+                fetch("{% url 'customer_options' %}")
+                    .then(function (response) { return response.json(); })
+                    .then(function (data) {
+                        self.customers = data.customers || [];
+                    })
+                    .catch(function () {});
+            },
+            loadHistory: function () {
+                var self = this;
+                var type = valueOf('id_order_type');
+                self.orderType = type;
+                if (!type) {
+                    self.history = [];
+                    return;
+                }
+
+                var params = new URLSearchParams({order_type: type});
+                var clothType = valueOf('id_cloth_type');
+                var customer = valueOf('id_customer');
+                var color = valueOf('id_color');
+                var exclude = host.dataset.exclude || '';
+                if (clothType) params.set('cloth_type', clothType);
+                if (customer) params.set('customer', customer);
+                if (color) params.set('color', color);
+                if (exclude) params.set('exclude', exclude);
+
+                fetch("{% url 'order_price_history' %}?" + params.toString())
+                    .then(function (response) { return response.json(); })
+                    .then(function (data) {
+                        self.history = data.history || [];
+                    })
+                    .catch(function () {
+                        self.history = [];
+                    });
+            },
+            applyHistory: function (item) {
+                var price = document.getElementById('id_price');
+                var unit = document.getElementById('id_price_unit');
+                var quantityUnit = document.getElementById('id_quantity_unit');
+                if (price && item.price) price.value = item.price;
+                if (unit && item.price_unit) unit.value = item.price_unit;
+                if (quantityUnit && item.quantity_unit) quantityUnit.value = item.quantity_unit;
+            }
+        },
+        mounted: function () {
+            var self = this;
+            host.dataset.exclude = '{% if object %} {{ object.pk }}{% endif %}';
+            this.loadCustomers();
+            this.loadHistory();
+
+            [
+                ['id_order_type', 'change'],
+                ['id_cloth_type', 'change'],
+                ['id_customer', 'change'],
+                ['id_color', 'change']
+            ].forEach(function (pair) {
+                var el = document.getElementById(pair[0]);
+                if (el) {
+                    el.addEventListener(pair[1], function () {
+                        self.loadHistory();
+                    });
+                }
+            });
+        }
+    }).mount(host);
+})();
+</script>
