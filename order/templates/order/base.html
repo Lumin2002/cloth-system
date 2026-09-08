@@ -663,6 +663,16 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 </script>
 
+<script>
+// 全局禁止鼠标滚轮修改 number 输入框数值，避免误触
+document.addEventListener("wheel", function (event) {
+    var target = event.target;
+    if (target && target.tagName === "INPUT" && target.type === "number") {
+        event.preventDefault();
+    }
+}, { passive: false });
+</script>
+
 {# 会话超时功能已注释停用，后续需要时恢复本行 #}
 {# include "order/_session_timeout.html" #}
 

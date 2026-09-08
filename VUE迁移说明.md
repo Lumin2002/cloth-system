@@ -76,3 +76,12 @@ https://unpkg.com/vue@3/dist/vue.global.prod.js
 ```
 
 如果后续需要内网离线运行，可以把 Vue 下载到 `order/static/js/vue.global.prod.js`，再改为本地静态文件引用。
+
+---
+
+## 全局输入规则
+
+Vue 化过程中，同时加入了全局交互规则：
+
+- 所有 `input[type="number"]` 编辑框禁止通过鼠标滚轮修改数值。
+- 该规则写在公共模板 `order/templates/order/base.html` 中，所有页面自动生效。
