@@ -10,60 +10,126 @@
     Vue.createApp({
         delimiters: ['[[', ']]'],
         data: function () {
-            return { suppliers: suppliers, search: '' };
+            return {
+                suppliers: suppliers,
+                search: '',
+                status: 'all',
+                currentPage: 1,
+                pageSize: 18
+            };
         },
         computed: {
             filteredSuppliers: function () {
                 var keyword = this.search.trim().toLowerCase();
-                if (!keyword) return this.suppliers;
                 return this.suppliers.filter(function (supplier) {
-                    return [
-                        supplier.company_name,
-                        supplier.username,
-                        supplier.contact_person,
-                        supplier.phone
-                    ].join(' ').toLowerCase().indexOf(keyword) !== -1;
-                });
+                    var statusMatched = true;
+                    if (this.status === 'active') {
+                        statusMatched = supplier.is_active;
+                    } else if (this.status === 'inactive') {
+                        statusMatched = !supplier.is_active;
+                    }
+
+                    var textMatched = true;
+                    if (keyword) {
+                        textMatched = [
+                            supplier.company_name,
+                            supplier.username,
+                            supplier.contact_person,
+                            supplier.phone
+                        ].join(' ').toLowerCase().indexOf(keyword) !== -1;
+                    }
+                    return statusMatched && textMatched;
+                }, this);
+            },
+            totalPages: function () {
+                return Math.max(1, Math.ceil(this.filteredSuppliers.length / this.pageSize));
+            },
+            pagedSuppliers: function () {
+                var start = (this.currentPage - 1) * this.pageSize;
+                return this.filteredSuppliers.slice(start, start + this.pageSize);
+            }
+        },
+        watch: {
+            search: function () {
+                this.currentPage = 1;
+            },
+            status: function () {
+                this.currentPage = 1;
+            }
+        },
+        methods: {
+            goPage: function (page) {
+                if (page >= 1 && page <= this.totalPages) this.currentPage = page;
+            },
+            prevPage: function () {
+                this.goPage(this.currentPage - 1);
+            },
+            nextPage: function () {
+                this.goPage(this.currentPage + 1);
             }
         },
         template: `
-            <div class="card card-flat">
-                <div class="card-body">
-                    <div class="row g-2 mb-3">
-                        <div class="col-auto flex-grow-1">
-                            <input v-model="search" type="text" class="form-control" placeholder="搜索公司名称/联系人/登录名...">
+            <div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <input v-model="search" type="text" class="form-control" placeholder="搜索公司名称/联系人/登录名...">
+                    </div>
+                    <div class="col-auto">
+                        <select v-model="status" class="form-select">
+                            <option value="all">全部状态</option>
+                            <option value="active">激活</option>
+                            <option value="inactive">禁用</option>
+                        </select>
+                    </div>
+                    <div class="col-auto text-muted small d-flex align-items-center">显示 [[ filteredSuppliers.length ]] 个账号</div>
+                </div>
+
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+                    <div v-for="supplier in pagedSuppliers" :key="supplier.id" class="col">
+                        <div class="card card-flat h-100 border-0 shadow-sm">
+                            <div class="card-body d-flex flex-column">
+                                <div class="d-flex align-items-start justify-content-between mb-2">
+                                    <div>
+                                        <h6 class="mb-1 fw-bold text-primary">[[ supplier.company_name ]]</h6>
+                                        <div class="small text-muted">登录名：<code>[[ supplier.username ]]</code></div>
+                                    </div>
+                                    <span class="badge" :class="supplier.is_active ? 'bg-success' : 'bg-secondary'">
+                                        [[ supplier.is_active ? '激活' : '禁用' ]]
+                                    </span>
+                                </div>
+
+                                <div class="small mb-3">
+                                    <div v-if="supplier.contact_person"><i class="bi bi-person me-1 text-muted"></i>[[ supplier.contact_person ]]</div>
+                                    <div v-if="supplier.phone"><i class="bi bi-telephone me-1 text-muted"></i>[[ supplier.phone ]]</div>
+                                    <div class="mt-1 text-muted"><i class="bi bi-calendar3 me-1"></i>[[ supplier.created_at ]]</div>
+                                </div>
+
+                                <div class="mt-auto d-flex gap-2">
+                                    <a :href="supplier.edit_url" class="btn btn-sm btn-outline-primary flex-fill">
+                                        <i class="bi bi-pencil me-1"></i>编辑
+                                    </a>
+                                    <a :href="supplier.reset_password_url" class="btn btn-sm btn-outline-warning flex-fill">
+                                        <i class="bi bi-key me-1"></i>重置密码
+                                    </a>
+                                    <a :href="supplier.delete_url" class="btn btn-sm btn-outline-danger flex-fill">
+                                        <i class="bi bi-trash me-1"></i>删除
+                                    </a>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-auto text-muted small d-flex align-items-center">显示 [[ filteredSuppliers.length ]] 个账号</div>
                     </div>
-                    <div class="table-responsive">
-                        <table class="table table-hover data-table mb-0">
-                            <thead>
-                                <tr>
-                                    <th>公司名称</th><th>登录名</th><th>联系人</th><th>电话</th><th>状态</th><th>创建时间</th><th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="supplier in filteredSuppliers" :key="supplier.id">
-                                    <td>[[ supplier.company_name ]]</td>
-                                    <td><code>[[ supplier.username ]]</code></td>
-                                    <td>[[ supplier.contact_person || '-' ]]</td>
-                                    <td>[[ supplier.phone || '-' ]]</td>
-                                    <td>
-                                        <span class="badge" :class="supplier.is_active ? 'bg-success' : 'bg-secondary'">
-                                            [[ supplier.is_active ? '激活' : '禁用' ]]
-                                        </span>
-                                    </td>
-                                    <td>[[ supplier.created_at ]]</td>
-                                    <td class="text-nowrap">
-                                        <a :href="supplier.edit_url" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                                        <a :href="supplier.reset_password_url" class="btn btn-sm btn-outline-warning"><i class="bi bi-key"></i></a>
-                                        <a :href="supplier.delete_url" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
-                                    </td>
-                                </tr>
-                                <tr v-if="!filteredSuppliers.length"><td colspan="7" class="text-center text-muted py-4">暂无供应商账号</td></tr>
-                            </tbody>
-                        </table>
+                    <div v-if="!pagedSuppliers.length" class="col-12">
+                        <div class="card card-flat border-0 shadow-sm">
+                            <div class="card-body text-center text-muted py-5">暂无供应商账号</div>
+                        </div>
                     </div>
+                </div>
+
+                <div v-if="totalPages > 1" class="d-flex flex-wrap align-items-center justify-content-end gap-2 mt-3">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="currentPage === 1" @click="prevPage">上一页</button>
+                    <button v-for="page in totalPages" type="button" class="btn btn-sm" :class="page === currentPage ? 'btn-primary' : 'btn-outline-primary'" @click="goPage(page)">[[ page ]]</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="currentPage === totalPages" @click="nextPage">下一页</button>
+                    <span class="small text-muted">第 [[ currentPage ]] / [[ totalPages ]] 页</span>
                 </div>
             </div>
         `

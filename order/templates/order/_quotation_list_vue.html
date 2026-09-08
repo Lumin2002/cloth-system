@@ -10,7 +10,12 @@
     Vue.createApp({
         delimiters: ['[[', ']]'],
         data: function () {
-            return { items: items, search: '' };
+            return {
+                items: items,
+                search: '',
+                currentPage: 1,
+                pageSize: 20
+            };
         },
         computed: {
             filteredItems: function () {
@@ -23,6 +28,29 @@
                         item.supplier_name
                     ].join(' ').toLowerCase().indexOf(keyword) !== -1;
                 });
+            },
+            totalPages: function () {
+                return Math.max(1, Math.ceil(this.filteredItems.length / this.pageSize));
+            },
+            pagedItems: function () {
+                var start = (this.currentPage - 1) * this.pageSize;
+                return this.filteredItems.slice(start, start + this.pageSize);
+            }
+        },
+        watch: {
+            search: function () {
+                this.currentPage = 1;
+            }
+        },
+        methods: {
+            goPage: function (page) {
+                if (page >= 1 && page <= this.totalPages) this.currentPage = page;
+            },
+            prevPage: function () {
+                this.goPage(this.currentPage - 1);
+            },
+            nextPage: function () {
+                this.goPage(this.currentPage + 1);
             }
         },
         template: `
@@ -43,7 +71,7 @@
                                     <th>克重</th><th>门幅</th><th>200m价(素色)</th><th>200m价(印花)</th><th>常规价</th><th>环保材料</th><th style="width:60px">操作</th>
                                 </tr></thead>
                                 <tbody>
-                                    <tr v-for="item in filteredItems" :key="item.id">
+                                    <tr v-for="item in pagedItems" :key="item.id">
                                         <td class="fw-semibold text-primary">
                                             <a :href="item.detail_url" class="text-decoration-none">[[ item.article_no || '-' ]]</a>
                                         </td>
@@ -69,6 +97,13 @@
                             </table>
                         </div>
                     </div>
+                </div>
+
+                <div v-if="totalPages > 1" class="d-flex flex-wrap align-items-center justify-content-end gap-2 mt-3">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="currentPage === 1" @click="prevPage">上一页</button>
+                    <button v-for="page in totalPages" type="button" class="btn btn-sm" :class="page === currentPage ? 'btn-primary' : 'btn-outline-primary'" @click="goPage(page)">[[ page ]]</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="currentPage === totalPages" @click="nextPage">下一页</button>
+                    <span class="small text-muted">第 [[ currentPage ]] / [[ totalPages ]] 页</span>
                 </div>
             </div>
         `

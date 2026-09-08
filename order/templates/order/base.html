@@ -673,6 +673,23 @@ document.addEventListener("wheel", function (event) {
 }, { passive: false });
 </script>
 
+<button id="back-to-top" type="button" class="btn btn-primary rounded-circle shadow"
+        style="position:fixed;right:20px;bottom:26px;width:44px;height:44px;z-index:1050;display:none;align-items:center;justify-content:center;">
+    <i class="bi bi-arrow-up"></i>
+</button>
+<script>
+(function () {
+    var btn = document.getElementById('back-to-top');
+    if (!btn) return;
+    window.addEventListener('scroll', function () {
+        btn.style.display = (window.scrollY > 300) ? 'flex' : 'none';
+    }, { passive: true });
+    btn.addEventListener('click', function () {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+})();
+</script>
+
 {# 会话超时功能已注释停用，后续需要时恢复本行 #}
 {# include "order/_session_timeout.html" #}
 
