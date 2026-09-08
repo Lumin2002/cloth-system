@@ -12,8 +12,9 @@
 
 ### 页面
 
-- 新增订单页
-- 模板文件：`order/templates/order/order_create.html`
+- 新增订单页：`order/templates/order/order_create.html`
+- 编辑订单页：`order/templates/order/order_form.html`
+- 订单详情编辑态：`order/templates/order/order_detail.html`
 
 ### Vue 组件文件
 
@@ -45,8 +46,6 @@
 
 以下页面仍使用原有原生 JS + Django 模板：
 
-- 编辑订单页：`order/templates/order/order_form.html`
-- 订单详情编辑态：`order/templates/order/order_detail.html`
 - 客户管理列表：`order/templates/order/customer_list.html`
 - 订单列表、供应商端、库存、报价等页面
 
