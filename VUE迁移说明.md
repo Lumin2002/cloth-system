@@ -21,6 +21,7 @@
 - 面料报价列表：`order/templates/order/quotation_list.html`
 - 供应商账号列表：`order/templates/order/supplier_manage_list.html`
 - 库存日志列表：`order/templates/order/inventory_log_list.html`
+- 供应商端仪表盘汇总卡片：`order/templates/order/supplier_dashboard.html`
 
 ### Vue 组件文件
 
@@ -32,6 +33,7 @@
 - `order/templates/order/_supplier_manage_list_vue.html`
 - `order/templates/order/_vue_pagination_component.html`
 - `order/templates/order/_inventory_log_list_vue.html`
+- `order/templates/order/_supplier_dashboard_summary_vue.html`
 
 ### Vue 负责的内容
 
@@ -72,6 +74,10 @@
 
 7. 库存日志列表
    - Vue 负责搜索、类型筛选、表格渲染和分页
+
+8. 供应商端仪表盘汇总卡片
+   - Vue 负责顶部统计卡片渲染
+   - 订单表格和筛选暂保留 Django 服务端渲染，避免影响供应商报价/出货流程
 
 ---
 

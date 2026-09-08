@@ -1,0 +1,50 @@
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+(function () {
+    if (typeof Vue === 'undefined') return;
+    var dataElement = document.getElementById('supplier-summary-data');
+    if (!dataElement) return;
+    var summary = {};
+    try { summary = JSON.parse(dataElement.textContent); } catch (e) { summary = {}; }
+
+    Vue.createApp({
+        delimiters: ['[[', ']]'],
+        data: function () {
+            return { summary: summary };
+        },
+        template: `
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3">
+                    <a href="/supplier/" class="kpi-card kpi-primary text-decoration-none">
+                        <div class="kpi-label">全部订单</div>
+                        <div class="kpi-value">[[ summary.total_count ]]</div>
+                        <div class="kpi-meta">待报价 [[ summary.pending_count ]] · 已出货 [[ summary.shipped_count ]]</div>
+                        <i class="bi bi-clipboard-data kpi-icon"></i>
+                    </a>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="kpi-card kpi-warning">
+                        <div class="kpi-label">待报价</div>
+                        <div class="kpi-value">[[ summary.pending_count ]]</div>
+                        <i class="bi bi-clock-history kpi-icon"></i>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="kpi-card kpi-info">
+                        <div class="kpi-label">已报价待出货</div>
+                        <div class="kpi-value">[[ summary.quoted_wait_ship_count ]]</div>
+                        <i class="bi bi-truck kpi-icon"></i>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="kpi-card kpi-success">
+                        <div class="kpi-label">已出货</div>
+                        <div class="kpi-value">[[ summary.shipped_count ]]</div>
+                        <i class="bi bi-check-circle kpi-icon"></i>
+                    </div>
+                </div>
+            </div>
+        `
+    }).mount('#supplier-summary-vue');
+})();
+</script>

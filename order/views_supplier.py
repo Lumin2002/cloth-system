@@ -267,6 +267,12 @@ class SupplierDashboardView(SupplierRequiredMixin, ListView):
         ctx["pending_count"] = cnt["pending"]
         ctx["quoted_wait_ship_count"] = cnt["wait_ship"]
         ctx["shipped_count"] = cnt["shipped"]
+        ctx["supplier_summary_json"] = {
+            "total_count": cnt["total"],
+            "pending_count": cnt["pending"],
+            "quoted_wait_ship_count": cnt["wait_ship"],
+            "shipped_count": cnt["shipped"],
+        }
 
         # 计算每条订单的小计（使用已注解的 _shipment_qty，不触发额外查询）
         totals = {}

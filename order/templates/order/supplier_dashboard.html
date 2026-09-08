@@ -7,37 +7,9 @@
     </ol>
 </nav>
 
-<div class="row g-3 mb-4">
-    <div class="col-6 col-md-3">
-        <a href="{% url 'supplier_dashboard' %}" class="kpi-card kpi-primary text-decoration-none">
-            <div class="kpi-label">全部订单</div>
-            <div class="kpi-value">{{ total_count }}</div>
-            <div class="kpi-meta">待报价 {{ pending_count }} · 已出货 {{ shipped_count }}</div>
-            <i class="bi bi-clipboard-data kpi-icon"></i>
-        </a>
-    </div>
-    <div class="col-6 col-md-3">
-        <div class="kpi-card kpi-warning">
-            <div class="kpi-label">待报价</div>
-            <div class="kpi-value">{{ pending_count }}</div>
-            <i class="bi bi-clock-history kpi-icon"></i>
-        </div>
-    </div>
-    <div class="col-6 col-md-3">
-        <div class="kpi-card kpi-info">
-            <div class="kpi-label">已报价待出货</div>
-            <div class="kpi-value">{{ quoted_wait_ship_count }}</div>
-            <i class="bi bi-truck kpi-icon"></i>
-        </div>
-    </div>
-    <div class="col-6 col-md-3">
-        <div class="kpi-card kpi-success">
-            <div class="kpi-label">已出货</div>
-            <div class="kpi-value">{{ shipped_count }}</div>
-            <i class="bi bi-check-circle kpi-icon"></i>
-        </div>
-    </div>
-</div>
+<div id="supplier-summary-vue"></div>
+{{ supplier_summary_json|json_script:"supplier-summary-data" }}
+{% include 'order/_supplier_dashboard_summary_vue.html' %}
 
 <div class="card card-flat mb-3">
     <div class="card-body py-2">
