@@ -23,6 +23,7 @@
 - 库存日志列表：`order/templates/order/inventory_log_list.html`
 - 供应商端仪表盘汇总卡片：`order/templates/order/supplier_dashboard.html`
 - 库存列表汇总卡片：`order/templates/order/inventory_list.html`
+- 订单列表汇总卡片和分页：`order/templates/order/order_list.html`
 
 ### Vue 组件文件
 
@@ -37,6 +38,8 @@
 - `order/templates/order/_supplier_dashboard_summary_vue.html`
 - `order/templates/order/_inventory_summary_vue.html`
 - `order/templates/order/_inventory_pagination_vue.html`
+- `order/templates/order/_order_summary_vue.html`
+- `order/templates/order/_order_pagination_vue.html`
 
 ### Vue 负责的内容
 
@@ -86,6 +89,10 @@
    - Vue 负责顶部四个统计卡片
    - 分页控件也已改为 Vue，保留当前筛选参数
    - 表格、筛选、批量操作暂保留服务端渲染，避免影响批量功能
+
+10. 订单列表汇总卡片和分页
+    - Vue 负责顶部财务汇总卡片和分页控件
+    - 表格、筛选、批量操作暂保留服务端渲染，避免影响订单批量功能
 
 ---
 

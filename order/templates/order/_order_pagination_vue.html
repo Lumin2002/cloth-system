@@ -1,0 +1,34 @@
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+{% include 'order/_vue_pagination_component.html' %}
+<script>
+(function () {
+    if (typeof Vue === 'undefined') return;
+    var dataElement = document.getElementById('order-pagination-data');
+    if (!dataElement) return;
+    var pagination = {};
+    try { pagination = JSON.parse(dataElement.textContent); } catch (e) { pagination = {}; }
+
+    var app = Vue.createApp({
+        delimiters: ['[[', ']]'],
+        data: function () {
+            return {
+                currentPage: Number(pagination.current_page || 1),
+                totalPages: Number(pagination.total_pages || 1)
+            };
+        },
+        methods: {
+            goPage: function (page) {
+                if (page < 1 || page > this.totalPages) return;
+                var params = new URLSearchParams(window.location.search);
+                params.set('page', page);
+                window.location.href = window.location.pathname + '?' + params.toString();
+            }
+        },
+        template: `
+            <pagination-bar :current-page="currentPage" :total-pages="totalPages" @page-change="goPage"></pagination-bar>
+        `
+    });
+    app.component('pagination-bar', window.__paginationBarComponent);
+    app.mount('#order-pagination-vue');
+})();
+</script>

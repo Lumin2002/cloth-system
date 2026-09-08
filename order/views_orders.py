@@ -154,6 +154,19 @@ class OrderListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
         total_profit = total_revenue - total_cost
         profit_margin = (total_profit / total_revenue * 100) if total_revenue else 0
 
+        page_obj = ctx.get('page_obj')
+        ctx["order_pagination_json"] = {
+            "current_page": page_obj.number if page_obj and getattr(page_obj, 'paginator', None) else 1,
+            "total_pages": page_obj.paginator.num_pages if page_obj and getattr(page_obj, 'paginator', None) else 1,
+        }
+        ctx["order_summary_json"] = {
+            "total_count": len(active_ids),
+            "total_revenue": total_revenue,
+            "total_cost": total_cost,
+            "total_profit": total_profit,
+            "profit_margin": profit_margin,
+        }
+
         ctx["total_count"] = len(active_ids)
         ctx["total_revenue"] = total_revenue
         ctx["total_cost"] = total_cost
