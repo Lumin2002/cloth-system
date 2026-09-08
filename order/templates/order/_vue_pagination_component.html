@@ -46,14 +46,14 @@
             }
         },
         template: `
-            <div v-if="totalPages > 1" class="d-flex flex-wrap align-items-center justify-content-end gap-2 mt-3">
+            <div v-if="totalPages > 1" class="d-flex flex-wrap align-items-center justify-content-center gap-2 mt-4 px-3 py-2 bg-white border rounded shadow-sm">
                 <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="currentPage === 1" @click="prevPage">上一页</button>
                 <template v-for="page in pageItems" :key="page">
-                    <button v-if="page !== '...'" type="button" class="btn btn-sm" :class="page === currentPage ? 'btn-primary' : 'btn-outline-primary'" @click="goPage(page)">[[ page ]]</button>
+                    <button v-if="page !== '...'" type="button" class="btn btn-sm rounded-circle" :class="page === currentPage ? 'btn-primary' : 'btn-light border'" @click="goPage(page)" style="min-width:34px;">[[ page ]]</button>
                     <span v-else class="text-muted px-1">...</span>
                 </template>
                 <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="currentPage === totalPages" @click="nextPage">下一页</button>
-                <span class="small text-muted">第 [[ currentPage ]] / [[ totalPages ]] 页</span>
+                <span class="small text-muted ms-2">第 [[ currentPage ]] / [[ totalPages ]] 页</span>
             </div>
         `
     };
