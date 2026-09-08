@@ -174,6 +174,17 @@ class InventoryListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         qs = self.get_queryset()
+        page_obj = context.get('page_obj')
+        if page_obj and getattr(page_obj, 'paginator', None):
+            context['inventory_pagination_json'] = {
+                'current_page': page_obj.number,
+                'total_pages': page_obj.paginator.num_pages,
+            }
+        else:
+            context['inventory_pagination_json'] = {
+                'current_page': 1,
+                'total_pages': 1,
+            }
         chip_zero = InventoryItem.objects.filter(quantity=0).count()
         chip_low = InventoryItem.objects.filter(quantity__gt=0, quantity__lt=50).count()
         chip_normal = InventoryItem.objects.filter(quantity__gte=50).count()

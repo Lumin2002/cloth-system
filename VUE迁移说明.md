@@ -36,6 +36,7 @@
 - `order/templates/order/_inventory_log_list_vue.html`
 - `order/templates/order/_supplier_dashboard_summary_vue.html`
 - `order/templates/order/_inventory_summary_vue.html`
+- `order/templates/order/_inventory_pagination_vue.html`
 
 ### Vue 负责的内容
 
@@ -83,7 +84,8 @@
 
 9. 库存列表汇总卡片
    - Vue 负责顶部四个统计卡片
-   - 筛选、表格、批量操作暂保留服务端渲染，避免影响批量功能
+   - 分页控件也已改为 Vue，保留当前筛选参数
+   - 表格、筛选、批量操作暂保留服务端渲染，避免影响批量功能
 
 ---
 

@@ -281,13 +281,9 @@
     </form>
 </div>
 
-    {% if page_obj and page_obj.paginator.count > 0 %}
-    <div class="card card-flat mb-3">
-        <div class="card-body py-2">
-            {% include 'order/_pagination.html' with page_obj=page_obj %}
-        </div>
-    </div>
-    {% endif %}
+    <div id="inventory-pagination-vue"></div>
+    {{ inventory_pagination_json|json_script:"inventory-pagination-data" }}
+    {% include 'order/_inventory_pagination_vue.html' %}
 	
 <!-- 回到顶部 -->
 <button id="back-to-top" title="回到顶部" aria-label="回到顶部">
