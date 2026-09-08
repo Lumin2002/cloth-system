@@ -29,6 +29,7 @@
 - `order/templates/order/_cloth_catalog_list_vue.html`
 - `order/templates/order/_quotation_list_vue.html`
 - `order/templates/order/_supplier_manage_list_vue.html`
+- `order/templates/order/_vue_pagination_component.html`
 
 ### Vue 负责的内容
 
@@ -65,6 +66,7 @@
    - 新增、编辑、删除仍走 Django 原有页面和接口
    - 布种编号、面料报价带客户端分页
    - 供应商账号已改为卡片展示
+   - 分页组件已抽成通用 `pagination-bar`，供各列表页复用
 
 ---
 
