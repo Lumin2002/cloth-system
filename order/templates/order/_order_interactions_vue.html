@@ -121,3 +121,37 @@
     }).mount(host);
 })();
 </script>
+
+<script>
+(function () {
+    var quantityUnit = document.getElementById('id_quantity_unit');
+    var priceUnit = document.getElementById('id_price_unit');
+    if (!quantityUnit || !priceUnit) return;
+
+    var hint = document.createElement('div');
+    hint.id = 'price-unit-hint';
+    hint.className = 'text-danger small mt-1';
+    hint.style.display = 'none';
+    priceUnit.parentNode.insertBefore(hint, priceUnit.nextSibling);
+
+    function syncHint() {
+        var q = quantityUnit.value.trim();
+        var p = priceUnit.value.trim();
+        var denominator = p.indexOf('米') !== -1 ? '米' : (p.indexOf('码') !== -1 ? '码' : '');
+        if (q && p && denominator && denominator !== q) {
+            var expected = q === '米'
+                ? '“元/米”或“美金/米”'
+                : '“元/码”或“美金/码”';
+            hint.textContent = '价格单位与数量单位不一致，' + q + '应对应' + expected;
+            hint.style.display = 'block';
+        } else {
+            hint.style.display = 'none';
+            hint.textContent = '';
+        }
+    }
+
+    quantityUnit.addEventListener('change', syncHint);
+    priceUnit.addEventListener('change', syncHint);
+    syncHint();
+})();
+</script>
