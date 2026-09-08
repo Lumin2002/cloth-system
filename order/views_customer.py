@@ -1,10 +1,13 @@
 """视图模块：内部客户资料管理。"""
 
+import json
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 from django.views.generic import CreateView, ListView, UpdateView
 
 from .decorators import admin_required
@@ -17,25 +20,35 @@ class CustomerListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
     model = Customer
     template_name = "order/customer_list.html"
     context_object_name = "customers"
-    paginate_by = 50
+    paginate_by = None
 
     def get_queryset(self):
-        qs = Customer.objects.all()
-        q = self.request.GET.get("q", "").strip()
-        if q:
-            qs = qs.filter(
-                Q(name__icontains=q)
-                | Q(code__icontains=q)
-                | Q(contact_person__icontains=q)
-                | Q(phone__icontains=q)
-            )
-        return qs
+        return Customer.objects.all()
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["q"] = self.request.GET.get("q", "")
-        ctx["total"] = Customer.objects.count()
-        ctx["active_count"] = Customer.objects.filter(is_active=True).count()
+        customers = list(Customer.objects.all().order_by("name"))
+        ctx["total"] = len(customers)
+        ctx["active_count"] = sum(1 for c in customers if c.is_active)
+        ctx["customers_json"] = json.dumps(
+            [
+                {
+                    "id": customer.pk,
+                    "name": customer.name,
+                    "code": customer.code or "",
+                    "contact_person": customer.contact_person or "",
+                    "phone": customer.phone or "",
+                    "email": customer.email or "",
+                    "address": customer.address or "",
+                    "remark": customer.remark or "",
+                    "is_active": customer.is_active,
+                    "edit_url": reverse("customer_edit", kwargs={"pk": customer.pk}),
+                    "delete_url": reverse("customer_delete", kwargs={"pk": customer.pk}),
+                }
+                for customer in customers
+            ],
+            ensure_ascii=False,
+        )
         return ctx
 
 

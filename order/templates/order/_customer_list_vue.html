@@ -1,0 +1,53 @@
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+(function () {
+    if (typeof Vue === 'undefined') return;
+
+    var dataElement = document.getElementById('customer-list-data');
+    if (!dataElement) return;
+
+    var customers = [];
+    try {
+        customers = JSON.parse(dataElement.textContent);
+    } catch (error) {
+        customers = [];
+    }
+
+    Vue.createApp({
+        delimiters: ['[[', ']]'],
+        data: function () {
+            return {
+                customers: customers,
+                search: '',
+                status: 'all'
+            };
+        },
+        computed: {
+            filteredCustomers: function () {
+                var keyword = this.search.trim().toLowerCase();
+                return this.customers.filter(function (customer) {
+                    var statusMatched = true;
+                    if (this.status === 'active') {
+                        statusMatched = customer.is_active;
+                    } else if (this.status === 'inactive') {
+                        statusMatched = !customer.is_active;
+                    }
+
+                    var textMatched = true;
+                    if (keyword) {
+                        var haystack = [
+                            customer.name,
+                            customer.code,
+                            customer.contact_person,
+                            customer.phone,
+                            customer.email
+                        ].join(' ').toLowerCase();
+                        textMatched = haystack.indexOf(keyword) !== -1;
+                    }
+                    return statusMatched && textMatched;
+                }, this);
+            }
+        }
+    }).mount('#customer-list-vue');
+})();
+</script>

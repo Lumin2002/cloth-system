@@ -15,10 +15,12 @@
 - 新增订单页：`order/templates/order/order_create.html`
 - 编辑订单页：`order/templates/order/order_form.html`
 - 订单详情编辑态：`order/templates/order/order_detail.html`
+- 客户管理列表：`order/templates/order/customer_list.html`
 
 ### Vue 组件文件
 
 - `order/templates/order/_order_interactions_vue.html`
+- `order/templates/order/_customer_list_vue.html`
 
 ### Vue 负责的内容
 
@@ -40,13 +42,17 @@
    - Vue 组件设置为 `[[ ]]`
    - 避免 Django 和 Vue 模板语法冲突
 
+4. 客户管理卡片列表
+   - Django 只负责输出初始客户 JSON
+   - Vue 负责搜索、状态筛选和卡片渲染
+   - 编辑、删除仍走原有 Django 接口
+
 ---
 
 ## 还未 Vue 化的位置
 
 以下页面仍使用原有原生 JS + Django 模板：
 
-- 客户管理列表：`order/templates/order/customer_list.html`
 - 订单列表、供应商端、库存、报价等页面
 
 原因：
@@ -59,10 +65,8 @@
 
 ## 后续建议顺序
 
-1. 将新增订单页 Vue 组件稳定后，复用到编辑订单页和详情编辑态。
-2. 将客户管理卡片列表改成 Vue 客户端筛选和卡片组件。
-3. 将订单列表的筛选、批量选择、表头排序逐步 Vue 化。
-4. 如需更大规模改造，再引入 Vite + Vue 3 独立前端，Django 改造成 API。
+1. 将订单列表的筛选、批量选择、表头排序逐步 Vue 化。
+2. 如需更大规模改造，再引入 Vite + Vue 3 独立前端，Django 改造成 API。
 
 ---
 
