@@ -6,6 +6,37 @@ from django.core.validators import MinValueValidator
 from .mixins import ClothCatalogMixin, ProgressStageMixin
 
 
+class Customer(models.Model):
+    """内部客户资料，不创建登录账号。"""
+    name = models.CharField(
+        max_length=200,
+        unique=True,
+        verbose_name="客户名称",
+        db_index=True,
+    )
+    code = models.CharField(max_length=50, verbose_name="客户编号", blank=True)
+    contact_person = models.CharField(max_length=100, verbose_name="联系人", blank=True)
+    phone = models.CharField(max_length=50, verbose_name="电话", blank=True)
+    email = models.EmailField(max_length=254, verbose_name="邮箱", blank=True)
+    address = models.TextField(verbose_name="地址", blank=True)
+    remark = models.TextField(verbose_name="备注", blank=True)
+    is_active = models.BooleanField(default=True, verbose_name="启用")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
+
+    class Meta:
+        verbose_name = "客户"
+        verbose_name_plural = "客户"
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["code"]),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
 class Supplier(models.Model):
     """供应商账号 —— 绑定 User，登录后可查看分配的订单并填写价格"""
     user = models.OneToOneField(
@@ -219,6 +250,12 @@ class ClothOrder(ClothCatalogMixin, ProgressStageMixin, models.Model):
             models.Index(fields=['order_date']),
             models.Index(fields=['payment_status']),
         ]
+
+    def save(self, *args, **kwargs):
+        """保存订单时同步内部客户资料。"""
+        if self.customer and str(self.customer).strip():
+            Customer.objects.get_or_create(name=str(self.customer).strip())
+        super().save(*args, **kwargs)
     
     def __str__(self):
         return f"{self.serial_number} - {self.customer} - {self.cloth_type}"
@@ -282,6 +319,19 @@ class ClothOrder(ClothCatalogMixin, ProgressStageMixin, models.Model):
         except Exception:
             pass
         return False
+
+    def advance_to_shipped_stage(self, save=True):
+        """根据订单类型推进到对应“已出货”阶段。"""
+        shipped_stage_by_type = {
+            "sample": "剪版寄出",
+            "bulk": "发货",
+            "bulk_print": "发货",
+            "other": "发货",
+        }
+        stage = shipped_stage_by_type.get(self.order_type)
+        if not stage:
+            return False
+        return self.set_progress_stage(stage, save=save)
 
     @property
     def is_overdue(self):

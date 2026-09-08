@@ -102,6 +102,8 @@
 </style>
 {% endblock %}
 {% block extra_js %}
+{% include 'order/_price_history.html' %}
+{% include 'order/_customer_datalist.html' %}
 <style>
 .cloth-ac-dropdown { position:absolute; z-index:999; width:100%; max-height:280px; overflow-y:auto; background:#fff; border:1px solid #dee2e6; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); display:none; }
 .cloth-ac-dropdown .ac-item { padding:8px 12px; cursor:pointer; border-bottom:1px solid #f0f0f0; font-size:.85rem; }
@@ -139,15 +141,6 @@ f.addEventListener("focus",function(){if(d.children.length)d.style.display="bloc
 })();
 </script>
 
-<script>
-(function(){
-var q=document.getElementById("id_quantity_unit");
-var p=document.getElementById("id_price_unit");
-if(!q||!p)return;
-q.addEventListener("change",function(){var v=this.value.trim();if(v==="米")p.value="元/米";else if(v==="码")p.value="元/码";});
-if(q.value&&!p.value){var v2=q.value.trim();if(v2==="米")p.value="元/米";else if(v2==="码")p.value="元/码";}
-})();
-</script>
 <script>
 // 面料报价自动填充：选编号后自动回填价格、成分、门幅、克重
 (function(){
@@ -218,13 +211,6 @@ f.addEventListener("blur", function(){
       
       if(fields.remark.el && !fields.remark.el.value && data.remark && data.remark !== "N/A")
         fields.remark.el.value = data.remark;
-      
-      // 单价单位：跟随数量单位（元/米 或 元/码）
-      if(!document.getElementById("id_price_unit").value){
-        var qu = document.getElementById("id_quantity_unit");
-        if(qu && qu.value === "码") document.getElementById("id_price_unit").value = "元/码";
-        else if(qu && (qu.value === "米" || qu.value === "")) document.getElementById("id_price_unit").value = "元/米";
-      }
       
       // 价格自动填充（按数量选200m价或常规价）
       if(fields.price.el && !fields.price.el.value){

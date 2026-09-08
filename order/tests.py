@@ -642,7 +642,7 @@ class ShipmentProgressTests(TestCase):
         self.assertTrue(order.supplier_shipped)
         self.assertEqual(order.current_stage_name, "剪版寄出")
 
-    def test_bulk_shipment_keeps_existing_progress(self):
+    def test_bulk_shipment_advances_to_shipped(self):
         order = self._create_order(order_type="bulk", serial_number=2)
         self.client.force_login(self.admin_user)
         response = self.client.post(
@@ -652,7 +652,7 @@ class ShipmentProgressTests(TestCase):
         self.assertEqual(response.status_code, 302)
         order.refresh_from_db()
         self.assertTrue(order.supplier_shipped)
-        self.assertEqual(order.current_stage_name, "通知供应商")
+        self.assertEqual(order.current_stage_name, "发货")
 
 
 class NotificationAccessTests(TestCase):

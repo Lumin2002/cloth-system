@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 from openpyxl import load_workbook
 
-from .models import ClothOrder, Supplier
+from .models import ClothOrder, Customer, Supplier
 from .constants import DEFAULT_STAGES_MAP
 
 SHEET_BULK = '大货'
@@ -632,6 +632,7 @@ def import_orders_from_file(
                     if key != 'order_status':
                         row_data.setdefault(key, default)
 
+                _ensure_customer(row_data.get("customer"))
                 existing = ClothOrder.objects.filter(serial_number=serial_number).first()
                 if existing:
                     was_cancelled = existing.order_status == 'cancelled'
@@ -674,6 +675,13 @@ def _match_supplier(order):
             order.save(update_fields=["supplier"])
     except Exception:
         pass
+
+
+def _ensure_customer(name):
+    """订单导入时自动补充不存在的客户。"""
+    name = str(name or "").strip()
+    if name:
+        Customer.objects.get_or_create(name=name)
 
 
 def _sync_shipments_from_order(order):

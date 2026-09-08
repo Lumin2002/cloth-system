@@ -1,13 +1,13 @@
 from django import forms
 from django.utils.safestring import mark_safe
-from .constants import DEFAULT_STAGES_MAP
+from .constants import DEFAULT_STAGES_MAP, PRICE_UNIT_CHOICES
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from datetime import date
 
 import html
 import json
-from .models import ClothOrder, InventoryItem, Supplier, Shipment
+from .models import ClothOrder, Customer, InventoryItem, Supplier, Shipment
 
 
 # 统一控件样式常量
@@ -135,7 +135,7 @@ class ClothOrderForm(forms.ModelForm):
         required_fields = [
             "order_date", "customer", "order_type", "cloth_type",
             "quantity_unit", "composition", "width", "weight",
-            "order_quantity", "price",
+            "order_quantity", "price", "price_unit",
         ]
         
         for fname in required_fields:
@@ -149,6 +149,15 @@ class ClothOrderForm(forms.ModelForm):
         for field_name, attrs in field_attrs.items():
             if field_name in self.fields:
                 self.fields[field_name].widget.attrs.update(attrs)
+
+        if "customer" in self.fields:
+            self.fields["customer"].widget = forms.TextInput(
+                attrs={
+                    **FORM_CONTROL,
+                    "list": "customer-options",
+                    "autocomplete": "off",
+                }
+            )
         
         # 2. 强制覆盖所有日期字段，替换为DateInput（生成type="date"日历输入框）
         DATE_FIELD_LIST = [
@@ -174,7 +183,12 @@ class ClothOrderForm(forms.ModelForm):
                 choices=[("", "---------"), ("米", "米"), ("码", "码")]
             )
         if "price_unit" in self.fields:
-            self.fields["price_unit"].widget.attrs.update({"readonly": True, "style": "background:#f8f9fa"})
+            self.fields["price_unit"].widget = forms.Select(
+                attrs=FORM_SELECT,
+                choices=[("", "---------")] + PRICE_UNIT_CHOICES,
+            )
+            if not self.initial.get("price_unit") and not getattr(self.instance, "price_unit", None):
+                self.initial["price_unit"] = "元/米"
         for fname in DATE_FIELD_LIST:
             if fname in self.fields:
                 self.fields[fname].widget = forms.DateInput(attrs=DATE_INPUT, format="%Y-%m-%d")
@@ -192,6 +206,21 @@ class ClothOrderForm(forms.ModelForm):
         if qs.exists():
             raise ValidationError(f"序号 {serial} 已存在，请更换")
         return serial
+
+    def clean(self):
+        cleaned_data = super().clean()
+        quantity_unit = cleaned_data.get("quantity_unit")
+        price_unit = cleaned_data.get("price_unit")
+
+        if quantity_unit and price_unit:
+            unit_hint = "米" if "米" in price_unit else "码" if "码" in price_unit else ""
+            if unit_hint and unit_hint != quantity_unit:
+                if quantity_unit == "米":
+                    raise ValidationError("价格单位与数量单位不一致，米应对应“元/米”或“美金/米”")
+                if quantity_unit == "码":
+                    raise ValidationError("价格单位与数量单位不一致，码应对应“元/码”或“美金/码”")
+
+        return cleaned_data
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -226,8 +255,8 @@ ORDER_FORM_SECTIONS = [
     {"title": "布料信息", "icon": "bi-palette", "header": "bg-info text-white",
      "fields": ("cloth_type", "textile_type", "color", "color_code", "composition", "width", "weight", "processing_type")},
     {"title": "数量与价格", "icon": "bi-currency-yen", "header": "bg-success text-white",
-     "fields": ("order_quantity", "quantity_unit", "price", "price_unit", "small_vat_fee",
-                "customer_delivery_date", "bulk_progress_tracking")},
+     "fields": ("order_quantity", "quantity_unit", "customer_delivery_date",
+                "price", "price_unit", "small_vat_fee", "bulk_progress_tracking")},
     {"title": "财务与对账", "icon": "bi-cash-stack", "header": "bg-warning text-dark",
      "fields": ("payment_method", "payment_period",
                 "reconciliation_date", "payment_date", "payment_status", "overdue_status",
@@ -252,6 +281,7 @@ CREATE_DEFAULTS = {
     "supplier_payment_method": "before_delivery",
     "order_date": date.today(),
     "quantity_unit": "米",
+    "price_unit": "元/米",
 }
 
 ORDER_CREATE_PRIMARY_COUNT = 4
@@ -327,6 +357,37 @@ class InventoryItemForm(forms.ModelForm):
         if qty is not None and qty < 0:
             raise ValidationError("库存数量不能为负数")
         return qty
+
+
+class CustomerForm(forms.ModelForm):
+    """内部客户资料表单。"""
+
+    class Meta:
+        model = Customer
+        fields = [
+            "name",
+            "code",
+            "contact_person",
+            "phone",
+            "email",
+            "address",
+            "is_active",
+            "remark",
+        ]
+        widgets = {
+            "name": forms.TextInput(attrs=FORM_CONTROL),
+            "code": forms.TextInput(attrs=FORM_CONTROL),
+            "contact_person": forms.TextInput(attrs=FORM_CONTROL),
+            "phone": forms.TextInput(attrs=FORM_CONTROL),
+            "email": forms.EmailInput(attrs=FORM_CONTROL),
+            "address": forms.Textarea(attrs=FORM_TEXTAREA),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "remark": forms.Textarea(attrs=FORM_TEXTAREA),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["name"].required = True
 
 
 

@@ -321,18 +321,25 @@ class SupplierOrderDetailView(SupplierRequiredMixin, DetailView):
             price = float(order.price or 0)
             order.finished_product_total_amount = order.computed_finished_product_total_amount
             order.supplier_shipped = order.shipments.filter(is_deleted=False).exists()
+            progress_changed = False
+            if order.supplier_shipped:
+                progress_changed = order.advance_to_shipped_stage(save=False)
 
             if not order.shipment_quantity_unit and order.quantity_unit:
                 order.shipment_quantity_unit = order.quantity_unit
 
+            update_fields = [
+                "total_shipment_quantity",
+                "total_amount",
+                "finished_product_total_amount",
+                "supplier_shipped",
+                "shipment_quantity_unit",
+            ]
+            if progress_changed:
+                update_fields.append("progress_current")
+
             order.save(
-                update_fields=[
-                    "total_shipment_quantity",
-                    "total_amount",
-                    "finished_product_total_amount",
-                    "supplier_shipped",
-                    "shipment_quantity_unit",
-                ]
+                update_fields=update_fields
             )
 
             logger.info(
@@ -413,7 +420,7 @@ def order_shipment_create(request, pk):
         order.finished_product_total_amount = order.computed_finished_product_total_amount
         if not order.shipment_quantity_unit and order.quantity_unit:
             order.shipment_quantity_unit = order.quantity_unit
-        progress_changed = order.set_progress_stage("剪版寄出", save=False)
+        progress_changed = order.advance_to_shipped_stage(save=False)
         order.save(
             update_fields=[
                 "supplier_shipped",

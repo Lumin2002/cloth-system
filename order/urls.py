@@ -3,6 +3,7 @@ from django.urls import path
 from . import views_auth
 from . import views_backup
 from . import views_catalog
+from . import views_customer
 from . import views_dashboard
 from . import views_inventory
 from . import views_monitor
@@ -22,6 +23,7 @@ urlpatterns = [
     path('orders/', views_orders.OrderListView.as_view(), name='order_list'),
     path('orders/add/', views_orders.OrderCreateView.as_view(), name='order_create'),
     path('orders/bulk/', views_orders.bulk_orders_action, name='bulk_orders'),
+    path('orders/price-history/', views_orders.order_price_history, name='order_price_history'),
     path('orders/<int:pk>/', views_orders.OrderDetailView.as_view(), name='order_detail'),
     path('orders/<int:pk>/edit/', views_orders.order_edit_redirect, name='order_edit'),
     path("orders/<int:pk>/statement/", views_orders.order_statement, name="order_statement"),
@@ -65,6 +67,12 @@ urlpatterns = [
     path("cloth-catalog/<int:pk>/delete/", views_catalog.cloth_catalog_delete, name="cloth_catalog_delete"),
     path("cloth-catalog/delete-all/", views_catalog.cloth_catalog_delete_all, name="cloth_catalog_delete_all"),
     path("cloth-catalog/api/autocomplete/", views_catalog.cloth_catalog_autocomplete, name="cloth_catalog_autocomplete"),
+    # 客户管理
+    path("customers/", views_customer.CustomerListView.as_view(), name="customer_list"),
+    path("customers/add/", views_customer.CustomerCreateView.as_view(), name="customer_add"),
+    path("customers/api/options/", views_customer.customer_options, name="customer_options"),
+    path("customers/<int:pk>/edit/", views_customer.CustomerUpdateView.as_view(), name="customer_edit"),
+    path("customers/<int:pk>/delete/", views_customer.customer_delete, name="customer_delete"),
     # 供应商账号管理
     path("supplier/manage/", views_supplier.SupplierManageListView.as_view(), name="supplier_manage_list"),
     path("supplier/manage/add/", views_supplier.SupplierManageCreateView.as_view(), name="supplier_manage_add"),

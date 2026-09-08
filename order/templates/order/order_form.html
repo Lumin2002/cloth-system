@@ -82,6 +82,8 @@
 {% endblock %}
 
 {% block extra_js %}
+{% include 'order/_price_history.html' %}
+{% include 'order/_customer_datalist.html' %}
 <script>
 // 面料自动补全脚本
 (function(){
@@ -112,27 +114,4 @@ f.addEventListener("focus",function(){if(d.children.length)d.style.display="bloc
 })();
 </script>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const q = document.getElementById('id_quantity_unit');
-    const p = document.getElementById('id_price_unit');
-
-    if (!q || !p) return;
-
-    function setPriceUnit() {
-        const val = q.value.trim();
-        if (val === '米') {
-            p.value = '元/米';
-        } else if (val === '码') {
-            p.value = '元/码';
-        } else {
-            p.value = '';
-        }
-    }
-
-    q.addEventListener('change', setPriceUnit);
-
-    setPriceUnit();
-});
-</script>
 {% endblock %}

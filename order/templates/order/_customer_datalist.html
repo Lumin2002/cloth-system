@@ -1,0 +1,33 @@
+<script>
+(function () {
+    var input = document.getElementById('id_customer');
+    if (!input) return;
+
+    var datalist = document.getElementById('customer-options');
+    if (!datalist) {
+        datalist = document.createElement('datalist');
+        datalist.id = 'customer-options';
+        document.body.appendChild(datalist);
+    }
+
+    function loadOptions() {
+        fetch("{% url 'customer_options' %}")
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                var names = data.customers || [];
+                datalist.innerHTML = names.map(function (name) {
+                    return '<option value="' + String(name)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#039;') + '"></option>';
+                }).join('');
+            })
+            .catch(function () {});
+    }
+
+    input.addEventListener('focus', loadOptions, { once: true });
+    loadOptions();
+})();
+</script>

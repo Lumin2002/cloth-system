@@ -677,7 +677,7 @@ def order_refresh_calculations(request, pk):
         if not order.supplier_shipped:
             order.supplier_shipped = True
             update_fields.append("supplier_shipped")
-            if order.set_progress_stage("剪版寄出", save=False):
+            if order.advance_to_shipped_stage(save=False):
                 update_fields.append("progress_current")
 
         order.save(update_fields=update_fields)
@@ -702,3 +702,59 @@ def order_list_updated_at(request):
     latest = ClothOrder.objects.order_by("-updated_at").values("updated_at").first()
     ts = latest["updated_at"].isoformat() if latest and latest["updated_at"] else ""
     return JsonResponse({"updated_at": ts})
+
+
+@admin_required
+def order_price_history(request):
+    """返回同类型订单的最近价格参考，供新增/编辑订单时提示。"""
+    order_type = request.GET.get("order_type", "").strip()
+    cloth_type = request.GET.get("cloth_type", "").strip()
+    customer = request.GET.get("customer", "").strip()
+    color = request.GET.get("color", "").strip()
+    exclude_pk = request.GET.get("exclude", "").strip()
+
+    type_groups = {
+        "bulk": ["bulk", "bulk_print"],
+        "bulk_print": ["bulk", "bulk_print"],
+        "sample": ["sample"],
+        "other": ["other"],
+    }
+    type_filter = type_groups.get(order_type)
+    if not type_filter:
+        return JsonResponse({"history": []})
+
+    qs = ClothOrder.objects.filter(
+        order_type__in=type_filter,
+        order_status="active",
+        price__isnull=False,
+    )
+    if cloth_type:
+        qs = qs.filter(cloth_type__iexact=cloth_type)
+    if customer:
+        qs = qs.filter(customer__icontains=customer)
+    if color:
+        qs = qs.filter(color__icontains=color)
+    if exclude_pk:
+        try:
+            qs = qs.exclude(pk=int(exclude_pk))
+        except (TypeError, ValueError):
+            pass
+
+    history = []
+    for order in qs.order_by("cloth_type", "-order_date", "-serial_number")[:5]:
+        history.append(
+            {
+                "id": order.pk,
+                "serial_number": order.serial_number,
+                "order_date": order.order_date.isoformat() if order.order_date else "",
+                "customer": order.customer or "",
+                "cloth_type": order.cloth_type or "",
+                "color": order.color or "",
+                "price": str(order.price) if order.price is not None else "",
+                "price_unit": order.price_unit or "",
+                "quantity": str(order.order_quantity) if order.order_quantity is not None else "",
+                "quantity_unit": order.quantity_unit or "",
+                "order_type": order.get_order_type_display() or "",
+            }
+        )
+    return JsonResponse({"history": history})

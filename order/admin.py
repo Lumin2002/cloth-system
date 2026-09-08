@@ -1,7 +1,24 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import ClothOrder
+from .models import ClothOrder, Customer
 from .models import InventoryLog
+
+
+@admin.register(Customer)
+class CustomerAdmin(admin.ModelAdmin):
+    list_display = [
+        "name",
+        "code",
+        "contact_person",
+        "phone",
+        "email",
+        "is_active",
+        "created_at",
+    ]
+    list_filter = ["is_active"]
+    search_fields = ["name", "code", "contact_person", "phone", "email"]
+    ordering = ["name"]
+    list_per_page = 50
 
 @admin.register(ClothOrder)
 class ClothOrderAdmin(admin.ModelAdmin):

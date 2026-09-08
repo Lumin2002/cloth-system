@@ -1,0 +1,70 @@
+{% extends "order/base.html" %}
+{% block title %}{{ form_title }}{% endblock %}
+{% block content %}
+<div class="container-fluid main-container">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{% url 'customer_list' %}">客户管理</a></li>
+      <li class="breadcrumb-item active">{{ form_title }}</li>
+    </ol>
+  </nav>
+
+  <div class="page-hero mb-4">
+    <div class="row align-items-center">
+      <div class="col-lg-8">
+        <h2 class="fw-bold mb-1"><i class="bi bi-person-plus text-primary me-2"></i>{{ form_title }}</h2>
+        <p class="text-muted mb-0">客户资料仅内部使用，不会创建客户登录账号</p>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="card card-flat mb-3">
+      <div class="card-header bg-primary text-white py-2"><h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>基本资料</h6></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label">客户名称 <span class="text-danger">*</span></label>
+            {{ form.name }}
+            {% for error in form.name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label">客户编号</label>
+            {{ form.code }}
+          </div>
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label">联系人</label>
+            {{ form.contact_person }}
+          </div>
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label">电话</label>
+            {{ form.phone }}
+          </div>
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label">邮箱</label>
+            {{ form.email }}
+          </div>
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label">是否启用</label>
+            <div class="form-check form-switch mt-2">{{ form.is_active }}</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">地址</label>
+            {{ form.address }}
+          </div>
+          <div class="col-12">
+            <label class="form-label">备注</label>
+            {{ form.remark }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mb-4">
+      <a href="{% url 'customer_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg me-1"></i>取消</a>
+      <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i>保存</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
