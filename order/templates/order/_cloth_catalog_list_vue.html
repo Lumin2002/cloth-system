@@ -1,0 +1,79 @@
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+(function () {
+    if (typeof Vue === 'undefined') return;
+    var dataElement = document.getElementById('cloth-catalog-data');
+    if (!dataElement) return;
+    var items = [];
+    try { items = JSON.parse(dataElement.textContent); } catch (e) { items = []; }
+
+    Vue.createApp({
+        delimiters: ['[[', ']]'],
+        data: function () {
+            return { items: items, search: '' };
+        },
+        computed: {
+            filteredItems: function () {
+                var keyword = this.search.trim().toLowerCase();
+                if (!keyword) return this.items;
+                return this.items.filter(function (item) {
+                    return [
+                        item.cloth_code,
+                        item.cloth_name,
+                        item.cloth_type,
+                        item.customer,
+                        item.composition_cn
+                    ].join(' ').toLowerCase().indexOf(keyword) !== -1;
+                });
+            }
+        },
+        template: `
+            <div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <input v-model="search" type="text" class="form-control form-control-sm" placeholder="搜索布种编号/名称/类型/客户...">
+                    </div>
+                    <div class="col-auto text-muted small d-flex align-items-center">显示 [[ filteredItems.length ]] 条记录</div>
+                </div>
+
+                <div class="card card-flat">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm data-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>布种编号</th><th>材料名称</th><th>布种类型</th><th>客户</th>
+                                        <th>成份</th><th>门幅</th><th>克重</th><th>规格</th><th style="width:60px">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="item in filteredItems" :key="item.id">
+                                        <td class="fw-semibold text-primary">
+                                            <a :href="item.detail_url" class="text-decoration-none">[[ item.cloth_code || '-' ]]</a>
+                                        </td>
+                                        <td>[[ item.cloth_name || '-' ]]</td>
+                                        <td>[[ item.cloth_type || '-' ]]</td>
+                                        <td>[[ item.customer || '-' ]]</td>
+                                        <td class="small">[[ item.composition_cn || '-' ]]</td>
+                                        <td>[[ item.width || '-' ]]</td>
+                                        <td>[[ item.weight || '-' ]]</td>
+                                        <td class="small">[[ item.specification || '-' ]]</td>
+                                        <td>
+                                            <form method="post" :action="item.delete_url"
+                                                  onsubmit="return confirm('确定删除该布种？')">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1"><i class="bi bi-trash"></i></button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="!filteredItems.length"><td colspan="9" class="text-center text-muted py-4">暂无数据，请先导入Excel</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `
+    }).mount('#cloth-catalog-vue');
+})();
+</script>

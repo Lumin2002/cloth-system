@@ -17,12 +17,18 @@
 - 订单详情编辑态：`order/templates/order/order_detail.html`
 - 客户管理列表：`order/templates/order/customer_list.html`
 - 仪表盘汇总区：`order/templates/order/dashboard.html`
+- 布种编号列表：`order/templates/order/cloth_catalog_list.html`
+- 面料报价列表：`order/templates/order/quotation_list.html`
+- 供应商账号列表：`order/templates/order/supplier_manage_list.html`
 
 ### Vue 组件文件
 
 - `order/templates/order/_order_interactions_vue.html`
 - `order/templates/order/_customer_list_vue.html`
 - `order/templates/order/_dashboard_summary_vue.html`
+- `order/templates/order/_cloth_catalog_list_vue.html`
+- `order/templates/order/_quotation_list_vue.html`
+- `order/templates/order/_supplier_manage_list_vue.html`
 
 ### Vue 负责的内容
 
@@ -52,6 +58,11 @@
 5. 仪表盘汇总区
    - Vue 负责核心指标卡片、状态快捷入口、本月对比卡片
    - 图表仍保留 ECharts，后续再单独评估是否 Vue 化
+
+6. 布种编号、面料报价、供应商账号列表
+   - Django 输出初始 JSON
+   - Vue 负责客户端搜索和表格渲染
+   - 新增、编辑、删除仍走 Django 原有页面和接口
 
 ---
 

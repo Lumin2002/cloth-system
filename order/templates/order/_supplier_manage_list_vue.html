@@ -1,0 +1,72 @@
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+(function () {
+    if (typeof Vue === 'undefined') return;
+    var dataElement = document.getElementById('supplier-manage-data');
+    if (!dataElement) return;
+    var suppliers = [];
+    try { suppliers = JSON.parse(dataElement.textContent); } catch (e) { suppliers = []; }
+
+    Vue.createApp({
+        delimiters: ['[[', ']]'],
+        data: function () {
+            return { suppliers: suppliers, search: '' };
+        },
+        computed: {
+            filteredSuppliers: function () {
+                var keyword = this.search.trim().toLowerCase();
+                if (!keyword) return this.suppliers;
+                return this.suppliers.filter(function (supplier) {
+                    return [
+                        supplier.company_name,
+                        supplier.username,
+                        supplier.contact_person,
+                        supplier.phone
+                    ].join(' ').toLowerCase().indexOf(keyword) !== -1;
+                });
+            }
+        },
+        template: `
+            <div class="card card-flat">
+                <div class="card-body">
+                    <div class="row g-2 mb-3">
+                        <div class="col-auto flex-grow-1">
+                            <input v-model="search" type="text" class="form-control" placeholder="搜索公司名称/联系人/登录名...">
+                        </div>
+                        <div class="col-auto text-muted small d-flex align-items-center">显示 [[ filteredSuppliers.length ]] 个账号</div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover data-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>公司名称</th><th>登录名</th><th>联系人</th><th>电话</th><th>状态</th><th>创建时间</th><th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="supplier in filteredSuppliers" :key="supplier.id">
+                                    <td>[[ supplier.company_name ]]</td>
+                                    <td><code>[[ supplier.username ]]</code></td>
+                                    <td>[[ supplier.contact_person || '-' ]]</td>
+                                    <td>[[ supplier.phone || '-' ]]</td>
+                                    <td>
+                                        <span class="badge" :class="supplier.is_active ? 'bg-success' : 'bg-secondary'">
+                                            [[ supplier.is_active ? '激活' : '禁用' ]]
+                                        </span>
+                                    </td>
+                                    <td>[[ supplier.created_at ]]</td>
+                                    <td class="text-nowrap">
+                                        <a :href="supplier.edit_url" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                                        <a :href="supplier.reset_password_url" class="btn btn-sm btn-outline-warning"><i class="bi bi-key"></i></a>
+                                        <a :href="supplier.delete_url" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                                    </td>
+                                </tr>
+                                <tr v-if="!filteredSuppliers.length"><td colspan="7" class="text-center text-muted py-4">暂无供应商账号</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `
+    }).mount('#supplier-manage-vue');
+})();
+</script>

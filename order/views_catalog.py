@@ -21,6 +21,7 @@ from django.db.models import (
 )
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 from .decorators import admin_required, validate_file_upload
@@ -55,36 +56,31 @@ class ClothCatalogListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
     model = ClothCatalog
     template_name = "order/cloth_catalog_list.html"
     context_object_name = "items"
-    paginate_by = 50
-
-    def get_paginate_by(self, queryset):
-        try:
-            return int(self.request.GET.get("per_page", 50))
-        except (ValueError, TypeError):
-            return 50
+    paginate_by = None
 
     def get_queryset(self):
-        qs = ClothCatalog.objects.all()
-        q = self.request.GET.get("q", "").strip()
-        if q:
-            qs = qs.filter(
-                Q(cloth_code__icontains=q)
-                | Q(cloth_name__icontains=q)
-                | Q(cloth_type__icontains=q)
-                | Q(customer__icontains=q)
-            )
-        return qs
+        return ClothCatalog.objects.all()
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["total"] = ClothCatalog.objects.count()
-        ctx["q"] = self.request.GET.get("q", "")
-        ctx["per_page_options"] = [20, 50, 100]
-        ctx["per_page"] = self.request.GET.get("per_page", 50)
-        try:
-            ctx["per_page"] = int(ctx["per_page"])
-        except ValueError:
-            ctx["per_page"] = 50
+        items = list(ClothCatalog.objects.all().order_by("cloth_code"))
+        ctx["total"] = len(items)
+        ctx["items_json"] = [
+            {
+                "id": item.pk,
+                "cloth_code": item.cloth_code or "",
+                "cloth_name": item.cloth_name or "",
+                "cloth_type": item.cloth_type or "",
+                "customer": item.customer or "",
+                "composition_cn": item.composition_cn or "",
+                "width": item.width or "",
+                "weight": item.weight or "",
+                "specification": item.specification or "",
+                "detail_url": reverse("cloth_catalog_detail", kwargs={"pk": item.pk}),
+                "delete_url": reverse("cloth_catalog_delete", kwargs={"pk": item.pk}),
+            }
+            for item in items
+        ]
         return ctx
 
 

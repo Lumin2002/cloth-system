@@ -1,4 +1,4 @@
-﻿{% extends "order/base.html" %}
+{% extends "order/base.html" %}
 {% block title %}布种编号表{% endblock %}
 {% block content %}
 <div class="container-fluid main-container">
@@ -10,74 +10,26 @@
 
   <div class="page-hero mb-4">
     <div class="row align-items-center g-2">
-        <div class="col-lg-8">
-            <h2 class="fw-bold mb-1"><i class="bi bi-grid text-primary me-2"></i>布种编号表</h2>
-            <p class="text-muted mb-0">共 <strong>{{ total }}</strong> 条记录</p>
+      <div class="col-lg-8">
+        <h2 class="fw-bold mb-1"><i class="bi bi-grid text-primary me-2"></i>布种编号表</h2>
+        <p class="text-muted mb-0">共 <strong>{{ total }}</strong> 条记录</p>
+      </div>
+      <div class="col-lg-4">
+        <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+          <a href="{% url 'cloth_catalog_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i> 新增</a>
+          <a href="{% url 'cloth_catalog_import' %}" class="btn btn-outline-success btn-sm"><i class="bi bi-upload me-1"></i> 导入</a>
+          <form method="post" action="{% url 'cloth_catalog_delete_all' %}" class="d-inline"
+                onsubmit="return confirm('确认要删除全部布种编号记录吗？此操作不可撤销！')">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash-fill me-1"></i> 清空</button>
+          </form>
         </div>
-        <div class="col-lg-4">
-            <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
-                <a href="{% url 'cloth_catalog_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i> 新增</a>
-                <a href="{% url 'cloth_catalog_import' %}" class="btn btn-outline-success btn-sm"><i class="bi bi-upload me-1"></i> 导入</a>
-                <form method="post" action="{% url 'cloth_catalog_delete_all' %}" class="d-inline"
-                      onsubmit="return confirm('确认要删除全部布种编号记录吗？此操作不可撤销！')">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash-fill me-1"></i> 清空</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-  <form method="get" class="row g-2 mb-3">
-    <div class="col-md-4">
-      <input type="text" name="q" class="form-control form-control-sm" placeholder="搜索布种编号/名称/类型/客户..." value="{{ q }}">
-    </div>
-    <div class="col-auto d-flex gap-1">
-      <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> 搜索</button>
-      {% if q %}<a href="{% url "cloth_catalog_list" %}" class="btn btn-sm btn-outline-secondary">清除</a>{% endif %}
-    </div>
-  </form>
-
-  <div class="card card-flat">
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-sm data-table mb-0">
-          <thead><tr>
-            <th>布种编号</th><th>材料名称</th><th>布种类型</th><th>客户</th>
-            <th>成份</th><th>门幅</th><th>克重</th><th>规格</th><th style="width:60px">操作</th>
-          </tr></thead>
-          <tbody>
-            {% for item in items %}
-            <tr>
-              <td class="fw-semibold text-primary"><a href="{% url "cloth_catalog_detail" item.pk %}" class="text-decoration-none">{{ item.cloth_code|default:"-" }}</a></td>
-              <td>{{ item.cloth_name|default:"-" }}</td>
-              <td>{{ item.cloth_type|default:"-" }}</td>
-              <td>{{ item.customer|default:"-" }}</td>
-              <td class="small">{{ item.composition_cn|truncatechars:20|default:"-" }}</td>
-              <td>{{ item.width|default:"-" }}</td>
-              <td>{{ item.weight|default:"-" }}</td>
-              <td class="small">{{ item.specification|truncatechars:15|default:"-" }}</td>
-              <td>
-                <form method="post" action="{% url "cloth_catalog_delete" item.pk %}" onsubmit="return confirm('确定删除 {{ item.cloth_code }}？')">
-                  {% csrf_token %}
-                  <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1"><i class="bi bi-trash"></i></button>
-                </form>
-              </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="9" class="text-center text-muted py-4">暂无数据，请先导入Excel</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
       </div>
     </div>
   </div>
-    {% if page_obj and page_obj.paginator.count > 0 %}
-    <div class="card card-flat mt-3 mb-3">
-        <div class="card-body py-2">
-            {% include 'order/_pagination.html' with page_obj=page_obj %}
-        </div>
-    </div>
+
+  <div id="cloth-catalog-vue"></div>
+  {{ items_json|json_script:"cloth-catalog-data" }}
+  {% include 'order/_cloth_catalog_list_vue.html' %}
 </div>
-    {% endif %}
 {% endblock %}

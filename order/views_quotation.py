@@ -24,6 +24,7 @@ from django.db.models import (
 )
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 from .decorators import admin_required, validate_file_upload
@@ -84,35 +85,35 @@ class QuotationListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
     model = FabricQuotation
     template_name = "order/quotation_list.html"
     context_object_name = "items"
-    paginate_by = 50
+    paginate_by = None
 
     def get_queryset(self):
-        qs = FabricQuotation.objects.all()
-        q = self.request.GET.get("q", "").strip()
-        if q:
-            qs = qs.filter(
-                Q(article_no__icontains=q)
-                | Q(composition__icontains=q)
-                | Q(supplier_name__icontains=q)
-            )
-        return qs
-
-    def get_paginate_by(self, queryset):
-        try:
-            return int(self.request.GET.get("per_page", 50))
-        except (ValueError, TypeError):
-            return 50
+        return FabricQuotation.objects.all()
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["q"] = self.request.GET.get("q", "")
-        ctx["total"] = FabricQuotation.objects.count()
-        ctx["per_page_options"] = [20, 50, 100]
-        ctx["per_page"] = self.request.GET.get("per_page", 50)
-        try:
-            ctx["per_page"] = int(ctx["per_page"])
-        except ValueError:
-            ctx["per_page"] = 50
+        items = list(FabricQuotation.objects.all().order_by("-date_sent", "article_no"))
+        ctx["total"] = len(items)
+        ctx["items_json"] = [
+            {
+                "id": item.pk,
+                "article_no": item.article_no or "",
+                "supplier_name": item.supplier_name or "",
+                "date_sent": item.date_sent.strftime("%Y-%m-%d") if item.date_sent else "",
+                "composition": item.composition or "",
+                "weight": item.weight or "",
+                "cuttable_width": item.cuttable_width or "",
+                "price_200m": str(item.price_200m) if item.price_200m is not None else "",
+                "price_200m_print": str(item.price_200m_print) if item.price_200m_print is not None else "",
+                "price_200m_unit": item.price_200m_unit or "",
+                "price_regular": str(item.price_regular) if item.price_regular is not None else "",
+                "price_regular_unit": item.price_regular_unit or "",
+                "preferred_material": item.preferred_material or "",
+                "detail_url": reverse("quotation_detail", kwargs={"pk": item.pk}),
+                "delete_url": reverse("quotation_delete", kwargs={"pk": item.pk}),
+            }
+            for item in items
+        ]
         return ctx
 
 

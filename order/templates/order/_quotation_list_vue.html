@@ -1,0 +1,77 @@
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+(function () {
+    if (typeof Vue === 'undefined') return;
+    var dataElement = document.getElementById('quotation-data');
+    if (!dataElement) return;
+    var items = [];
+    try { items = JSON.parse(dataElement.textContent); } catch (e) { items = []; }
+
+    Vue.createApp({
+        delimiters: ['[[', ']]'],
+        data: function () {
+            return { items: items, search: '' };
+        },
+        computed: {
+            filteredItems: function () {
+                var keyword = this.search.trim().toLowerCase();
+                if (!keyword) return this.items;
+                return this.items.filter(function (item) {
+                    return [
+                        item.article_no,
+                        item.composition,
+                        item.supplier_name
+                    ].join(' ').toLowerCase().indexOf(keyword) !== -1;
+                });
+            }
+        },
+        template: `
+            <div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-3">
+                        <input v-model="search" type="text" class="form-control form-control-sm" placeholder="搜索面料编号/成分/供应商...">
+                    </div>
+                    <div class="col-auto text-muted small d-flex align-items-center">显示 [[ filteredItems.length ]] 条报价</div>
+                </div>
+
+                <div class="card card-flat">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm data-table mb-0">
+                                <thead><tr>
+                                    <th>面料编号</th><th>供应商</th><th>报价日期</th><th>成分</th>
+                                    <th>克重</th><th>门幅</th><th>200m价(素色)</th><th>200m价(印花)</th><th>常规价</th><th>环保材料</th><th style="width:60px">操作</th>
+                                </tr></thead>
+                                <tbody>
+                                    <tr v-for="item in filteredItems" :key="item.id">
+                                        <td class="fw-semibold text-primary">
+                                            <a :href="item.detail_url" class="text-decoration-none">[[ item.article_no || '-' ]]</a>
+                                        </td>
+                                        <td>[[ item.supplier_name || '-' ]]</td>
+                                        <td class="small">[[ item.date_sent || '-' ]]</td>
+                                        <td class="small">[[ item.composition || '-' ]]</td>
+                                        <td>[[ item.weight || '-' ]]</td>
+                                        <td>[[ item.cuttable_width || '-' ]]</td>
+                                        <td>[[ item.price_200m ? item.price_200m + '/' + item.price_200m_unit : '-' ]]</td>
+                                        <td>[[ item.price_200m_print ? item.price_200m_print + '/' + item.price_200m_unit : '-' ]]</td>
+                                        <td>[[ item.price_regular ? item.price_regular + '/' + item.price_regular_unit : '-' ]]</td>
+                                        <td>[[ item.preferred_material || '-' ]]</td>
+                                        <td>
+                                            <form method="post" :action="item.delete_url"
+                                                  onsubmit="return confirm('确认删除该报价？')">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1"><i class="bi bi-trash"></i></button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="!filteredItems.length"><td colspan="11" class="text-center text-muted py-4">暂无数据，请先导入报价表</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `
+    }).mount('#quotation-vue');
+})();
+</script>

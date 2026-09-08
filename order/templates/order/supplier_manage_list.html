@@ -2,51 +2,29 @@
 {% block title %}供应商账号管理{% endblock %}
 {% block content %}
 <div class="container-fluid main-container">
-<nav aria-label="breadcrumb" class="mb-3"><ol class="breadcrumb mb-0">
-<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">仪表板</a></li>
-<li class="breadcrumb-item active">供应商账号</li>
-</ol></nav>
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">仪表板</a></li>
+      <li class="breadcrumb-item active">供应商账号</li>
+    </ol>
+  </nav>
 
-<div class="page-hero mb-4">
+  <div class="page-hero mb-4">
     <div class="row align-items-center">
-        <div class="col-lg-8">
-            <h2 class="fw-bold mb-1"><i class="bi bi-people text-primary me-2"></i>供应商账号</h2>
-            <p class="text-muted mb-0">共 {{ total }} 个账号，激活 {{ active_count }} 个</p>
+      <div class="col-lg-8">
+        <h2 class="fw-bold mb-1"><i class="bi bi-people text-primary me-2"></i>供应商账号</h2>
+        <p class="text-muted mb-0">共 {{ total }} 个账号，激活 {{ active_count }} 个</p>
+      </div>
+      <div class="col-lg-4 mt-3 mt-lg-0">
+        <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+          <a href="{% url 'supplier_manage_add' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>新建供应商</a>
         </div>
-        <div class="col-lg-4 mt-3 mt-lg-0">
-            <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
-                <a href="{% url 'supplier_manage_add' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>新建供应商</a>
-            </div>
-        </div>
+      </div>
     </div>
-</div>
+  </div>
 
-<div class="card card-flat">
-<div class="card-body">
-<form method="get" class="row g-2 mb-3">
-<div class="col-auto flex-grow-1"><input type="text" name="q" class="form-control" placeholder="搜索公司名称/联系人/登录名..." value="{{ q }}"></div>
-<div class="col-auto"><button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i>搜索</button>
-<a href="{% url 'supplier_manage_list' %}" class="btn btn-outline-secondary">清除</a></div>
-</form>
-<div class="table-responsive">
-<table class="table table-hover data-table mb-0">
-<thead><tr>
-<th>公司名称</th><th>登录名</th><th>联系人</th><th>电话</th><th>状态</th><th>创建时间</th><th>操作</th>
-</tr></thead>
-<tbody>{% for s in suppliers %}<tr>
-<td>{{ s.company_name }}</td>
-<td><code>{{ s.user.username }}</code></td>
-<td>{{ s.contact_person|default:"-" }}</td>
-<td>{{ s.phone|default:"-" }}</td>
-<td>{% if s.is_active %}<span class="badge bg-success">激活</span>{% else %}<span class="badge bg-secondary">禁用</span>{% endif %}</td>
-<td>{{ s.created_at|date:"Y-m-d" }}</td>
-<td>
-<a href="{% url 'supplier_manage_edit' s.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-<a href="{% url 'supplier_manage_reset_password' s.pk %}" class="btn btn-sm btn-outline-warning"><i class="bi bi-key"></i></a>
-<a href="{% url 'supplier_manage_delete' s.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
-</td>
-</tr>{% empty %}<tr><td colspan="7" class="text-center text-muted py-4">暂无供应商账号</td></tr>{% endfor %}
-</tbody></table></div></div></div>
-{% if page_obj.paginator.num_pages > 1 %}{% include "order/_pagination.html" %}{% endif %}
+  <div id="supplier-manage-vue"></div>
+  {{ suppliers_json|json_script:"supplier-manage-data" }}
+  {% include 'order/_supplier_manage_list_vue.html' %}
 </div>
 {% endblock %}

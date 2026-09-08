@@ -58,24 +58,31 @@ class SupplierManageListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
     model = Supplier
     template_name = "order/supplier_manage_list.html"
     context_object_name = "suppliers"
-    paginate_by = 50
+    paginate_by = None
 
     def get_queryset(self):
-        qs = Supplier.objects.all().select_related("user")
-        q = self.request.GET.get("q", "").strip()
-        if q:
-            qs = qs.filter(
-                Q(company_name__icontains=q)
-                | Q(contact_person__icontains=q)
-                | Q(user__username__icontains=q)
-            )
-        return qs
+        return Supplier.objects.all().select_related("user")
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["q"] = self.request.GET.get("q", "")
-        ctx["total"] = Supplier.objects.count()
-        ctx["active_count"] = Supplier.objects.filter(is_active=True).count()
+        suppliers = list(Supplier.objects.all().select_related("user").order_by("company_name"))
+        ctx["total"] = len(suppliers)
+        ctx["active_count"] = sum(1 for s in suppliers if s.is_active)
+        ctx["suppliers_json"] = [
+            {
+                "id": s.pk,
+                "company_name": s.company_name,
+                "username": s.user.username,
+                "contact_person": s.contact_person or "",
+                "phone": s.phone or "",
+                "is_active": s.is_active,
+                "created_at": s.created_at.strftime("%Y-%m-%d"),
+                "edit_url": reverse("supplier_manage_edit", kwargs={"pk": s.pk}),
+                "reset_password_url": reverse("supplier_manage_reset_password", kwargs={"pk": s.pk}),
+                "delete_url": reverse("supplier_manage_delete", kwargs={"pk": s.pk}),
+            }
+            for s in suppliers
+        ]
         return ctx
 
 
