@@ -85,6 +85,8 @@
                     <div class="col-auto text-muted small d-flex align-items-center">显示 [[ filteredSuppliers.length ]] 个账号</div>
                 </div>
 
+                <pagination-bar :current-page="currentPage" :total-pages="totalPages" @page-change="goPage"></pagination-bar>
+
                 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
                     <div v-for="supplier in pagedSuppliers" :key="supplier.id" class="col">
                         <div class="card card-flat h-100 border-0 shadow-sm">

@@ -65,6 +65,8 @@
                     <div class="col-auto text-muted small d-flex align-items-center">显示 [[ filteredItems.length ]] 条记录</div>
                 </div>
 
+                <pagination-bar :current-page="currentPage" :total-pages="totalPages" @page-change="goPage"></pagination-bar>
+
                 <div class="card card-flat">
                     <div class="card-body p-0">
                         <div class="table-responsive">
