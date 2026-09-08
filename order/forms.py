@@ -487,14 +487,15 @@ class SupplierPriceForm(forms.ModelForm):
         self.fields["address"].required = False
         self.fields["remark"].required = False
 
-        # 成本价格单位自动同步订单的价格单位
+        # 成本价格单位始终跟随订单的价格单位
         if self.instance and self.instance.pk:
-            if not self.instance.cost_price_unit and self.instance.price_unit:
-                self.initial["cost_price_unit"] = self.instance.price_unit
-                self.instance.cost_price_unit = self.instance.price_unit
+            self.initial["cost_price_unit"] = self.instance.price_unit or ""
+            self.instance.cost_price_unit = self.instance.price_unit or ""
 
     def save(self, commit=True):
         instance = super().save(commit=False)
+        if instance.price_unit:
+            instance.cost_price_unit = instance.price_unit
         if commit:
             instance.save()
         return instance
