@@ -14,6 +14,16 @@
             }
         },
         emits: ['page-change'],
+        data: function () {
+            return {
+                jumpPage: this.currentPage
+            };
+        },
+        watch: {
+            currentPage: function (value) {
+                this.jumpPage = value;
+            }
+        },
         computed: {
             pageItems: function () {
                 var total = this.totalPages;
@@ -43,6 +53,14 @@
             },
             nextPage: function () {
                 this.goPage(this.currentPage + 1);
+            },
+            jumpTo: function () {
+                var page = parseInt(this.jumpPage, 10);
+                if (!isNaN(page)) {
+                    this.goPage(page);
+                } else {
+                    this.jumpPage = this.currentPage;
+                }
             }
         },
         template: `
@@ -54,6 +72,12 @@
                 </template>
                 <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="currentPage === totalPages" @click="nextPage">下一页</button>
                 <span class="small text-muted ms-2">第 [[ currentPage ]] / [[ totalPages ]] 页</span>
+                <div class="d-flex align-items-center ms-2">
+                    <span class="small text-muted me-1">跳至</span>
+                    <input v-model.number="jumpPage" type="number" min="1" :max="totalPages" class="form-control form-control-sm text-center" style="width:70px;" @keyup.enter="jumpTo">
+                    <span class="small text-muted mx-1">页</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary" @click="jumpTo">跳转</button>
+                </div>
             </div>
         `
     };
