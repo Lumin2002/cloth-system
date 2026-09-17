@@ -9,7 +9,7 @@ services:
     volumes:
       - mysql-data-volume:/var/lib/mysql
     environment:
-      MYSQL_ROOT_PASSWORD: "Qwe123456()_+"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-change-me}"
       MYSQL_DATABASE: cloth_order_db
       TZ: Asia/Shanghai
       MYSQL_DEFAULT_AUTH_PLUGIN: mysql_native_password
@@ -24,7 +24,7 @@ services:
       - .env
     environment:
       # 通过 FRP 公网地址做端到端 Nginx 健康探测
-      NGINX_CHECK_URL: https://frp-ski.com:40614
+      NGINX_CHECK_URL: "${NGINX_CHECK_URL}"
     volumes:
       - ./:/app
       - static_volume:/app/staticfiles

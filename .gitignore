@@ -11,8 +11,11 @@ venv/
 
 # Django
 db.sqlite3
+db.sqlite3.bak_*
+*.sqlite3
 staticfiles/
 media/
+mediafiles/
 
 # IDE
 .vscode/
@@ -35,3 +38,13 @@ _*.py
 _*.sh
 *.bak
 *.log
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Project specific
+fix_import.py
+start.bat
+backups/
