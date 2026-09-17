@@ -66,6 +66,7 @@ from .models import (
 from .order_excel import export_orders_dataframe
 from .order_filters import filter_orders_queryset
 from .statement import generate_bulk_statement, generate_order_statement
+from .tc import generate_bulk_tc
 from .views_common import AdminRequiredMixin, logger
 
 
@@ -598,6 +599,44 @@ def order_statement_bulk(request):
     )
     ts = now().strftime("%Y%m%d_%H%M%S")
     filename = f"statement_bulk_{ts}.xlsx"
+    response = HttpResponse(
+        output.read(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+@admin_required
+def order_tc_bulk(request):
+    ids_raw = request.GET.get("ids", "").strip()
+    if not ids_raw:
+        messages.error(request, t("msg.order_id_required"))
+        return redirect("order_list")
+    try:
+        pk_list = [int(x) for x in ids_raw.split(",") if x.strip()]
+    except ValueError:
+        messages.error(request, t("msg.order_id_invalid"))
+        return redirect("order_list")
+    if not pk_list:
+        messages.error(request, t("msg.order_not_found"))
+        return redirect("order_list")
+
+    orders = ClothOrder.objects.filter(pk__in=pk_list)
+    if not orders.exists():
+        messages.error(request, t("msg.order_not_matched"))
+        return redirect("order_list")
+
+    output = generate_bulk_tc(list(orders))
+    logger.info(
+        t(
+            "log.tc_bulk",
+            username=request.user.username,
+            count=orders.count(),
+        )
+    )
+    ts = now().strftime("%Y%m%d_%H%M%S")
+    filename = f"tc_bulk_{ts}.xlsx"
     response = HttpResponse(
         output.read(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

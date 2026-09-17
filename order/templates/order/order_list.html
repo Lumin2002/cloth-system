@@ -254,6 +254,9 @@
                     <button type="button" class="btn btn-sm btn-success" id="statementBtn" onclick="doStatement()">
                         <i class="bi bi-file-earmark-excel me-1"></i> 生成对账单
                     </button>
+                    <button type="button" class="btn btn-sm btn-outline-success" id="tcBtn" onclick="doTC()">
+                        <i class="bi bi-file-earmark-spreadsheet me-1"></i> 生成TC表
+                    </button>
                     <button type="submit" class="btn btn-sm btn-primary" id="bulk-submit" disabled>
                         <i class="bi bi-lightning me-1"></i> 执行
                     </button>
@@ -479,6 +482,13 @@ function doStatement() {
     if (selectedBoxes.length === 0) { alert('请先勾选订单'); return; }
     var ids = selectedBoxes.map(function(cb) { return cb.value; }).join(',');
     window.location.href = '/orders/statement/bulk/?ids=' + ids;
+}
+
+function doTC() {
+    const selectedBoxes = Array.from(document.querySelectorAll('.order-checkbox:checked'));
+    if (selectedBoxes.length === 0) { alert('请先勾选订单'); return; }
+    var ids = selectedBoxes.map(function(cb) { return cb.value; }).join(',');
+    window.location.href = '/orders/tc/bulk/?ids=' + ids;
 }
 
 (function () {

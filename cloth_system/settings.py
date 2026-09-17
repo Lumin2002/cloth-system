@@ -258,9 +258,14 @@ NGINX_CHECK_URL = os.environ.get("NGINX_CHECK_URL", "http://127.0.0.1:8000/")
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "https://nas.u737912.nyat.app:40614",
     "https://frp-ski.com:40614",
 ]
 
-# 代理转发请求头兼容
-USE_X_FORWARDED_HOST = True
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# 代理转发请求头兼容（生产环境启用，本地开发可注释）
+# USE_X_FORWARDED_HOST = True
+# SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# HTTPS Cookie 安全配置（生产环境启用，本地 HTTP 开发需注释）
+# SESSION_COOKIE_SECURE = True
+# CSRF_COOKIE_SECURE = True

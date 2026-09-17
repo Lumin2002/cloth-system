@@ -1,8 +1,7 @@
-django-redis>=5.4
 django>=5.2,<6.0
 pandas>=2.0
 openpyxl>=3.0
 gunicorn>=21.2
 python-dotenv>=1.0
 mysqlclient>=2.2
-psutil>=5.9
+django-redis>=5.4.0

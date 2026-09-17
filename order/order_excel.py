@@ -737,10 +737,48 @@ def export_orders_dataframe(queryset=None) -> pd.DataFrame:
     """将订单 queryset 转为与汇总表一致的 DataFrame。"""
     if queryset is None:
         queryset = ClothOrder.objects.all().order_by('-order_date', '-serial_number')
+
+    from collections import defaultdict
+    from .models import Shipment
+
+    shipment_rows = (
+        Shipment.objects
+        .filter(order__in=queryset, is_deleted=False)
+        .order_by('order_id', 'batch_number')
+        .values_list('order_id', 'batch_number', 'date', 'quantity')
+    )
+    shipments_by_order = defaultdict(list)
+    max_shipment_count = 0
+    for order_id, batch_number, ship_date, quantity in shipment_rows:
+        shipments_by_order[order_id].append({
+            'batch_number': batch_number,
+            'date': ship_date,
+            'quantity': quantity,
+        })
+        max_shipment_count = max(max_shipment_count, len(shipments_by_order[order_id]))
+
     rows = []
     for order in queryset:
-        rows.append({
+        row = {
             excel_col: _display_value(order, model_field)
             for excel_col, model_field in EXPORT_COLUMNS
-        })
+        }
+        shipments = shipments_by_order.get(order.pk, [])
+
+        summary_parts = []
+        for shipment in shipments:
+            date_text = shipment['date'].strftime('%Y-%m-%d') if shipment['date'] else ''
+            quantity_text = float(shipment['quantity']) if shipment['quantity'] is not None else 0
+            summary_parts.append(
+                f"批次{shipment['batch_number']}:{date_text} 数量{quantity_text}"
+            )
+        row['出货记录'] = ' | '.join(summary_parts)
+
+        for index in range(max_shipment_count):
+            shipment = shipments[index] if index < len(shipments) else None
+            row[f'出货批次{index + 1}'] = shipment['batch_number'] if shipment else ''
+            row[f'出货日期{index + 1}'] = shipment['date'].strftime('%Y-%m-%d') if shipment and shipment['date'] else ''
+            row[f'出货数量{index + 1}'] = float(shipment['quantity']) if shipment and shipment['quantity'] is not None else ''
+
+        rows.append(row)
     return pd.DataFrame(rows)

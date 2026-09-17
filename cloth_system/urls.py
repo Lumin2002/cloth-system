@@ -17,14 +17,6 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
-from order.views_common import handler400, handler403, handler404, handler500
-
-# 统一错误/异常提示页
-handler400 = handler400
-handler403 = handler403
-handler404 = handler404
-handler500 = handler500
-
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('order.urls')),

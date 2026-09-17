@@ -28,6 +28,7 @@ urlpatterns = [
     path('orders/<int:pk>/edit/', views_orders.order_edit_redirect, name='order_edit'),
     path("orders/<int:pk>/statement/", views_orders.order_statement, name="order_statement"),
     path("orders/statement/bulk/", views_orders.order_statement_bulk, name="order_statement_bulk"),
+    path("orders/tc/bulk/", views_orders.order_tc_bulk, name="order_tc_bulk"),
     path('orders/<int:pk>/toggle-status/', views_orders.order_toggle_status, name='order_toggle_status'),
     path('orders/<int:pk>/toggle-payment/', views_orders.order_toggle_payment_status, name='order_toggle_payment_status'),
     path('orders/<int:pk>/toggle-supplier-paid/', views_orders.order_toggle_supplier_paid, name='order_toggle_supplier_paid'),

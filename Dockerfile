@@ -1,9 +1,6 @@
 FROM python:3.12-slim
-
 WORKDIR /app
-
 RUN mkdir -p /app/logs
-
 # MySQL编译依赖 + 工具
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
@@ -13,13 +10,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
+# 设置阿里云pip源
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
+ENV PIP_TRUSTED_HOST=mirrors.aliyun.com
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt gunicorn python-dotenv
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-
 EXPOSE 8000
-
 # 启动流程：等MySQL → 收集静态文件写入共享卷 → 迁移 → 创建超级用户 → 启动gunicorn
 CMD ["sh", "-c", "\
 until timeout 1 bash -c 'echo > /dev/tcp/db/3306'; do sleep 1; echo '等待MySQL...'; done; \

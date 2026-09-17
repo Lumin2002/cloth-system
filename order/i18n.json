@@ -121,6 +121,7 @@
     "refresh_calculations": "[重算金额] {username} 重新计算了订单 #{serial} 的金额（对账：{balance}，成本：{cost}）",
     "statement": "[生成对账单] {username} 生成了订单 #{serial} 的对账单",
     "statement_bulk": "[生成对账单] {username} 批量生成对账单（共 {count} 单）",
+    "tc_bulk": "[生成TC表] {username} 批量生成TC表（共 {count} 单）",
     "supplier_create": "[新增供应商] {username} 新增了供应商账号 {company}",
     "supplier_update": "[修改供应商] {username} 修改了供应商账号 {company}",
     "supplier_delete": "[删除供应商] {username} 删除了供应商账号 {company}",
