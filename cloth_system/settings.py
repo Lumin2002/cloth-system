@@ -269,10 +269,3 @@ CSRF_TRUSTED_ORIGINS = [
 # HTTPS Cookie 安全配置（生产环境启用，本地 HTTP 开发需注释）
 # SESSION_COOKIE_SECURE = True
 # CSRF_COOKIE_SECURE = True
-
-# ===================== 本地 Excel 双向同步 =====================
-# Django 编辑后自动导出到本地 Excel；watcher 发现本地 Excel 被外部保存后自动导入。
-# 首次发现已有文件时不会覆盖数据库，请用 `python manage.py sync_orders --import-now` 主动导入。
-ORDER_EXCEL_SYNC_ENABLED = os.environ.get("ORDER_EXCEL_SYNC_ENABLED", "1") == "1"
-ORDER_EXCEL_SYNC_FILE = BASE_DIR / "sync" / "orders_sync.xlsx"
-ORDER_EXCEL_SYNC_INTERVAL = float(os.environ.get("ORDER_EXCEL_SYNC_INTERVAL", "3"))
