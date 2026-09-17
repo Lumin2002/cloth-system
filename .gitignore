@@ -48,3 +48,6 @@ _*.sh
 fix_import.py
 start.bat
 backups/
+
+# 本地 Excel 双向同步文件
+sync/
