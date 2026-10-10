@@ -1,0 +1,8 @@
+{% comment %}
+订单类型下拉框 + 同色徽章（创建页 / 编辑页共用）。
+徽章随下拉框选择实时更新，脚本在 base.html 的订单类型换底色逻辑里。
+{% endcomment %}
+<div class="order-type-field">
+    {{ field }}
+    <span id="orderTypeBadge" class="badge order-type-badge order-type-badge-{{ field.value|default:'other' }}{% if not field.value %} d-none{% endif %}">{% for value, label in field.field.choices %}{% if value == field.value %}{{ label }}{% endif %}{% endfor %}</span>
+</div>

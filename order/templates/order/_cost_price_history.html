@@ -1,0 +1,28 @@
+{% comment %}
+成品成本价格修改记录：供应商每次改价留痕，按时间倒序展示。
+用法：{% include 'order/_cost_price_history.html' with order=order cost_price_history=order.cost_price_history.all %}
+{% endcomment %}
+{% if cost_price_history %}
+<div class="table-responsive">
+    <table class="table table-sm table-bordered mb-0">
+        <thead>
+            <tr>
+                <th class="text-nowrap">修改时间</th>
+                <th class="text-end text-nowrap">成品成本价格</th>
+                <th class="text-nowrap">操作人</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in cost_price_history %}
+            <tr>
+                <td class="text-nowrap">{{ record.created_at|date:"Y-m-d H:i" }}</td>
+                <td class="text-end"><strong class="text-primary">{{ record.price|floatformat:2 }}</strong> {{ record.unit }}</td>
+                <td class="text-muted small text-nowrap">{% if record.changed_by %}{{ record.changed_by.get_full_name|default:record.changed_by.username }}{% else %}-{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="text-muted small p-3">暂无改价记录</div>
+{% endif %}

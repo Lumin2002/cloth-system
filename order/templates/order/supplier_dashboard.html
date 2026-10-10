@@ -1,4 +1,4 @@
-﻿{% extends "order/supplier_base.html" %}
+{% extends "order/supplier_base.html" %}
 {% block title %}我的订单 - 供应商面板{% endblock %}
 {% block content %}
 <nav aria-label="breadcrumb" class="mb-3">
@@ -44,6 +44,10 @@
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><strong>订单列表</strong></span>
         <span class="d-flex align-items-center gap-2">
+            <a href="{% url 'supplier_orders_export' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}"
+               class="btn btn-sm btn-outline-success" title="导出当前筛选结果">
+                <i class="bi bi-download me-1"></i>导出 Excel
+            </a>
             <a href="{{ request.get_full_path }}" class="btn btn-sm btn-outline-secondary" title="刷新列表（保留当前筛选）">
                 <i class="bi bi-arrow-clockwise me-1"></i>刷新
             </a>
@@ -56,8 +60,13 @@
                 <tr>
                     <th>序号</th>
                     <th>客户</th>
+                    <th>跟单员</th>
                     <th>订单类型</th>
                     <th>昇奕隆编号</th>
+                    <th>档口</th>
+                    <th>档口编号</th>
+                    <th>颜色</th>
+                    <th>订单数量</th>
                     <th>下单日期</th>
                     <th>出货总数量</th>
                     <th>成品成本价格</th>
@@ -72,8 +81,13 @@
                 <tr class="order-row" data-target="#shipments-{{ order.pk }}" style="cursor:pointer;">
                     <td><i class="bi bi-chevron-down me-1 text-muted small"></i>{{ order.serial_number|default:"-" }}</td>
                     <td>{{ order.customer|default:"-" }}</td>
-                    <td>{{ order.get_order_type_display|default:"-" }}</td>
+                    <td>{{ order.order_follower|default:"-" }}</td>
+                    <td><span class="badge order-type-badge order-type-badge-{{ order.order_type|default:'other' }}">{{ order.get_order_type_display|default:"-" }}</span></td>
                     <td>{{ order.cloth_type|default:"-" }}</td>
+                    <td>{{ order.booth|default:"-" }}</td>
+                    <td>{{ order.supplier_code|default:"-" }}</td>
+                    <td>{{ order.color|default:"-" }}</td>
+                    <td>{{ order.order_quantity|default:"-" }} {{ order.quantity_unit }}</td>
                     <td>{{ order.order_date|date:"Y-m-d"|default:"-" }}</td>
                     <td>{{ order.total_shipment_from_shipments|default:"-" }} {{ order.shipment_quantity_unit }}</td>
                     <td>
@@ -107,7 +121,7 @@
                     </td>
                 </tr>
                 <tr id="shipments-{{ order.pk }}" class="shipment-detail-row" style="display:none;">
-                    <td colspan="11" class="p-0">
+                    <td colspan="16" class="p-0">
                         <div class="p-3 bg-light">
                             <table class="table table-sm table-bordered mb-0">
                                 <thead>
@@ -130,19 +144,16 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="9" class="text-center text-muted py-4">暂无分配给您的订单</td></tr>
+                <tr><td colspan="16" class="text-center text-muted py-4">暂无分配给您的订单</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
-{% if page_obj and page_obj.paginator.count > 0 %}
-<div class="card card-flat mt-3 mb-3">
-    <div class="card-body py-2">
-        {% include 'order/_pagination.html' with page_obj=page_obj %}
-    </div>
-</div>
-{% endif %}
+{# 分页组件与管理端订单列表用同一套（Vue pagination-bar） #}
+<div id="order-pagination-vue"></div>
+{{ order_pagination_json|json_script:"order-pagination-data" }}
+{% include 'order/vue/_order_pagination_vue.html' %}
 
 <script>
 document.addEventListener("click", function(e) {

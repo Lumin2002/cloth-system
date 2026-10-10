@@ -1,6 +1,7 @@
 {% extends 'order/base.html' %}
 
 {% block title %}{{ form_title }}{% endblock %}
+{% block body_class %}{% if object.order_type %}order-type-{{ object.order_type }}{% endif %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid main-container">

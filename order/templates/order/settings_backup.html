@@ -115,8 +115,8 @@
 
 <div class="alert alert-light border small mt-3 mb-0">
     <i class="bi bi-info-circle me-1 text-primary"></i>
-    说明：备份统一为 <code>dumpdata</code> JSON 的 <strong>zip 压缩包</strong>（解压后可用
-    <code>manage.py loaddata</code> 恢复）。应用启动后会自动定时备份（模式可在上方设置），并自动只保留最近
+    说明：备份统一为包含 <code>dumpdata</code> JSON、管理端订单 Excel、供应商订单 Excel 的
+    <strong>zip 压缩包</strong>（JSON 解压后可用 <code>manage.py loaddata</code> 恢复）。应用启动后会自动定时备份（模式可在上方设置），并自动只保留最近
     <code>DB_BACKUP_KEEP</code>（默认 30）份。备份文件保存在项目 <code>backups/</code> 目录，
     建议下载后转存到其他位置。
 </div>

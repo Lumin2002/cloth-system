@@ -2,6 +2,7 @@
 import logging
 import os
 import socket
+import sys
 import threading
 import time
 
@@ -72,7 +73,8 @@ def _loop():
 
 def start_scheduler():
     """应用启动时调用；设置 DB_BACKUP_DISABLED=1 可关闭自动备份。"""
-    if os.environ.get("DB_BACKUP_DISABLED") == "1":
+    if os.environ.get("DB_BACKUP_DISABLED") == "1" or "test" in sys.argv:
+        # 跑测试时不启动：dumpdata 子进程会连到真实数据库，且会和测试库争 SQLite 锁
         return None
     thread = threading.Thread(target=_loop, daemon=True, name="db-backup-scheduler")
     thread.start()

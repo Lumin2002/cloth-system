@@ -1,6 +1,10 @@
 """视图模块：供应商管理/供应商端/出货（由 views.py 拆分而来）。"""
 
+from decimal import Decimal
+
+import pandas as pd
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import models
 from django.db.models import (
@@ -20,9 +24,12 @@ from django.db.models import (
     Value,
 )
 from django.db.models.functions import Coalesce
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils.timezone import now
+from django.views.decorators.http import require_GET
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 from .forms import (
     CREATE_DEFAULTS,
@@ -47,8 +54,27 @@ from .models import (
     notify_all_staff,
     notify_user,
 )
+from .order_excel import export_supplier_orders_dataframe
 from .views_common import logger
 from .views_common import AdminRequiredMixin, SupplierRequiredMixin
+
+# 供应商端订单状态分类：待提交 / 待出货 / 已出货
+# 面板的 status 筛选与详情页左侧「我的订单」分类共用这一套判定，避免两处走偏
+SUPPLIER_STATUS_GROUPS = (
+    ("pending", "待提交", Q(finished_product_cost_price__isnull=True)),
+    ("quoted", "待出货", Q(
+        finished_product_cost_price__isnull=False,
+        supplier_shipped=False,
+        has_active_shipments=False,
+    )),
+    ("shipped", "已出货", Q(supplier_shipped=True) | Q(has_active_shipments=True)),
+)
+SUPPLIER_STATUS_FILTERS = {
+    value: condition for value, _label, condition in SUPPLIER_STATUS_GROUPS
+}
+
+# 供应商端订单详情页左侧「我的订单」导航卡片最多列出的最近订单数
+SIDEBAR_ORDER_LIMIT = 50
 
 
 class SupplierManageListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
@@ -177,65 +203,7 @@ class SupplierDashboardView(SupplierRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        supplier = self.request.user.supplier_profile
-        qs = ClothOrder.objects.filter(supplier=supplier)
-
-        # 筛选
-        params = self.request.GET
-        search = params.get("search", "").strip()
-        if search:
-            qs = qs.filter(
-                Q(customer__icontains=search)
-                | Q(cloth_type__icontains=search)
-                | Q(serial_number__icontains=search)
-            )
-
-        status = params.get("status", "").strip()
-        if status == "pending":
-            qs = qs.filter(finished_product_cost_price__isnull=True)
-        elif status == "quoted":
-            qs = qs.filter(
-                finished_product_cost_price__isnull=False,
-                supplier_shipped=False,
-                has_active_shipments=False,
-            )
-        elif status == "shipped":
-            qs = qs.filter(Q(supplier_shipped=True) | Q(has_active_shipments=True))
-
-        start_date = params.get("start_date", "").strip()
-        if start_date:
-            qs = qs.filter(order_date__gte=start_date)
-
-        end_date = params.get("end_date", "").strip()
-        if end_date:
-            qs = qs.filter(order_date__lte=end_date)
-
-        qs = qs.order_by("-order_date", "-serial_number")
-
-        subq = (
-            Shipment.objects.filter(order=OuterRef("pk"), is_deleted=False)
-            .values("order")
-            .annotate(total=Sum("quantity"))
-            .values("total")
-        )
-        has_ship = Shipment.objects.filter(order=OuterRef("pk"), is_deleted=False)
-
-        qs = qs.prefetch_related(
-            Prefetch(
-                "shipments",
-                queryset=Shipment.objects.annotate(
-                    row_total=ExpressionWrapper(
-                        F("quantity") * F("order__finished_product_cost_price"),
-                        output_field=FloatField(),
-                    )
-                ).order_by("batch_number"),
-            )
-        )
-
-        return qs.annotate(
-            _ship_qty=Subquery(subq, output_field=FloatField()),
-            has_active_shipments=Exists(has_ship),
-        )
+        return supplier_order_queryset(self.request)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -245,8 +213,8 @@ class SupplierDashboardView(SupplierRequiredMixin, ListView):
 
         ctx["supplier"] = supplier
 
-        # 合并计数为一次聚合
-        cnt = qs.aggregate(
+        # 分类计数按该供应商的全部订单统计（不随当前筛选变化，否则点一个分类其他分类会归零）
+        cnt = supplier_orders_base(supplier).aggregate(
             total=Count("id"),
             quoted=Count("id", filter=Q(finished_product_cost_price__isnull=False)),
             pending=Count("id", filter=Q(finished_product_cost_price__isnull=True)),
@@ -259,7 +227,9 @@ class SupplierDashboardView(SupplierRequiredMixin, ListView):
                 Q(supplier_shipped=True) | Q(has_active_shipments=True)
             )),
         )
-        ctx["total_count"] = cnt["total"]
+        page_obj = ctx.get("page_obj")
+        # 列表头部显示的是当前筛选后的条数
+        ctx["total_count"] = page_obj.paginator.count if page_obj else qs.count()
         ctx["quoted_count"] = cnt["quoted"]
         ctx["pending_count"] = cnt["pending"]
         ctx["quoted_wait_ship_count"] = cnt["wait_ship"]
@@ -280,9 +250,143 @@ class SupplierDashboardView(SupplierRequiredMixin, ListView):
         ctx["order_totals"] = totals
 
         ctx["filter_params"] = self.request.GET
-        ctx["per_page_options"] = (10, 20, 50, 100)
-        ctx["per_page"] = self.paginate_by
+        ctx["order_pagination_json"] = {
+            "current_page": page_obj.number if page_obj else 1,
+            "total_pages": page_obj.paginator.num_pages if page_obj else 1,
+        }
         return ctx
+
+
+def supplier_orders_base(supplier):
+    """当前供应商的订单（带出货数量/是否已出货注解），不含筛选条件。"""
+    subq = (
+        Shipment.objects.filter(order=OuterRef("pk"), is_deleted=False)
+        .values("order")
+        .annotate(total=Sum("quantity"))
+        .values("total")
+    )
+    has_ship = Shipment.objects.filter(order=OuterRef("pk"), is_deleted=False)
+    return ClothOrder.objects.filter(supplier=supplier).annotate(
+        _ship_qty=Subquery(subq, output_field=FloatField()),
+        has_active_shipments=Exists(has_ship),
+        _supplier_sort_serial=Coalesce(
+            F("serial_number"),
+            Value(-1),
+            output_field=IntegerField(),
+        ),
+    )
+
+
+def supplier_order_queryset(request):
+    """返回当前供应商的订单，并应用供应商面板的筛选条件。"""
+    qs = supplier_orders_base(request.user.supplier_profile)
+
+    params = request.GET
+    search = params.get("search", "").strip()
+    if search:
+        qs = qs.filter(
+            Q(customer__icontains=search)
+            | Q(cloth_type__icontains=search)
+            | Q(serial_number__icontains=search)
+        )
+
+    status = params.get("status", "").strip()
+    if status in SUPPLIER_STATUS_FILTERS:
+        qs = qs.filter(SUPPLIER_STATUS_FILTERS[status])
+
+    start_date = params.get("start_date", "").strip()
+    if start_date:
+        qs = qs.filter(order_date__gte=start_date)
+
+    end_date = params.get("end_date", "").strip()
+    if end_date:
+        qs = qs.filter(order_date__lte=end_date)
+
+    qs = qs.prefetch_related(
+        Prefetch(
+            "shipments",
+            queryset=Shipment.objects.annotate(
+                row_total=ExpressionWrapper(
+                    F("quantity") * F("order__finished_product_cost_price"),
+                    output_field=FloatField(),
+                )
+            ).order_by("batch_number"),
+        )
+    )
+    # 供应商端按序号倒序展示，避免下单日期优先导致序号被打散。
+    return qs.order_by("-_supplier_sort_serial", "-order_date", "-pk")
+
+
+def cost_price_reference(order):
+    """取同一供应商对同一布种最近一次填写的成品成本价格，用于自动填写参考。
+
+    仅作建议值，供应商可自行修改；没有历史记录时返回 None。
+    """
+    cloth_type = (order.cloth_type or "").strip()
+    if not cloth_type or not order.supplier_id:
+        return None
+    if order.finished_product_cost_price:
+        # 已提交过价格就不必再给建议值
+        return None
+
+    previous = (
+        ClothOrder.objects.filter(
+            supplier_id=order.supplier_id,
+            cloth_type__iexact=cloth_type,
+            order_status="active",
+            finished_product_cost_price__gt=0,
+        )
+        .exclude(pk=order.pk)
+        .order_by("-updated_at", "-pk")
+        .values(
+            "id",
+            "serial_number",
+            "customer",
+            "order_date",
+            "updated_at",
+            "finished_product_cost_price",
+            "cost_price_unit",
+            "price_unit",
+        )
+        .first()
+    )
+    if not previous:
+        return None
+
+    return {
+        "order_id": previous["id"],
+        "price": previous["finished_product_cost_price"],
+        "unit": previous["cost_price_unit"] or previous["price_unit"] or "",
+        "serial_number": previous["serial_number"],
+        "customer": previous["customer"] or "",
+        "order_date": previous["order_date"],
+        "filled_at": previous["updated_at"],
+    }
+
+
+@login_required
+@require_GET
+def supplier_orders_export(request):
+    """导出当前供应商按当前筛选条件看到的订单。"""
+    if not hasattr(request.user, "supplier_profile"):
+        messages.error(request, t("auth.supplier_no_access"))
+        return redirect("dashboard")
+
+    queryset = supplier_order_queryset(request)
+    dataframe = export_supplier_orders_dataframe(queryset)
+    filename = f"supplier_orders_{now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    logger.info(
+        "[供应商导出] %s 导出了 %s 条订单",
+        request.user.username,
+        queryset.count(),
+    )
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    with pd.ExcelWriter(response, engine="openpyxl") as writer:
+        dataframe.to_excel(writer, sheet_name="供应商订单", index=False)
+    return response
 
 
 class SupplierOrderDetailView(SupplierRequiredMixin, DetailView):
@@ -300,6 +404,8 @@ class SupplierOrderDetailView(SupplierRequiredMixin, DetailView):
         ctx["form_sections"] = ORDER_FORM_SECTIONS
         ctx["price_form"] = SupplierPriceForm(instance=order)
         ctx["shipment_form"] = ShipmentForm()
+        ctx["cost_price_history"] = order.cost_price_history.select_related("changed_by")
+        ctx["cost_price_reference"] = cost_price_reference(order)
 
         shipments_qs = order.shipments.all().order_by("batch_number")
         cost_price = Coalesce("order__finished_product_cost_price", Value(0))
@@ -310,8 +416,45 @@ class SupplierOrderDetailView(SupplierRequiredMixin, DetailView):
         ctx["shipment_total_sum"] = order.shipments.filter(is_deleted=False).aggregate(
             total=Sum(F("quantity") * F("order__finished_product_cost_price"))
         )["total"] or 0
+        shipment_quantities = [
+            quantity or Decimal("0")
+            for quantity in order.shipments.filter(is_deleted=False)
+            .order_by("batch_number")
+            .values_list("quantity", flat=True)
+        ]
+        shipment_total_quantity = sum(shipment_quantities, Decimal("0"))
+        ctx["shipment_quantity_summary"] = " + ".join(
+            f"{quantity:.2f}" for quantity in shipment_quantities
+        ) or "0.00"
+        ctx["shipment_total_quantity"] = shipment_total_quantity
+        ctx["shipment_quantity_unit"] = order.shipment_quantity_unit or order.quantity_unit
 
         ctx["supplier"] = self.request.user.supplier_profile
+
+        # 左侧「我的订单」导航卡片：当前订单 + 按状态分类的最近订单
+        supplier = ctx["supplier"]
+        order.has_active_shipments = order.shipments.filter(is_deleted=False).exists()
+        orders_base = supplier_orders_base(supplier)
+        status_groups = []
+        for value, label, condition in SUPPLIER_STATUS_GROUPS:
+            group_qs = orders_base.filter(condition)
+            total = group_qs.count()
+            if not total:
+                # 没有订单的分类不展示
+                continue
+            status_groups.append(
+                {
+                    "value": value,
+                    "label": label,
+                    "total": total,
+                    "orders": list(
+                        group_qs.exclude(pk=order.pk)
+                        .order_by("-serial_number", "-pk")[:SIDEBAR_ORDER_LIMIT]
+                    ),
+                }
+            )
+        ctx["status_groups"] = status_groups
+        ctx["sidebar_order_total"] = orders_base.count()
         return ctx
 
     def post(self, request, *args, **kwargs):
@@ -321,6 +464,8 @@ class SupplierOrderDetailView(SupplierRequiredMixin, DetailView):
         is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
         if form.is_valid():
+            # 记录本次改价的操作人（ClothOrder.save() 检测到价格变化时留痕）
+            order._price_changed_by = request.user
             order = form.save()
             supplier_name = request.user.supplier_profile.company_name
 
@@ -378,6 +523,16 @@ class SupplierOrderDetailView(SupplierRequiredMixin, DetailView):
                         "address": order.address or "",
                         "remark": order.remark or "",
                         "supplier_shipped": order.supplier_shipped,
+                        "cost_price_history_html": render_to_string(
+                            "order/_cost_price_history.html",
+                            {
+                                "order": order,
+                                "cost_price_history": order.cost_price_history.select_related(
+                                    "changed_by"
+                                ),
+                            },
+                            request=request,
+                        ),
                     }
                 )
 

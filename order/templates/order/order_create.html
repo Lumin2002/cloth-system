@@ -1,5 +1,6 @@
-﻿{% extends 'order/base.html' %}
+{% extends 'order/base.html' %}
 {% block title %}添加订单{% endblock %}
+{% block body_class %}{% if form.order_type.value %}order-type-{{ form.order_type.value }}{% endif %}{% endblock %}
 {% block content %}
 {% load static %}
 {% load pagination %}
@@ -40,7 +41,7 @@
 {% if field %}
 <div class="col-md-6 col-lg-4{% if field.name == 'bulk_progress_tracking' %} col-12{% endif %}">
 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="text-danger">*</span>{% endif %}</label>
-{{ field }}
+{% if field.name == 'order_type' %}{% include 'order/_order_type_field.html' with field=field %}{% else %}{{ field }}{% endif %}
 {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
 {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
 </div>
@@ -60,7 +61,7 @@
 {% if field %}
 <div class="col-md-6 col-lg-4">
 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="text-danger">*</span>{% endif %}</label>
-{{ field }}
+{% if field.name == 'order_type' %}{% include 'order/_order_type_field.html' with field=field %}{% else %}{{ field }}{% endif %}
 {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
 {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
 </div>

@@ -21,3 +21,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('order.urls')),
 ]
+
+# 统一错误页（实现在 order/views_common.py）：DJANGO_DEBUG=False 时生效
+handler400 = 'order.views_common.handler400'
+handler403 = 'order.views_common.handler403'
+handler404 = 'order.views_common.handler404'
+handler500 = 'order.views_common.handler500'

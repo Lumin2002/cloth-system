@@ -147,6 +147,38 @@ EXPORT_COLUMNS: list[tuple[str, str]] = [
     ('供应商已出货', 'supplier_shipped'),
 ]
 
+SUPPLIER_EXPORT_COLUMNS: list[tuple[str, str]] = [
+    ('序号', 'serial_number'),
+    ('订单状态', 'order_status'),
+    ('下单日期', 'order_date'),
+    ('客户', 'customer'),
+    ('跟单员', 'order_follower'),
+    ('订单类型', 'order_type'),
+    ('订单号', 'order_number'),
+    ('款号', 'style_number'),
+    ('昇奕隆编号', 'cloth_type'),
+    ('纺织类型', 'textile_type'),
+    ('档口', 'booth'),
+    ('档口编号', 'supplier_code'),
+    ('颜色', 'color'),
+    ('色号', 'color_code'),
+    ('成份', 'composition'),
+    ('门幅', 'width'),
+    ('克重', 'weight'),
+    ('规格', 'specification'),
+    ('订单数量', 'order_quantity'),
+    ('数量单位', 'quantity_unit'),
+    ('客人要求交期', 'customer_delivery_date'),
+    ('成品成本价格', 'finished_product_cost_price'),
+    ('成本价格单位', 'cost_price_unit'),
+    ('出货总数量', 'total_shipment_quantity'),
+    ('出货数量单位', 'shipment_quantity_unit'),
+    ('供应商已出货', 'supplier_shipped'),
+    ('地址', 'address'),
+    ('给供应商备注', 'supplier_remark'),
+    ('供应商备注', 'remark'),
+]
+
 
 def _normalize_header(name: Any) -> str:
     text = str(name).replace('*', '').replace('\n', ' ').strip()
@@ -782,3 +814,85 @@ def export_orders_dataframe(queryset=None) -> pd.DataFrame:
 
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def export_supplier_orders_dataframe(queryset=None) -> pd.DataFrame:
+    """将供应商可见订单转换为 Excel 数据，不包含内部收款等字段。"""
+    if queryset is None:
+        queryset = ClothOrder.objects.all().order_by('-serial_number', '-order_date', '-pk')
+
+    from collections import defaultdict
+    from .models import Shipment
+
+    shipment_rows = (
+        Shipment.objects
+        .filter(order__in=queryset, is_deleted=False)
+        .order_by('order_id', 'batch_number')
+        .values_list('order_id', 'batch_number', 'date', 'quantity')
+    )
+    shipments_by_order = defaultdict(list)
+    max_shipment_count = 0
+    for order_id, batch_number, ship_date, quantity in shipment_rows:
+        shipments_by_order[order_id].append({
+            'batch_number': batch_number,
+            'date': ship_date,
+            'quantity': quantity,
+        })
+        max_shipment_count = max(max_shipment_count, len(shipments_by_order[order_id]))
+
+    rows = []
+    for order in queryset:
+        row = {}
+        for excel_col, model_field in SUPPLIER_EXPORT_COLUMNS:
+            value = getattr(order, model_field, None)
+            if model_field == 'order_status':
+                value = order.get_order_status_display()
+            elif model_field == 'order_type':
+                value = order.get_order_type_display()
+            elif model_field == 'supplier_shipped':
+                value = '是' if value else '否'
+            elif hasattr(value, 'isoformat'):
+                value = value.isoformat()
+            row[excel_col] = value
+
+        shipments = shipments_by_order.get(order.pk, [])
+        total_quantity = sum(
+            float(shipment['quantity'] or 0)
+            for shipment in shipments
+        )
+        cost_price = float(order.finished_product_cost_price or 0)
+        row['出货总数量'] = total_quantity
+        row['出货总金额'] = round(cost_price * total_quantity, 2)
+
+        summary_parts = []
+        for shipment in shipments:
+            date_text = shipment['date'].strftime('%Y-%m-%d') if shipment['date'] else ''
+            quantity_text = float(shipment['quantity']) if shipment['quantity'] is not None else 0
+            summary_parts.append(
+                f"批次{shipment['batch_number']}:{date_text} 数量{quantity_text}"
+            )
+        row['出货记录'] = ' | '.join(summary_parts)
+
+        for index in range(max_shipment_count):
+            shipment = shipments[index] if index < len(shipments) else None
+            row[f'出货批次{index + 1}'] = shipment['batch_number'] if shipment else ''
+            row[f'出货日期{index + 1}'] = (
+                shipment['date'].strftime('%Y-%m-%d')
+                if shipment and shipment['date'] else ''
+            )
+            row[f'出货数量{index + 1}'] = (
+                float(shipment['quantity'])
+                if shipment and shipment['quantity'] is not None else ''
+            )
+
+        rows.append(row)
+
+    columns = [excel_col for excel_col, _ in SUPPLIER_EXPORT_COLUMNS]
+    columns.extend(['出货总金额', '出货记录'])
+    for index in range(max_shipment_count):
+        columns.extend([
+            f'出货批次{index + 1}',
+            f'出货日期{index + 1}',
+            f'出货数量{index + 1}',
+        ])
+    return pd.DataFrame(rows, columns=columns)

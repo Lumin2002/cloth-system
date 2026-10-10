@@ -1,4 +1,5 @@
 from django import forms
+from django.utils import timezone
 from django.utils.safestring import mark_safe
 from .constants import DEFAULT_STAGES_MAP, PRICE_UNIT_CHOICES
 from django.core.exceptions import ValidationError
@@ -520,3 +521,6 @@ class ShipmentForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['date'].required = True
         self.fields['quantity'].required = True
+        # 新增出货时默认当天日期，允许手工改
+        if not self.is_bound and not self.instance.pk:
+            self.fields['date'].initial = timezone.localdate()

@@ -69,6 +69,9 @@ from .statement import generate_bulk_statement, generate_order_statement
 from .tc import generate_bulk_tc
 from .views_common import AdminRequiredMixin, logger
 
+# 管理端订单详情页左侧「订单导航」卡片：按订单类型分组，每组最多列出的最近订单数
+ORDER_NAV_GROUP_LIMIT = 20
+
 
 class OrderListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
     model = ClothOrder
@@ -323,6 +326,30 @@ class OrderDetailView(AdminRequiredMixin, LoginRequiredMixin, DetailView):
         ctx["shipment_total_sum"] = order.shipments.filter(is_deleted=False).aggregate(
             total=Sum(F("quantity") * F("order__finished_product_cost_price"))
         )["total"] or 0
+
+        # 左侧「订单导航」卡片：当前订单 + 按订单类型分组的最近订单（空分类不展示）
+        type_counts = dict(
+            ClothOrder.objects.values_list("order_type").annotate(n=Count("id"))
+        )
+        nav_groups = []
+        for value, label in ClothOrder.ORDER_TYPE_CHOICES:
+            total = type_counts.get(value, 0)
+            if not total:
+                continue
+            nav_groups.append(
+                {
+                    "value": value,
+                    "label": label,
+                    "total": total,
+                    "orders": list(
+                        ClothOrder.objects.filter(order_type=value)
+                        .select_related("supplier")
+                        .exclude(pk=order.pk)
+                        .order_by("-serial_number", "-pk")[:ORDER_NAV_GROUP_LIMIT]
+                    ),
+                }
+            )
+        ctx["order_nav_groups"] = nav_groups
 
         return ctx
 

@@ -252,10 +252,37 @@ class ClothOrder(ClothCatalogMixin, ProgressStageMixin, models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        """保存订单时同步内部客户资料。"""
+        """保存订单时同步内部客户资料，并为成品成本价格变更留痕。"""
+        if kwargs.get("raw"):
+            # loaddata / fixtures 还原时不触发副作用（价格记录已包含在备份数据中）
+            return super().save(*args, **kwargs)
+
         if self.customer and str(self.customer).strip():
             Customer.objects.get_or_create(name=str(self.customer).strip())
+
+        update_fields = kwargs.get("update_fields")
+        track_price = update_fields is None or "finished_product_cost_price" in update_fields
+        previous_price = None
+        if track_price and self.pk:
+            previous_price = (
+                ClothOrder.objects.filter(pk=self.pk)
+                .values_list("finished_product_cost_price", flat=True)
+                .first()
+            )
+
         super().save(*args, **kwargs)
+
+        if (
+            track_price
+            and self.finished_product_cost_price is not None
+            and previous_price != self.finished_product_cost_price
+        ):
+            CostPriceHistory.objects.create(
+                order=self,
+                price=self.finished_product_cost_price,
+                unit=self.cost_price_unit or self.price_unit or "",
+                changed_by=getattr(self, "_price_changed_by", None),
+            )
     
     def __str__(self):
         return f"{self.serial_number} - {self.customer} - {self.cloth_type}"
@@ -609,6 +636,38 @@ class Shipment(models.Model):
 
     def __str__(self):
         return f'{self.order.serial_number} - 批次{self.batch_number}'
+
+
+class CostPriceHistory(models.Model):
+    """成品成本价格变更记录 —— 每次改价留痕，便于按不同价格核对出货金额"""
+
+    order = models.ForeignKey(
+        ClothOrder,
+        on_delete=models.CASCADE,
+        related_name='cost_price_history',
+        verbose_name='订单',
+    )
+    price = models.DecimalField(max_digits=15, decimal_places=2, verbose_name='成品成本价格')
+    unit = models.CharField(max_length=20, verbose_name='价格单位', blank=True)
+    changed_by = models.ForeignKey(
+        'auth.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='操作人',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='修改时间')
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        verbose_name = '成本价格修改记录'
+        verbose_name_plural = '成本价格修改记录'
+        indexes = [
+            models.Index(fields=['order', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.order_id} - {self.price} {self.unit}'
 
 
 import re

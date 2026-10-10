@@ -6,6 +6,7 @@ import sys
 import tempfile
 import zipfile
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 
 from django.conf import settings
@@ -133,9 +134,36 @@ def _timestamp():
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
+def _dataframe_to_xlsx_bytes(dataframe, sheet_name):
+    """将订单 DataFrame 编码为 xlsx 字节，直接写入备份压缩包。"""
+    import pandas as pd
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
+    return output.getvalue()
+
+
+def _build_order_excel_backups(timestamp):
+    """生成管理端和供应商端各自可用的订单 Excel 备份。"""
+    from .order_excel import export_orders_dataframe, export_supplier_orders_dataframe
+
+    return [
+        (
+            f"orders_backup_{timestamp}.xlsx",
+            _dataframe_to_xlsx_bytes(export_orders_dataframe(), "订单数据"),
+        ),
+        (
+            f"supplier_orders_backup_{timestamp}.xlsx",
+            _dataframe_to_xlsx_bytes(export_supplier_orders_dataframe(), "供应商订单"),
+        ),
+    ]
+
+
 def _backup_dumpdata():
-    """通过 manage.py dumpdata 导出 JSON 并压缩为 zip 压缩包。"""
-    json_name = f"db_backup_{_timestamp()}.json"
+    """将数据库 JSON 和两份订单 Excel 一并压缩为备份包。"""
+    timestamp = _timestamp()
+    json_name = f"db_backup_{timestamp}"
     dest = _ensure_dir() / f"{json_name}.zip"
     cmd = [
         sys.executable,
@@ -159,12 +187,14 @@ def _backup_dumpdata():
             subprocess.run(cmd, cwd=str(settings.BASE_DIR), stdout=f, env=env, check=True)
         with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.write(json_path, arcname=json_name)
+            for excel_name, excel_bytes in _build_order_excel_backups(timestamp):
+                zf.writestr(excel_name, excel_bytes)
     return dest
 
 
 def create_backup():
-    """创建一次备份，返回 (文件路径, 备份方式说明)。"""
-    return _backup_dumpdata(), "dumpdata JSON 压缩包"
+    """创建一次数据库和订单 Excel 备份，返回 (文件路径, 备份方式说明)。"""
+    return _backup_dumpdata(), "dumpdata JSON + 订单 Excel 压缩包"
 
 
 def prune_backups(keep=None):

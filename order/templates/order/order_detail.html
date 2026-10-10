@@ -1,5 +1,6 @@
-﻿{% extends "order/base.html" %}
+{% extends "order/base.html" %}
 {% block title %}订单详情 - {{ order.serial_number }}{% endblock %}
+{% block body_class %}{% if order.order_type %}order-type-{{ order.order_type }}{% endif %}{% endblock %}
 {% block content %}
 {% load static %}
 {% load pagination %}
@@ -57,7 +58,7 @@
 {% with field=form|get_field:field_name %}
 <div class="col-md-6 col-lg-4{% if field.name == "bulk_progress_tracking" %} col-12{% endif %}">
 <label class="form-label">{{ field.label }}{% if field.field.required %}<span class="text-danger">*</span>{% endif %}</label>
-{{ field }}
+{% if field.name == "order_type" %}{% include 'order/_order_type_field.html' with field=field %}{% else %}{{ field }}{% endif %}
 {% for err in field.errors %}<div class="text-danger small mt-1">{{ err }}</div>{% endfor %}
 </div>
 {% endwith %}
@@ -75,12 +76,67 @@
 {% else %}
 
 <div class="row g-4">
-<div class="col-md-6">
+<!-- 订单导航：当前订单 + 按订单类型分组的最近订单（窄屏时排到最后） -->
+<div class="col-lg-3 order-3 order-lg-1">
+<div class="card card-flat mb-3">
+<div class="card-header py-2"><h6 class="mb-0"><i class="bi bi-list-ul me-2 text-primary"></i>订单导航</h6></div>
+
+<div class="list-group list-group-flush">
+<a href="{% url 'order_detail' order.pk %}" class="list-group-item list-group-item-action py-2 sidebar-order-active">
+<div class="d-flex justify-content-between align-items-center gap-2">
+<span class="fw-bold text-nowrap">#{{ order.serial_number|default:"-" }}</span>
+<span class="badge order-type-badge order-type-badge-{{ order.order_type|default:'other' }}">{{ order.get_order_type_display|default:"-" }}</span>
+</div>
+<div class="mt-1 d-flex flex-wrap align-items-center gap-1">
+<span class="badge bg-primary">当前</span>
+{% if order.order_status == "cancelled" %}<span class="badge bg-secondary">已取消</span>{% else %}<span class="badge bg-success">正常</span>{% endif %}
+<small class="text-muted ms-auto text-end sidebar-order-meta" title="客户：{{ order.customer|default:'-' }}｜跟单员：{{ order.order_follower|default:'-' }}｜供应商：{{ order.supplier.company_name|default:order.finished_product_supplier|default:'-' }}">{{ order.customer|default:"-" }} · {{ order.order_follower|default:"-" }} · {{ order.supplier.company_name|default:order.finished_product_supplier|default:"-" }}</small>
+</div>
+</a>
+</div>
+
+<div class="sidebar-order-list">
+{% for group in order_nav_groups %}
+<a class="sidebar-group-header px-3 py-1 bg-light border-top border-bottom d-flex justify-content-between align-items-center text-decoration-none"
+   data-bs-toggle="collapse" href="#navGroup-{{ group.value }}" role="button" aria-expanded="false">
+<small class="fw-semibold text-muted"><i class="bi bi-chevron-down me-1"></i>{{ group.label }}</small>
+<small class="text-muted">{{ group.total }} 条</small>
+</a>
+<div class="collapse" id="navGroup-{{ group.value }}">
+<div class="list-group list-group-flush">
+{% for item in group.orders %}
+<a href="{% url 'order_detail' item.pk %}" class="list-group-item list-group-item-action py-2">
+<div class="d-flex justify-content-between align-items-center gap-2">
+<span class="fw-bold text-nowrap">#{{ item.serial_number|default:"-" }}</span>
+<span class="badge order-type-badge order-type-badge-{{ item.order_type|default:'other' }}">{{ item.get_order_type_display|default:"-" }}</span>
+</div>
+<div class="mt-1 d-flex flex-wrap align-items-center gap-1">
+{% if item.order_status == "cancelled" %}<span class="badge bg-secondary">已取消</span>{% else %}<span class="badge bg-success">正常</span>{% endif %}
+<small class="text-muted ms-auto text-end sidebar-order-meta" title="客户：{{ item.customer|default:'-' }}｜跟单员：{{ item.order_follower|default:'-' }}｜供应商：{{ item.supplier.company_name|default:item.finished_product_supplier|default:'-' }}">{{ item.customer|default:"-" }} · {{ item.order_follower|default:"-" }} · {{ item.supplier.company_name|default:item.finished_product_supplier|default:"-" }}</small>
+</div>
+</a>
+{% empty %}
+<div class="list-group-item text-muted small">暂无其他订单</div>
+{% endfor %}
+</div>
+</div>
+{% empty %}
+<div class="list-group-item text-muted small">暂无订单</div>
+{% endfor %}
+</div>
+
+<div class="card-footer text-center py-2">
+<a href="{% url 'order_list' %}" class="small text-decoration-none">查看全部订单 <i class="bi bi-arrow-right"></i></a>
+</div>
+</div>
+</div>
+
+<div class="col-lg-5 order-1 order-lg-2">
 <div class="card card-flat mb-4"><div class="card-header"><h6 class="mb-0"><i class="bi bi-info-circle me-2 text-primary"></i>基本信息</h6></div>
 <div class="card-body"><div class="row g-3">
 <div class="col-6"><div class="detail-label">客户</div><div class="detail-value fw-semibold text-primary">{{ order.customer|default:"-" }}</div></div>
 <div class="col-6"><div class="detail-label">跟单员</div><div class="detail-value">{{ order.order_follower|default:"-" }}</div></div>
-<div class="col-6"><div class="detail-label">订单类型</div><div class="detail-value">{{ order.get_order_type_display|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">订单类型</div><div class="detail-value"><span class="badge order-type-badge order-type-badge-{{ order.order_type|default:'other' }}">{{ order.get_order_type_display|default:"-" }}</span></div></div>
 <div class="col-6"><div class="detail-label">订单状态</div><div class="detail-value">
 {% if order.order_status == "cancelled" %}<span class="badge bg-secondary">已取消</span>{% else %}<span class="badge bg-success">正常</span>{% endif %}
 <form method="post" action="{% url 'order_toggle_status' order.pk %}" style="display:inline" class="ms-1">{% csrf_token %}<button type="submit" class="btn btn-sm {% if order.order_status == "cancelled" %}btn-outline-success{% else %}btn-outline-danger{% endif %}">{% if order.order_status == "cancelled" %}恢复订单{% else %}取消订单{% endif %}</button></form>
@@ -98,8 +154,8 @@
 <div class="col-6"><div class="detail-label">颜色</div><div class="detail-value">{{ order.color|default:"-" }}</div></div>
 <div class="col-6"><div class="detail-label">色号</div><div class="detail-value">{{ order.color_code|default:"-" }}</div></div>
 <div class="col-6"><div class="detail-label">成份</div><div class="detail-value">{{ order.composition|default:"-" }}</div></div>
-<div class="col-6"><div class="detail-label">门幅</div><div class="detail-value">{{ order.width|floatformat:2|default:"-" }}</div></div>
-<div class="col-6"><div class="detail-label">克重</div><div class="detail-value">{{ order.weight|floatformat:2|default:"-" }}</div></div>
+<div class="col-6"><div class="detail-label">门幅</div><div class="detail-value">{{ order.width|floatformat:2|default:"-" }} cm</div></div>
+<div class="col-6"><div class="detail-label">克重</div><div class="detail-value">{{ order.weight|floatformat:2|default:"-" }} gsm</div></div>
 <div class="col-6"><div class="detail-label">加工别</div><div class="detail-value">{{ order.processing_type|default:"-" }}</div></div>
 </div></div></div>
 
@@ -158,7 +214,7 @@
 </div></div></div>
 </div>
 
-<div class="col-md-6">
+<div class="col-lg-4 order-2 order-lg-3">
 <div class="card card-flat mb-4"><div class="card-header"><h6 class="mb-0"><i class="bi bi-currency-yen me-2 text-success"></i>订单与财务</h6></div>
 <div class="card-body"><div class="row g-3">
 <div class="col-6"><div class="detail-label">订单数量</div><div class="detail-value">{{ order.order_quantity|floatformat:2|default:"-" }} {{ order.quantity_unit|default:"" }}</div></div>
@@ -185,6 +241,15 @@
 
 <div class="col-6"><div class="detail-label">出货成本价格</div><div class="detail-value">{{ order.finished_product_cost_price|floatformat:2|default:"-" }} {{ order.cost_price_unit }}</div></div>
 </div></div></div>
+
+<div class="card card-flat mb-4"><div class="card-header d-flex justify-content-between align-items-center py-2">
+    <h6 class="mb-0"><i class="bi bi-clock-history me-2 text-info"></i>成品成本价格修改记录</h6>
+    <small class="text-muted">每次改价都会留痕</small>
+</div>
+<div class="card-body p-0">
+{% include 'order/_cost_price_history.html' with order=order cost_price_history=order.cost_price_history.all %}
+</div>
+</div>
 
 <div class="card card-flat mb-4"><div class="card-header"><h6 class="mb-0"><i class="bi bi-building me-2 text-warning"></i>供应商信息</h6></div>
 <div class="card-body"><div class="row g-3">

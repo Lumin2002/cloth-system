@@ -1,0 +1,55 @@
+{% comment %}
+顶部横幅导航栏样式：管理端 base.html 与供应商端 supplier_base.html 共用这一份，保证两端完全一致。
+顺带定义品牌主渐变 --gradient-primary（管理端卡片标题/主按钮也在用，供应商端引入后同样可用）。
+用法：放在 <style> 块内（纯 CSS 片段）。
+{% endcomment %}
+:root {
+    --gradient-primary: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+}
+
+.navbar {
+    background: var(--gradient-primary) !important;
+    box-shadow: 0 4px 20px rgba(67, 97, 238, 0.3);
+    padding: 1rem 0;
+}
+
+.navbar-brand {
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: #fff !important;
+}
+
+.navbar-nav .nav-link {
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.navbar-nav .nav-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff !important;
+    transform: translateY(-2px);
+}
+
+.navbar-nav .dropdown-menu {
+    border: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+}
+
+.navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 30 30%27%3e%3cpath stroke=%27rgba(255,255,255,0.9)%27 stroke-linecap=%27round%27 stroke-miterlimit=%2710%27 stroke-width=%272%27 d=%27M4 7h22M4 15h22M4 23h22%27/%3e%3c/svg%3e") !important;
+}
+
+/* 导航栏移动端 */
+@media (max-width: 991.98px) {
+    .navbar { padding: .4rem 0; }
+    .navbar-brand { font-size: 1rem; }
+    .navbar-toggler { padding: .25rem .4rem; font-size: .9rem; border: none; }
+    .navbar-toggler:focus { box-shadow: none; }
+    .navbar-nav .nav-link { padding: .4rem .75rem; border-radius: 6px; }
+    .navbar-nav .dropdown-menu { border: none; box-shadow: none; padding-left: .75rem; }
+    .navbar-nav .dropdown-menu .dropdown-item { font-size: .875rem; padding: .3rem .75rem; }
+}

@@ -47,6 +47,8 @@ def notification_list(request):
 
 
 def notification_unread_count(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"count": 0})
     count = request.user.notifications.filter(is_read=False).count()
     return JsonResponse({"count": count})
 

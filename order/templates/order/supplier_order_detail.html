@@ -1,5 +1,6 @@
-﻿{% extends "order/supplier_base.html" %}
+{% extends "order/supplier_base.html" %}
 {% block title %}订单 #{{ order.serial_number }} - 供应商面板{% endblock %}
+{% block body_class %}{% if order.order_type %}order-type-{{ order.order_type }}{% endif %}{% endblock %}
 {% block content %}
 <nav aria-label="breadcrumb" class="mb-3"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="{% url 'supplier_dashboard' %}">我的订单</a></li><li class="breadcrumb-item active" aria-current="page">订单 #{{ order.serial_number }}</li></ol></nav>
 
@@ -25,7 +26,7 @@
                 <div class="step {% if step3 %}active{% endif %} {% if step3 and step4 %}completed{% endif %} {% if not step2 %}disabled{% endif %}">
                     <div class="step-circle"><i class="bi bi-truck"></i></div>
                     <div class="step-label">安排出货</div>
-                    <div class="step-desc">{% if step3 %}{{ order.total_shipment_from_shipments|floatformat:2 }} {{ order.quantity_unit }}{% else %}等待出货{% endif %}</div>
+                    <div class="step-desc">{% if step3 %}{{ order.total_shipment_from_shipments|floatformat:2 }} {{ order.shipment_quantity_unit|default:order.quantity_unit }}{% else %}等待出货{% endif %}</div>
                 </div>
                 <div class="step-connector {% if step4 %}completed{% endif %}"></div>
                 <div class="step {% if step4 %}active completed{% endif %} {% if not step3 %}disabled{% endif %}">
@@ -41,7 +42,73 @@
 </div>
 
 <div class="row g-4">
-    <div class="col-md-8">
+    <!-- 我的订单：订单列表跳转（窄屏时排到最后，避免把订单详情挤下去） -->
+    <div class="col-lg-3 order-3 order-lg-1">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                <strong>我的订单</strong>
+                <small class="text-muted">共 {{ sidebar_order_total }} 条</small>
+            </div>
+
+            <div class="list-group list-group-flush">
+                <a href="{% url 'supplier_order_detail' order.pk %}"
+                   class="list-group-item list-group-item-action py-2 sidebar-order-active">
+                    <div class="d-flex justify-content-between align-items-center gap-2">
+                        <span class="fw-bold text-nowrap">#{{ order.serial_number|default:"-" }}</span>
+                        <span class="badge order-type-badge order-type-badge-{{ order.order_type|default:'other' }}">{{ order.get_order_type_display|default:"-" }}</span>
+                    </div>
+                    <div class="mt-1 d-flex flex-wrap align-items-center gap-1">
+                        <span class="badge bg-primary">当前</span>
+                        {% if order.has_active_shipments %}<span class="badge bg-success">已出货</span>
+                        {% elif order.finished_product_cost_price %}<span class="badge bg-info">待出货</span>
+                        {% else %}<span class="badge bg-warning text-dark">待提交</span>{% endif %}
+                        <small class="text-muted ms-auto text-end sidebar-order-meta" title="客户：{{ order.customer|default:'-' }}｜跟单员：{{ order.order_follower|default:'-' }}">{{ order.customer|default:"-" }} · {{ order.order_follower|default:"-" }}</small>
+                    </div>
+                </a>
+            </div>
+
+            <div class="sidebar-order-list">
+                {% for group in status_groups %}
+                <a class="sidebar-group-header px-3 py-1 bg-light border-top border-bottom d-flex justify-content-between align-items-center text-decoration-none"
+                   data-bs-toggle="collapse" href="#statusGroup-{{ group.value }}" role="button" aria-expanded="false">
+                    <small class="fw-semibold text-muted"><i class="bi bi-chevron-down me-1"></i>{{ group.label }}</small>
+                    <small class="text-muted">{{ group.total }} 条</small>
+                </a>
+                <div class="collapse" id="statusGroup-{{ group.value }}">
+                    <div class="list-group list-group-flush">
+                        {% for item in group.orders %}
+                        <a href="{% url 'supplier_order_detail' item.pk %}"
+                           class="list-group-item list-group-item-action py-2">
+                            <div class="d-flex justify-content-between align-items-center gap-2">
+                                <span class="fw-bold text-nowrap">#{{ item.serial_number|default:"-" }}</span>
+                                <span class="badge order-type-badge order-type-badge-{{ item.order_type|default:'other' }}">{{ item.get_order_type_display|default:"-" }}</span>
+                            </div>
+                            <div class="mt-1 d-flex flex-wrap align-items-center gap-1">
+                                {% if item.has_active_shipments %}<span class="badge bg-success">已出货</span>
+                                {% elif item.finished_product_cost_price %}<span class="badge bg-info">待出货</span>
+                                {% else %}<span class="badge bg-warning text-dark">待提交</span>{% endif %}
+                                <small class="text-muted ms-auto text-end sidebar-order-meta" title="客户：{{ item.customer|default:'-' }}｜跟单员：{{ item.order_follower|default:'-' }}">{{ item.customer|default:"-" }} · {{ item.order_follower|default:"-" }}</small>
+                            </div>
+                        </a>
+                        {% empty %}
+                        <div class="list-group-item text-muted small">暂无其他订单</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% empty %}
+                <div class="list-group-item text-muted small">暂无订单</div>
+                {% endfor %}
+            </div>
+
+            <div class="card-footer text-center py-2">
+                <a href="{% url 'supplier_dashboard' %}" class="small text-decoration-none">
+                    查看全部订单 <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5 order-1 order-lg-2">
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><strong>订单详情</strong></span>
@@ -51,7 +118,7 @@
                 <span class="badge bg-success fs-6">正常</span>
                 {% endif %}
                 <span class="badge {% if order.shipments.exists %}bg-success{% elif order.finished_product_cost_price %}bg-info{% else %}bg-warning text-dark{% endif %} fs-6">
-                    {% if order.shipments.exists %}已出货{% elif order.finished_product_cost_price %}已提交待出货{% else %}待提交{% endif %}
+                    {% if order.shipments.exists %}已出货{% elif order.finished_product_cost_price %}待出货{% else %}待提交{% endif %}
                 </span>
             </div>
             <div class="card-body">
@@ -60,7 +127,7 @@
                     <tbody>
                         <tr><th style="width:110px;">序号</th><td>{{ order.serial_number|default:"-" }}</td>
                             <th style="width:110px;">下单日期</th><td>{{ order.order_date|date:"Y-m-d"|default:"-" }}</td></tr>
-                        <tr><th>订单类型</th><td>{{ order.get_order_type_display|default:"-" }}</td>
+                        <tr><th>订单类型</th><td><span class="badge order-type-badge order-type-badge-{{ order.order_type|default:'other' }}">{{ order.get_order_type_display|default:"-" }}</span></td>
                             <th>订单号</th><td>{{ order.order_number|default:"-" }}</td></tr>
                         <tr><th>款号</th><td>{{ order.style_number|default:"-" }}</td>
                             <th>昇奕隆编号</th><td>{{ order.cloth_type|default:"-" }}</td></tr>
@@ -69,8 +136,8 @@
                         <tr><th>档口编号</th><td>{{ order.supplier_code|default:"-" }}</td>
                             <th>颜色</th><td>{{ order.color|default:"-" }}</td></tr>
                         <tr><th>成份</th><td colspan="3">{{ order.composition|default:"-" }}</td></tr>
-                        <tr><th>幅宽</th><td>{{ order.width|default:"-" }}</td>
-                            <th>克重</th><td>{{ order.weight|default:"-" }}</td></tr>
+                        <tr><th>幅宽</th><td>{{ order.width|default:"-" }}{% if order.width %} cm{% endif %}</td>
+                            <th>克重</th><td>{{ order.weight|default:"-" }}{% if order.weight %} gsm{% endif %}</td></tr>
                         <tr><th>订单数量</th><td>{{ order.order_quantity|default:"-" }} {{ order.quantity_unit }}</td>
                             <th>单位</th><td>{{ order.quantity_unit|default:"-" }}</td></tr>
                         <tr><th>规格</th><td colspan="3">{{ order.specification|default:"-" }}</td></tr>
@@ -96,16 +163,16 @@
                         <td class="ship-date">{{ s.date|date:"Y-m-d"|default:"-" }}</td>
                         <td class="text-end ship-qty">{{ s.quantity|floatformat:2|default:"-" }}</td>
                         <td class="text-end"><strong class="{% if s.is_deleted %}text-muted{% else %}text-primary{% endif %}">{{ s.shipment_total|floatformat:2|default:"-" }}</strong></td>
-                        <td class="text-center">
+                        <td class="text-center text-nowrap">
                             {% if s.is_deleted %}
                             <span class="badge bg-secondary">已删除</span>
                             {% else %}
-                            <button class="btn btn-sm btn-outline-primary py-0 px-1" onclick="editShipment({{ s.pk }})" title="编辑">
+                            <button class="btn btn-sm btn-outline-primary" onclick="editShipment({{ s.pk }})" title="编辑">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <form method="post" action="{% url 'order_shipment_delete' order.pk s.pk %}" style="display:inline" onsubmit="return confirm('确定删除此出货记录？')">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="删除">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="删除">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>
@@ -119,7 +186,7 @@
                     <tfoot>
                     <tr class="table-active fw-bold">
                         <td colspan="2" class="text-end">合计：</td>
-                        <td class="text-end">{{ order.total_shipment_from_shipments|floatformat:2|default:"0.00" }} 米</td>
+                        <td class="text-end">{{ order.total_shipment_from_shipments|floatformat:2|default:"0.00" }} {{ shipment_quantity_unit }}</td>
                         <td class="text-end text-primary">{{ shipment_total_sum|floatformat:2|default:"0.00" }} 元</td>
                         <td></td>
                     </tr>
@@ -131,7 +198,7 @@
         </div>
     </div>
 
-    <div class="col-md-4">
+    <div class="col-lg-4 order-2 order-lg-3">
         <!-- 成本与出货 -->
         <div class="card mb-3">
             <div class="card-header"><strong>成本与出货</strong></div>
@@ -141,10 +208,15 @@
                     {% csrf_token %}
                     <div class="mb-2">
                         <label class="form-label small">{{ shipment_form.date.label }} <span class="text-danger">*</span></label>
-                        <input type="date" name="date" class="form-control form-control-sm" required id="id_date">
+                        <input type="date" name="date" class="form-control form-control-sm" required id="id_date" value="{{ shipment_form.date.value|date:'Y-m-d'|default:'' }}">
                     </div>
                     <div class="mb-2">
-                        <label class="form-label small">{{ shipment_form.quantity.label }} <span class="text-danger">*</span></label>
+                        <label class="form-label small d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <span>{{ shipment_form.quantity.label }} <span class="text-danger">*</span></span>
+                            <span class="text-muted text-end shipment-total-summary">
+                                出货总数量：{{ shipment_quantity_summary }} = {{ shipment_total_quantity|floatformat:2 }} {{ shipment_quantity_unit }}（订单数量：{{ order.order_quantity|floatformat:2|default:"-" }} {{ order.quantity_unit|default:"-" }}）
+                            </span>
+                        </label>
                         <input type="number" name="quantity" step="0.01" class="form-control form-control-sm" required placeholder="例如 100.00" id="id_quantity">
                     </div>
                     <button type="submit" class="btn btn-success btn-sm w-100" id="shipmentSubmitBtn">
@@ -163,7 +235,7 @@
                             <div class="col-7">
                                 <input type="number" name="finished_product_cost_price" id="id_finished_product_cost_price"
                                        step="0.01" min="0.01" class="form-control form-control-sm"
-                                       value="{{ order.finished_product_cost_price|default_if_none:'' }}">
+                                       value="{% firstof order.finished_product_cost_price cost_price_reference.price %}">
                             </div>
                             <div class="col-5">
                                 <input type="text" name="cost_price_unit" class="form-control form-control-sm"
@@ -173,7 +245,21 @@
                         <div id="priceTextView" class="{% if order.finished_product_cost_price %}{% else %}d-none{% endif %}">
                             <span class="fs-5 fw-bold text-primary">{{ order.finished_product_cost_price|default:"-" }} {{ order.cost_price_unit|default:"" }}</span>
                         </div>
+                        <div id="costPriceRefHint" class="text-muted small mt-1{% if not cost_price_reference or order.finished_product_cost_price %} d-none{% endif %}">
+                            {% if cost_price_reference %}<i class="bi bi-clock-history me-1"></i>同布种最近成本价 <strong>{{ cost_price_reference.price|floatformat:2 }} {{ cost_price_reference.unit }}</strong>（订单 #{{ cost_price_reference.serial_number|default:"-" }}，{{ cost_price_reference.filled_at|date:"Y-m-d" }}），已自动填写，可修改{% endif %}
+                        </div>
                         {% if price_form.finished_product_cost_price.errors %}<div class="text-danger small mt-1">{{ price_form.finished_product_cost_price.errors }}</div>{% endif %}
+                    </div>
+
+                    <!-- 成品成本价格修改记录：紧跟在成品成本价格下面 -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label fw-bold small mb-0">成品成本价格修改记录</label>
+                            <small class="text-muted">每次改价都会留痕</small>
+                        </div>
+                        <div class="border rounded" id="costPriceHistoryWrap">
+                            {% include 'order/_cost_price_history.html' with order=order cost_price_history=cost_price_history %}
+                        </div>
                     </div>
 
                     <button type="submit" class="btn btn-primary w-100 mb-3" id="priceSubmitBtn">
@@ -276,6 +362,10 @@
 .edit-inline { display: flex; gap: 4px; align-items: center; }
 .edit-inline input { width: 100%; min-width: 80px; }
 .edit-inline .btn { white-space: nowrap; }
+.shipment-total-summary { font-size: .75rem; font-weight: 400; margin-left: auto; }
+@media (max-width: 575.98px) {
+    .shipment-total-summary { width: 100%; margin-left: 0; text-align: left !important; }
+}
 </style>
 <script>
 function showFlash(tag, text) {
@@ -410,7 +500,7 @@ function updateProgressUI(data) {
             stateBadge.textContent = "已出货";
         } else if (hasPrice) {
             stateBadge.className = "badge bg-info fs-6";
-            stateBadge.textContent = "已提交待出货";
+            stateBadge.textContent = "待出货";
         }
     }
     var steps = document.querySelectorAll(".step");
@@ -469,6 +559,12 @@ document.addEventListener("DOMContentLoaded", function () {
                     );
                     recomputeShipmentTotals(parseFloat(data.cost_price) || 0);
                     updateProgressUI(data);
+                    var historyWrap = document.getElementById("costPriceHistoryWrap");
+                    if (historyWrap && data.cost_price_history_html) {
+                        historyWrap.innerHTML = data.cost_price_history_html;
+                    }
+                    var refHint = document.getElementById("costPriceRefHint");
+                    if (refHint) refHint.classList.add("d-none");
                     showFlash("success", data.message || "保存成功");
                 } else {
                     submitBtn.innerHTML = oldHtml;
@@ -496,6 +592,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
         });
+
+        // 出货数量填好后按回车直接出货
+        var qtyInput = document.getElementById("id_quantity");
+        if (qtyInput) {
+            qtyInput.addEventListener("keydown", function (e) {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                if (typeof shipmentForm.requestSubmit === "function") {
+                    shipmentForm.requestSubmit();
+                } else {
+                    shipmentForm.submit();
+                }
+            });
+        }
     }
 });
 
@@ -511,7 +621,7 @@ function editShipment(shipmentPk) {
     dateCell.innerHTML = '<input type="date" class="form-control form-control-sm" value="' + origDate + '" id="edit-date-' + shipmentPk + '">';
     qtyCell.innerHTML = '<input type="number" step="0.01" class="form-control form-control-sm text-end" value="' + origQty + '" id="edit-qty-' + shipmentPk + '">';
     var actionCell = row.querySelector('td:last-child');
-    actionCell.innerHTML = '<button class="btn btn-sm btn-success py-0 px-1 me-1" onclick="saveShipment(' + shipmentPk + ')" title="保存"><i class="bi bi-check-lg"></i></button><button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="cancelEditShipment(' + shipmentPk + ')" title="取消"><i class="bi bi-x-lg"></i></button>';
+    actionCell.innerHTML = '<button class="btn btn-sm btn-success me-1" onclick="saveShipment(' + shipmentPk + ')" title="保存"><i class="bi bi-check-lg"></i></button><button class="btn btn-sm btn-outline-secondary" onclick="cancelEditShipment(' + shipmentPk + ')" title="取消"><i class="bi bi-x-lg"></i></button>';
 }
 function saveShipment(shipmentPk) {
     var dateVal = document.getElementById('edit-date-' + shipmentPk).value;

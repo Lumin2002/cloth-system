@@ -23,7 +23,6 @@
             --info-color: #7209b7;
             --light-color: #f8f9fa;
             --dark-color: #212529;
-            --gradient-primary: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
             --gradient-success: linear-gradient(135deg, #4cc9f0 0%, #4895ef 100%);
             --gradient-warning: linear-gradient(135deg, #f72585 0%, #b5179e 100%);
         }
@@ -35,37 +34,11 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        .navbar {
-            background: var(--gradient-primary) !important;
-            box-shadow: 0 4px 20px rgba(67, 97, 238, 0.3);
-            padding: 1rem 0;
-        }
+        /* 订单类型配色见 order/_order_type_theme.html（与供应商端共用同一份） */
+        {% include 'order/_order_type_theme.html' %}
 
-        .navbar-brand {
-            font-weight: 700;
-            font-size: 1.5rem;
-            color: white !important;
-        }
-
-        .navbar-nav .nav-link {
-            color: rgba(255, 255, 255, 0.9) !important;
-            font-weight: 500;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-        }
-
-        .navbar-nav .nav-link:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: white !important;
-            transform: translateY(-2px);
-        }
-
-        .navbar-nav .dropdown-menu {
-            border: none;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            border-radius: 12px;
-        }
+        /* 顶部导航栏样式见 order/_navbar_theme.html（与供应商端共用同一份） */
+        {% include 'order/_navbar_theme.html' %}
 
         .card {
             border: none;
@@ -392,8 +365,6 @@
         @media (max-width: 767.98px) {
             body { font-size: .875rem; padding-top: 60px; }
             .main-container { padding: 1rem 0; }
-            .navbar { padding: .5rem 0; }
-            .navbar-brand { font-size: 1.1rem; }
             .page-hero { padding: 1rem; }
             .page-hero h2, .page-hero h4 { font-size: 1.1rem; }
             .kpi-card { padding: .9rem; }
@@ -442,43 +413,14 @@
         }
 
     
-        /* Pagination responsive */
-        @media (max-width: 767.98px) {
-            .order-pagination .btn-text { display: none; }
-            .order-pagination .btn-group .btn { padding: .25rem .5rem; font-size: .8rem; min-width: 2rem; }
-            .order-pagination .btn-group .btn i { font-size: .8rem; }
-            .order-pagination .d-flex.flex-wrap { gap: .5rem !important; }
-            .order-pagination form .form-select-sm { font-size: .75rem; padding: .2rem .4rem; }
-            .order-pagination form .form-control-sm { font-size: .75rem; padding: .2rem .4rem; width: 3rem !important; }
-            .order-pagination form .btn-sm { font-size: .75rem; padding: .2rem .5rem; }
-        }
-        @media (max-width: 575.98px) {
-            .order-pagination .btn-group .btn { padding: .2rem .4rem; font-size: .75rem; min-width: 1.8rem; }
-            .order-pagination .btn-group { gap: .15rem; }
-        }
-        .order-pagination .btn-group .btn:focus-visible { outline: 2px solid #4361ee; outline-offset: 1px; }
-
-    
-        /* Navbar mobile */
+        /* Navbar mobile：导航栏移动端样式在 _navbar_theme.html 里，这里只留通知铃铛定位 */
         @media (max-width: 991.98px) {
-            .navbar { padding: .4rem 0; }
-            .navbar-brand { font-size: 1rem; }
-            .navbar-toggler { padding: .25rem .4rem; font-size: .9rem; border: none; }
-            .navbar-toggler:focus { box-shadow: none; }
-            .navbar-nav .nav-link { padding: .4rem .75rem; border-radius: 6px; }
-            .navbar-nav .dropdown-menu { border: none; box-shadow: none; padding-left: .75rem; }
-            .navbar-nav .dropdown-menu .dropdown-item { font-size: .875rem; padding: .3rem .75rem; }
             #notification-bell .dropdown-menu { left: 0 !important; right: auto !important; }
-        }
-
-    
-        .navbar-toggler-icon {
-            background-image: url("data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 30 30%27%3e%3cpath stroke=%27rgba(255,255,255,0.9)%27 stroke-linecap=%27round%27 stroke-miterlimit=%2710%27 stroke-width=%272%27 d=%27M4 7h22M4 15h22M4 23h22%27/%3e%3c/svg%3e") !important;
         }
 
     </style>
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
     <nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top">
         <div class="container">
             <a class="navbar-brand" href="{% url 'home' %}">
@@ -671,6 +613,39 @@ document.addEventListener("wheel", function (event) {
         event.preventDefault();
     }
 }, { passive: false });
+</script>
+
+<script>
+// 订单类型换底色：创建/编辑页切换订单类型时，实时更新页面背景与徽章
+(function () {
+    var ORDER_TYPES = ["bulk", "bulk_print", "sample", "other"];
+    var select = document.getElementById("id_order_type");
+    if (!select) return;
+
+    var badge = document.getElementById("orderTypeBadge");
+
+    function syncOrderType() {
+        var type = select.value;
+        if (ORDER_TYPES.indexOf(type) === -1) {
+            // 留空或异常值时按「其他」处理，保证底色和徽章始终有配色
+            type = "other";
+        }
+        ORDER_TYPES.forEach(function (item) {
+            document.body.classList.remove("order-type-" + item);
+            if (badge) badge.classList.remove("order-type-badge-" + item);
+        });
+        document.body.classList.add("order-type-" + type);
+        if (!badge) return;
+        badge.classList.add("order-type-badge-" + type);
+        var option = select.options[select.selectedIndex];
+        badge.textContent = (select.value && option) ? option.text : "";
+        // 没选类型时不显示空徽章
+        badge.classList.toggle("d-none", !select.value);
+    }
+
+    select.addEventListener("change", syncOrderType);
+    syncOrderType();
+})();
 </script>
 
 <button id="back-to-top" type="button" class="btn btn-primary rounded-circle shadow"

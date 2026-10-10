@@ -1,0 +1,37 @@
+{% comment %}
+订单相关共享样式：订单类型色板 + 页面底色 + 类型徽章 + 下拉框布局 + 订单导航卡片。
+管理端 base.html 与供应商端 supplier_base.html 共用这一份，页面底色与徽章永远同色。
+用法：放在 <style> 块内（纯 CSS 片段），页面 <body> 上挂 order-type-<类型> 类。
+{% endcomment %}
+:root {
+    --order-tint-bulk: #c3daf9;
+    --order-tint-bulk_print: #ddc6f7;
+    --order-tint-sample: #c3e9d6;
+    --order-tint-other: #dde1e6;
+}
+
+/* 订单类型底色：便于一眼区分订单类型 */
+body.order-type-bulk { background: linear-gradient(135deg, #e4effd 0%, var(--order-tint-bulk) 100%); }
+body.order-type-bulk_print { background: linear-gradient(135deg, #f2e6fe 0%, var(--order-tint-bulk_print) 100%); }
+body.order-type-sample { background: linear-gradient(135deg, #e3f7ed 0%, var(--order-tint-sample) 100%); }
+body.order-type-other { background: linear-gradient(135deg, #f0f2f5 0%, var(--order-tint-other) 100%); }
+
+/* 订单类型徽章：与页面底色同一颜色 */
+.badge.order-type-badge { border: 1px solid rgba(0, 0, 0, .08); font-weight: 600; }
+.badge.order-type-badge-bulk { background-color: var(--order-tint-bulk); color: #14498f; }
+.badge.order-type-badge-bulk_print { background-color: var(--order-tint-bulk_print); color: #5b21a8; }
+.badge.order-type-badge-sample { background-color: var(--order-tint-sample); color: #14663f; }
+.badge.order-type-badge-other { background-color: var(--order-tint-other); color: #41474d; }
+
+/* 订单类型下拉框 + 徽章同一行展示 */
+.order-type-field { display: flex; align-items: center; gap: .5rem; }
+.order-type-field .form-select { flex: 1 1 auto; min-width: 0; }
+.order-type-field .badge { white-space: nowrap; }
+
+/* 订单导航卡片（管理端订单详情 / 供应商端订单详情共用） */
+.sidebar-order-list { max-height: 560px; overflow-y: auto; }
+.sidebar-order-active { background: rgba(67, 97, 238, .08); box-shadow: inset 3px 0 0 #4361ee; }
+.sidebar-group-header { position: sticky; top: 0; z-index: 1; }
+.sidebar-order-meta { font-size: .7rem; line-height: 1.25; }
+.sidebar-group-header .bi-chevron-down { transition: transform .2s ease; }
+.sidebar-group-header[aria-expanded="true"] .bi-chevron-down { transform: rotate(180deg); }

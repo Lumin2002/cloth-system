@@ -81,6 +81,7 @@ urlpatterns = [
     path("supplier/manage/<int:pk>/delete/", views_supplier.supplier_manage_delete, name="supplier_manage_delete"),
     path("supplier/manage/<int:pk>/reset-password/", views_supplier.supplier_manage_reset_password, name="supplier_manage_reset_password"),
     path("supplier/", views_supplier.SupplierDashboardView.as_view(), name="supplier_dashboard"),
+    path("supplier/export/", views_supplier.supplier_orders_export, name="supplier_orders_export"),
     path("supplier/orders/<int:pk>/", views_supplier.SupplierOrderDetailView.as_view(), name="supplier_order_detail"),
     path("supplier/logout/", views_auth.supplier_logout_view, name="supplier_logout"),
     path("orders/updated-at/", views_orders.order_list_updated_at, name="order_list_updated_at"),

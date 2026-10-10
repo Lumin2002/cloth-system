@@ -113,7 +113,7 @@ class ClothOrderAdmin(admin.ModelAdmin):
     )
     
     readonly_fields = ['created_at', 'updated_at']
-    
+
     def payment_status_display(self, obj):
         """支付状态显示"""
         colors = {
@@ -173,7 +173,10 @@ class ClothOrderAdmin(admin.ModelAdmin):
             # 自动生成序号
             last_order = ClothOrder.objects.order_by('-serial_number').first()
             obj.serial_number = (last_order.serial_number + 1) if last_order else 1
-        
+
+        # 后台直接改成品成本价格时，也把操作人记进改价历史
+        obj._price_changed_by = request.user
+
         super().save_model(request, obj, form, change)
     
     class Media:
