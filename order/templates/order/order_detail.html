@@ -147,7 +147,7 @@
 <div class="col-6"><div class="detail-label">规格</div><div class="detail-value">{{ order.specification|default:"-" }}</div></div>
 <div class="col-6"><div class="detail-label">下单日期</div><div class="detail-value">{{ order.order_date|date:"Y-m-d"|default:"-" }}</div></div>
 <div class="col-6"><div class="detail-label">创建人</div><div class="detail-value">
-{% if order.created_by %}<i class="bi bi-person-circle me-1 text-primary"></i><strong>{{ order.created_by.get_full_name|default:order.created_by.username }}</strong>{% if order.created_by.get_full_name %}<span class="text-muted small">（{{ order.created_by.username }}）</span>{% endif %}{% else %}<span class="text-muted">未记录</span>{% endif %}
+{% if order.created_by %}<i class="bi bi-person-circle me-1 text-primary"></i><strong>{{ order.created_by.get_full_name|default:order.created_by.username }}</strong>{% if order.created_by.get_full_name %}<span class="text-muted small">（{{ order.created_by.username }}）</span>{% endif %}<span class="badge ms-1 {% if order.created_by.is_superuser %}bg-danger{% else %}bg-primary{% endif %}">{% if order.created_by.is_superuser %}超级管理员{% else %}管理员{% endif %}</span>{% else %}<span class="text-muted">未记录</span>{% endif %}
 <details class="d-inline-block ms-2">
 <summary class="small text-primary" style="cursor:pointer">修改</summary>
 <form method="post" action="{% url 'order_update_creator' order.pk %}" class="d-flex align-items-center gap-1 mt-2">{% csrf_token %}
@@ -155,9 +155,9 @@
 <option value="">未记录</option>
 {% for su in staff_users %}
 {% if order.created_by_id == su.pk %}
-<option value="{{ su.pk }}" selected>{{ su.get_full_name|default:su.username }}（{{ su.username }}）</option>
+<option value="{{ su.pk }}" selected>{{ su.get_full_name|default:su.username }}（{{ su.username }}）· {% if su.is_superuser %}超级管理员{% else %}管理员{% endif %}</option>
 {% else %}
-<option value="{{ su.pk }}">{{ su.get_full_name|default:su.username }}（{{ su.username }}）</option>
+<option value="{{ su.pk }}">{{ su.get_full_name|default:su.username }}（{{ su.username }}）· {% if su.is_superuser %}超级管理员{% else %}管理员{% endif %}</option>
 {% endif %}
 {% endfor %}
 </select>

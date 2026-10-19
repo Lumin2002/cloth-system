@@ -48,3 +48,4 @@ _*.sh
 fix_import.py
 start.bat
 backups/
+logs/

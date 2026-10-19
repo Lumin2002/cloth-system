@@ -297,8 +297,13 @@ class OrderListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
         # 表头筛选下拉的选项
         ctx["order_status_choices"] = ClothOrder.ORDER_STATUS_CHOICES
         ctx["created_by_choices"] = [
-            (str(user.pk), user.get_full_name() or user.username)
-            for user in User.objects.filter(is_staff=True).order_by("username")
+            (
+                str(user.pk),
+                f"{user.get_full_name() or user.username}（{'超管' if user.is_superuser else '管理员'}）",
+            )
+            for user in User.objects.filter(is_staff=True).order_by(
+                "-is_superuser", "username"
+            )
         ] + [("none", "未分配")]
         ctx["order_type_choices"] = ClothOrder.ORDER_TYPE_CHOICES
         ctx["payment_status_choices"] = ClothOrder.PAYMENT_STATUS_CHOICES
@@ -339,7 +344,7 @@ class OrderDetailView(AdminRequiredMixin, LoginRequiredMixin, DetailView):
         ctx["edit_mode"] = self.request.GET.get("edit") == "1"
         ctx["staff_users"] = User.objects.filter(
             is_staff=True, is_active=True
-        ).order_by("username")
+        ).order_by("-is_superuser", "username")
         ctx["form_sections"] = ORDER_FORM_SECTIONS
         ctx["form"] = ClothOrderForm(instance=order)
         ctx["price_form"] = SupplierPriceForm(instance=order)
