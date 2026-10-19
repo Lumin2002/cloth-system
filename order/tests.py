@@ -22,7 +22,16 @@ from order import service_monitor
 from order import terminal
 from order.forms import ShipmentForm
 from order.middleware import SESSION_LAST_ACTIVITY_KEY
-from order.models import ClothOrder, Notification, Shipment, Supplier
+from order.models import (
+    ClothCatalog,
+    ClothOrder,
+    Customer,
+    FabricQuotation,
+    InventoryItem,
+    Notification,
+    Shipment,
+    Supplier,
+)
 from order.views_common import handler400, handler403, handler404, handler500
 
 
@@ -592,8 +601,8 @@ class ShipmentProgressTests(TestCase):
         self.assertEqual(order.remark, "请尽快安排剪版")
         self.assertFalse(order.shipments.exists())
 
-    def test_shipment_action_buttons_use_standard_table_button_style(self):
-        """出货记录操作列按钮与其他表格一致：btn btn-sm btn-outline-*，不要 py-0 px-1 的压缩样式"""
+    def test_shipment_action_buttons_are_text_buttons(self):
+        """出货记录操作列与供应商端订单列表一致：纯文字按钮，不用纯图标或压缩样式"""
         order = self._create_order()
         order.finished_product_cost_price = "12.50"
         order.save(update_fields=["finished_product_cost_price"])
@@ -607,10 +616,9 @@ class ShipmentProgressTests(TestCase):
         )
 
         html = response.content.decode("utf-8")
-        self.assertIn(
-            'class="btn btn-sm btn-outline-primary" onclick="editShipment(', html
-        )
-        self.assertIn('class="btn btn-sm btn-outline-danger" title="删除"', html)
+        self.assertIn('class="btn btn-sm btn-outline-primary" onclick="editShipment(', html)
+        self.assertIn('class="btn btn-sm btn-outline-danger">删除</button>', html)
+        self.assertIn("d-flex flex-nowrap gap-1 justify-content-center", html)
         self.assertNotIn("py-0 px-1", html)
 
     def test_shipment_create_blocked_without_cost_price(self):
@@ -1308,6 +1316,11 @@ class OrderTypeBackgroundTests(TestCase):
             f'href="{reverse("order_detail", kwargs={"pk": excluded.pk})}"', html
         )
 
+    def test_buttons_never_wrap_text(self):
+        """Bootstrap 5 的 .btn 没设 nowrap，放进操作列的 flex 容器会被压成竖排文字"""
+        response = self.client.get(reverse("order_list"))
+        self.assertContains(response, ".btn { white-space: nowrap; }")
+
     def test_admin_page_includes_shared_navbar_theme(self):
         response = self.client.get(reverse("order_list"))
         html = response.content.decode("utf-8")
@@ -1417,6 +1430,11 @@ class SupplierOrderTypeThemeTests(TestCase):
             cloth_type="THEME-001",
             supplier=self.supplier,
         )
+
+    def test_buttons_never_wrap_text(self):
+        """供应商端同样引入共享样式，按钮文字不换行"""
+        response = self.client.get(reverse("supplier_dashboard"))
+        self.assertContains(response, ".btn { white-space: nowrap; }")
 
     def test_supplier_page_uses_same_navbar_theme_as_admin(self):
         """供应商端横幅必须与管理端同一份样式：品牌渐变、导航项内边距/悬浮位移、下拉面板阴影"""
@@ -1748,6 +1766,486 @@ class SupplierStatusClassificationTests(TestCase):
         self.assertEqual(summary["quoted_wait_ship_count"], 1)
         self.assertEqual(summary["shipped_count"], 1)
         self.assertEqual(response.context["total_count"], 1)
+
+
+class LogClassificationTests(TestCase):
+    """日志分类：操作日志（含耗时）/ 登录日志 / 业务明细"""
+
+    def setUp(self):
+        cache.clear()
+        self.admin_user = User.objects.create_superuser(
+            username="log_admin",
+            email="log_admin@example.com",
+            password="test-pass-123",
+        )
+
+    def _set_captcha(self, code="TEST", expires_in=300):
+        session = self.client.session
+        session[CAPTCHA_SESSION_KEY] = {"code": code, "expires": time() + expires_in}
+        session.save()
+
+    # ---------- 类别分流 ----------
+
+    def test_category_filter_routes_by_category(self):
+        import logging
+
+        from order.logging_context import CategoryFilter
+
+        operation = logging.LogRecord("t", logging.INFO, "f", 1, "m", None, None)
+        operation.category = "operation"
+        business = logging.LogRecord("t", logging.INFO, "f", 1, "m", None, None)
+
+        self.assertTrue(CategoryFilter(category="operation").filter(operation))
+        self.assertFalse(CategoryFilter(category="operation").filter(business))
+        self.assertTrue(CategoryFilter(exclude=["operation", "login"]).filter(business))
+        self.assertFalse(CategoryFilter(exclude=["operation", "login"]).filter(operation))
+
+    def test_request_context_filter_supplies_duration_default(self):
+        import logging
+
+        from order.logging_context import RequestContextFilter
+
+        record = logging.LogRecord("t", logging.INFO, "f", 1, "m", None, None)
+        RequestContextFilter().filter(record)
+
+        self.assertEqual(record.duration_ms, "-")
+        self.assertEqual(record.username, "-")
+        self.assertEqual(record.ip, "-")
+
+    def test_operation_formatter_renders_duration(self):
+        import logging
+
+        from order.logging_context import RequestContextFilter
+
+        formatter = logging.Formatter(
+            settings.LOGGING["formatters"]["verbose_duration"]["format"], style="{"
+        )
+        record = logging.LogRecord(
+            "order.middleware", logging.INFO, "f", 1, "[操作] POST /x/ -> 200", None, None
+        )
+        record.duration_ms = 128
+        RequestContextFilter().filter(record)
+
+        text = formatter.format(record)
+        self.assertIn("耗时:128ms", text)
+        self.assertIn("[操作] POST /x/ -> 200", text)
+
+    # ---------- 中间件写入 ----------
+
+    def test_operation_request_is_logged_with_duration(self):
+        self.client.force_login(self.admin_user)
+
+        with self.assertLogs("order.middleware", level="INFO") as captured:
+            response = self.client.post(reverse("notification_mark_all_read"))
+
+        self.assertEqual(response.status_code, 302)
+        records = [
+            record
+            for record in captured.records
+            if getattr(record, "category", "") == "operation"
+        ]
+        self.assertEqual(len(records), 1)
+        self.assertGreaterEqual(records[0].duration_ms, 0)
+        self.assertIn("[操作] POST /notifications/mark-all-read/ -> 302", records[0].getMessage())
+
+    def test_static_poll_and_login_pages_are_not_operation_logged(self):
+        self.client.force_login(self.admin_user)
+
+        with self.assertNoLogs("order.middleware", level="INFO"):
+            self.client.get("/static/css/bootstrap.min.css")
+            self.client.get(reverse("notification_unread_count"))
+            self.client.get(reverse("home"))
+
+    # ---------- 登录日志 ----------
+
+    def test_failed_login_is_written_to_login_log(self):
+        self._set_captcha()
+
+        # views_auth 用的是共享 logger（order.views_common）
+        with self.assertLogs("order.views_common", level="INFO") as captured:
+            self.client.post(
+                reverse("home"),
+                {"username": "log_admin", "password": "wrong-pass", "captcha": "TEST"},
+            )
+
+        self.assertTrue(
+            any(getattr(record, "category", None) == "login" for record in captured.records)
+        )
+        self.assertTrue(
+            any("登录失败" in record.getMessage() for record in captured.records)
+        )
+
+    def test_logout_is_written_to_login_log(self):
+        self.client.force_login(self.admin_user)
+
+        with self.assertLogs("order.views_common", level="INFO") as captured:
+            self.client.get(reverse("logout"))
+
+        self.assertTrue(
+            any(getattr(record, "category", None) == "login" for record in captured.records)
+        )
+        self.assertTrue(any("登出" in record.getMessage() for record in captured.records))
+
+    # ---------- 解析 ----------
+
+    def test_parse_operation_log_returns_structured_rows(self):
+        from order.monitor import parse_operation_log
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "operation.log"
+            path.write_text(
+                "2026-10-10 10:00:01,123 INFO order.middleware:70 [用户:admin IP:127.0.0.1] "
+                "[操作] POST /orders/add/ -> 302 耗时:128ms\n"
+                "Traceback (most recent call last):\n"
+                "2026-10-10 10:00:02,456 INFO order.middleware:70 [用户:supplier IP:10.0.0.2] "
+                "[操作] GET /orders/export/ -> 200 耗时:1500ms\n",
+                encoding="utf-8",
+            )
+            rows = parse_operation_log(path, limit=100)
+
+        # 无法解析的堆栈行被跳过，且最新的排最前
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["path"], "/orders/export/")
+        self.assertEqual(rows[0]["username"], "supplier")
+        self.assertEqual(rows[0]["ip"], "10.0.0.2")
+        self.assertEqual(rows[0]["method"], "GET")
+        self.assertEqual(rows[0]["status"], "200")
+        self.assertEqual(rows[0]["duration_text"], "1.50 s")
+        self.assertEqual(rows[1]["duration_ms"], 128)
+        self.assertEqual(rows[1]["duration_text"], "128 ms")
+
+    def test_parse_login_log_labels_events(self):
+        from order.monitor import parse_login_log
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "login.log"
+            path.write_text(
+                "2026-10-10 09:00:00,001 INFO order.views_auth:43 [用户:admin IP:127.0.0.1] "
+                "[登录] admin 登录成功\n"
+                "2026-10-10 09:01:00,002 WARNING order.views_auth:59 [用户:- IP:127.0.0.1] "
+                "[登录失败] 用户名 bob 登录失败\n"
+                "2026-10-10 09:02:00,003 INFO order.views_auth:85 [用户:admin IP:127.0.0.1] "
+                "[登出] admin 登出系统\n",
+                encoding="utf-8",
+            )
+            rows = parse_login_log(path, limit=100)
+
+        self.assertEqual([row["event"] for row in rows], ["登出", "登录失败", "登录成功"])
+        self.assertEqual(rows[1]["event_tone"], "danger")
+        self.assertEqual(rows[1]["username"], "-")
+        self.assertEqual(rows[1]["ip"], "127.0.0.1")
+
+    def test_app_log_regex_covers_classified_logs(self):
+        from order.monitor import APP_LOG_RE
+
+        for name in (
+            "django-info.log",
+            "django-error.log",
+            "django-info.log.1",
+            "operation.log",
+            "operation.log.2",
+            "login.log",
+        ):
+            self.assertIsNotNone(APP_LOG_RE.match(name), name)
+        for name in ("runserver.stdout.log", "backup_config.json", "operation.txt"):
+            self.assertIsNone(APP_LOG_RE.match(name), name)
+
+    def test_settings_logs_page_switches_view_by_dropdown(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("settings_logs"))
+        self.assertEqual(response.context["current_view"], "operation")
+        self.assertContains(response, 'name="view"')
+        self.assertContains(response, "来源 operation.log")
+        self.assertContains(response, "耗时")
+
+        response = self.client.get(reverse("settings_logs"), {"view": "login"})
+        self.assertEqual(response.context["current_view"], "login")
+        self.assertContains(response, "来源 login.log")
+        self.assertNotContains(response, "来源 operation.log")
+
+        response = self.client.get(reverse("settings_logs"), {"view": "files"})
+        self.assertEqual(response.context["current_view"], "files")
+        self.assertContains(response, "最后写入")
+        self.assertNotContains(response, "来源 operation.log")
+
+    def test_settings_logs_page_falls_back_to_operation_view(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("settings_logs"), {"view": "bogus"})
+
+        self.assertEqual(response.context["current_view"], "operation")
+        self.assertContains(response, "来源 operation.log")
+
+
+class CustomerSupplierListTableTests(TestCase):
+    """客户管理 / 供应商管理改为列表（表格）展示"""
+
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username="list_admin",
+            email="list_admin@example.com",
+            password="test-pass-123",
+        )
+        self.client.force_login(self.admin_user)
+        Customer.objects.create(
+            name="表格客户",
+            code="C-001",
+            contact_person="张三",
+            phone="13800000000",
+            email="zhangsan@example.com",
+            address="广州市海珠区",
+            remark="重点客户",
+        )
+        supplier_user = User.objects.create_user(
+            username="table_supplier", password="test-pass-123"
+        )
+        Supplier.objects.create(
+            user=supplier_user,
+            company_name="表格供应商",
+            contact_person="李四",
+            phone="13900000000",
+        )
+
+    def test_customer_page_uses_table_instead_of_cards(self):
+        response = self.client.get(reverse("customer_list"))
+
+        html = response.content.decode("utf-8")
+        self.assertContains(response, 'id="customer-list-data"')
+        self.assertIn("<table", html)
+        for header in ("客户名称", "编号", "联系人", "电话", "邮箱", "地址", "备注", "状态"):
+            self.assertIn(f"<th>{header}</th>", html)
+        self.assertIn('<th class="text-end">操作</th>', html)
+        # 卡片栅格不应残留
+        self.assertNotIn("row-cols-lg-3", html)
+
+    def test_customer_actions_are_text_buttons(self):
+        response = self.client.get(reverse("customer_list"))
+
+        html = response.content.decode("utf-8")
+        # 与其他列表统一：描边按钮 + 纯文字 + 横向排列
+        self.assertIn('class="btn btn-sm btn-outline-primary">编辑</a>', html)
+        self.assertIn('class="btn btn-sm btn-outline-danger">删除</button>', html)
+        self.assertIn("d-flex flex-nowrap gap-1 justify-content-end", html)
+        # 操作列不再使用纯图标按钮
+        self.assertNotIn('title="编辑"', html)
+        self.assertNotIn('title="删除"', html)
+
+    def test_customer_json_carries_list_columns(self):
+        response = self.client.get(reverse("customer_list"))
+
+        row = response.context["customers_json"][0]
+        for key in (
+            "name",
+            "code",
+            "contact_person",
+            "phone",
+            "email",
+            "address",
+            "remark",
+            "is_active",
+            "edit_url",
+            "delete_url",
+        ):
+            self.assertIn(key, row)
+        self.assertEqual(row["address"], "广州市海珠区")
+
+    def test_supplier_manage_page_uses_table_instead_of_cards(self):
+        response = self.client.get(reverse("supplier_manage_list"))
+
+        html = response.content.decode("utf-8")
+        self.assertContains(response, 'id="supplier-manage-data"')
+        self.assertIn("<table", html)
+        for header in ("公司名称", "登录账号", "联系人", "电话", "状态", "创建时间"):
+            self.assertIn(f"<th>{header}</th>", html)
+        self.assertIn('<th class="text-end">操作</th>', html)
+        self.assertNotIn("row-cols-lg-3", html)
+        # 纯文字操作按钮，横向排列
+        self.assertIn('class="btn btn-sm btn-outline-primary">编辑</a>', html)
+        self.assertIn('class="btn btn-sm btn-outline-warning">重置密码</a>', html)
+        self.assertIn('class="btn btn-sm btn-outline-danger">删除</a>', html)
+        self.assertIn("d-flex flex-nowrap gap-1 justify-content-end", html)
+        self.assertNotIn('title="编辑"', html)
+
+    def test_supplier_json_carries_list_columns(self):
+        response = self.client.get(reverse("supplier_manage_list"))
+
+        row = response.context["suppliers_json"][0]
+        for key in (
+            "company_name",
+            "username",
+            "contact_person",
+            "phone",
+            "is_active",
+            "created_at",
+            "edit_url",
+            "reset_password_url",
+            "delete_url",
+        ):
+            self.assertIn(key, row)
+        self.assertEqual(row["company_name"], "表格供应商")
+
+
+class ActionButtonTextStyleTests(TestCase):
+    """其余列表的操作列也统一为纯文字按钮（不用纯图标）"""
+
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username="action_admin",
+            email="action_admin@example.com",
+            password="test-pass-123",
+        )
+        self.client.force_login(self.admin_user)
+        InventoryItem.objects.create(
+            cloth_name="按钮测试布",
+            color="黑",
+            quantity=10,
+        )
+
+    def test_inventory_list_actions_are_text(self):
+        response = self.client.get(reverse("inventory_list"))
+
+        html = response.content.decode("utf-8")
+        self.assertIn('class="btn btn-sm btn-outline-primary">详情</a>', html)
+        self.assertIn('class="btn btn-sm btn-outline-secondary">编辑</a>', html)
+        self.assertIn("d-flex flex-nowrap gap-1 justify-content-end", html)
+        self.assertNotIn('title="详情"', html)
+        self.assertNotIn('title="编辑"', html)
+
+    def test_cloth_catalog_delete_is_text(self):
+        response = self.client.get(reverse("cloth_catalog_list"))
+
+        html = response.content.decode("utf-8")
+        self.assertIn('class="btn btn-sm btn-outline-danger">删除</button>', html)
+        self.assertNotIn("py-0 px-1", html)
+
+    def test_quotation_delete_is_text(self):
+        response = self.client.get(reverse("quotation_list"))
+
+        html = response.content.decode("utf-8")
+        self.assertIn('class="btn btn-sm btn-outline-danger">删除</button>', html)
+        self.assertNotIn("py-0 px-1", html)
+
+
+class ClothCatalogUnitDisplayTests(TestCase):
+    """布种编号的门幅 / 克重显示单位"""
+
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username="catalog_admin",
+            email="catalog_admin@example.com",
+            password="test-pass-123",
+        )
+        self.client.force_login(self.admin_user)
+        self.item = ClothCatalog.objects.create(
+            cloth_code="UNIT-001",
+            cloth_name="单位测试布",
+            width="150",
+            weight="180",
+        )
+
+    def test_detail_page_shows_units(self):
+        response = self.client.get(
+            reverse("cloth_catalog_detail", kwargs={"pk": self.item.pk})
+        )
+
+        self.assertContains(response, "150 cm")
+        self.assertContains(response, "180 gsm")
+
+    def test_detail_page_omits_unit_when_empty(self):
+        empty = ClothCatalog.objects.create(cloth_code="UNIT-002", cloth_name="空值布")
+
+        response = self.client.get(
+            reverse("cloth_catalog_detail", kwargs={"pk": empty.pk})
+        )
+
+        html = response.content.decode("utf-8")
+        self.assertNotIn("- cm", html)
+        self.assertNotIn("- gsm", html)
+
+    def test_list_template_appends_units(self):
+        response = self.client.get(reverse("cloth_catalog_list"))
+
+        html = response.content.decode("utf-8")
+        self.assertIn("[[ item.width ? ' cm' : '' ]]", html)
+        self.assertIn("[[ item.weight ? ' gsm' : '' ]]", html)
+
+
+class QuotationUnitDisplayTests(TestCase):
+    """面料报价的克重 / 门幅 / 价格单位显示统一"""
+
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username="quote_admin",
+            email="quote_admin@example.com",
+            password="test-pass-123",
+        )
+        self.client.force_login(self.admin_user)
+        self.item = FabricQuotation.objects.create(
+            article_no="Q-001",
+            supplier_name="报价供应商",
+            composition="100% Cotton",
+            weight="200gsm",           # 数据里自带单位
+            cuttable_width="150cm",
+            price_200m="57.30",
+            price_200m_print="47.30",
+            price_200m_unit="M",
+            price_regular="55.30",
+            price_regular_print="45.30",
+            price_regular_unit="M",
+        )
+
+    def test_model_display_strips_duplicated_unit(self):
+        self.assertEqual(self.item.weight_display, "200 gsm")
+        self.assertEqual(self.item.width_display, "150 cm")
+
+    def test_model_display_adds_unit_when_missing(self):
+        bare = FabricQuotation(weight="180", cuttable_width="145")
+
+        self.assertEqual(bare.weight_display, "180 gsm")
+        self.assertEqual(bare.width_display, "145 cm")
+
+    def test_model_display_keeps_range_values(self):
+        ranged = FabricQuotation(weight="", cuttable_width="145-150cm")
+
+        self.assertEqual(ranged.width_display, "145-150 cm")
+
+    def test_model_display_empty_values(self):
+        empty = FabricQuotation()
+
+        self.assertEqual(empty.weight_display, "-")
+        self.assertEqual(empty.width_display, "-")
+        self.assertEqual(empty.price_200m_display, "-")
+        self.assertEqual(empty.price_regular_print_display, "-")
+
+    def test_price_display_uses_yuan_per_unit(self):
+        self.assertEqual(self.item.price_200m_display, "57.30 元/M")
+        self.assertEqual(self.item.price_200m_print_display, "47.30 元/M")
+        self.assertEqual(self.item.price_regular_display, "55.30 元/M")
+        self.assertEqual(self.item.price_regular_print_display, "45.30 元/M")
+
+    def test_list_page_renders_display_values(self):
+        response = self.client.get(reverse("quotation_list"))
+
+        # json_script 会把中文转义，所以断言下发给 Vue 的数据契约
+        row = response.context["items_json"][0]
+        self.assertEqual(row["weight"], "200 gsm")
+        self.assertEqual(row["cuttable_width"], "150 cm")
+        self.assertEqual(row["price_200m"], "57.30 元/M")
+        self.assertEqual(row["price_200m_print"], "47.30 元/M")
+        self.assertEqual(row["price_regular"], "55.30 元/M")
+        # 列表模板不再在前端拼接单位
+        self.assertNotIn("+ '/' +", response.content.decode("utf-8"))
+
+    def test_detail_page_renders_display_values(self):
+        response = self.client.get(
+            reverse("quotation_detail", kwargs={"pk": self.item.pk})
+        )
+
+        self.assertContains(response, "200 gsm")
+        self.assertContains(response, "150 cm")
+        self.assertContains(response, "57.30 元/M")
+        self.assertContains(response, "45.30 元/M")
 
 
 class CostPriceHistoryTests(TestCase):

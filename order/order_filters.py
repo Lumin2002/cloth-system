@@ -66,6 +66,13 @@ def filter_orders_queryset(params, queryset=None):
         if status in ('active', 'cancelled'):
             qs = qs.filter(order_status=status)
 
+    # 创建人（管理员）：none / null / unassigned 表示「未分配」
+    if created_by := (params.get('created_by') or '').strip():
+        if created_by in ('none', 'null', 'unassigned'):
+            qs = qs.filter(created_by__isnull=True)
+        elif created_by.isdigit():
+            qs = qs.filter(created_by_id=int(created_by))
+
     for param, lookup in (('start_date', 'order_date__gte'), ('end_date', 'order_date__lte')):
         raw = (params.get(param) or '').strip()
         if raw:
@@ -74,4 +81,4 @@ def filter_orders_queryset(params, queryset=None):
             except ValueError:
                 pass
 
-    return qs.order_by('-order_date', '-serial_number', '-created_at')
+    return qs.order_by('-serial_number', '-order_date', '-created_at')

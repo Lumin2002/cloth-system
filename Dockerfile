@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libmariadb-dev \
     libgomp1 \
+    fonts-wqy-zenhei \
     && rm -rf /var/lib/apt/lists/*
 
 # 设置阿里云pip源

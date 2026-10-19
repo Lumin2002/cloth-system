@@ -1,8 +1,13 @@
-"""日志请求上下文：为每条日志附加操作人用户名与来源 IP。"""
+"""日志请求上下文：为每条日志附加操作人用户名与来源 IP，并按类别分流。"""
 import logging
 import threading
 
 _local = threading.local()
+
+# 日志类别：业务明细（默认）/ 操作（请求级，含耗时）/ 登录
+CATEGORY_BUSINESS = "business"
+CATEGORY_OPERATION = "operation"
+CATEGORY_LOGIN = "login"
 
 
 def set_request(request):
@@ -35,10 +40,31 @@ def _current_username(request):
 
 
 class RequestContextFilter(logging.Filter):
-    """给日志记录补充 record.ip 和 record.username，由 formatter 使用。"""
+    """补充 record.ip / record.username，并保证 record.duration_ms 有默认值。"""
 
     def filter(self, record):
         request = getattr(_local, "request", None)
         record.ip = get_client_ip(request)
         record.username = _current_username(request)
+        if getattr(record, "duration_ms", None) is None:
+            record.duration_ms = "-"
         return True
+
+
+class CategoryFilter(logging.Filter):
+    """按日志类别分流：handler 只接收指定类别（或排除指定类别）的记录。
+
+    记录未显式指定 category 时按业务明细处理，保持原有日志文件内容不变。
+    """
+
+    def __init__(self, name="", category=None, exclude=()):
+        super().__init__(name)
+        self.category = category
+        self.exclude = tuple(exclude)
+
+    def filter(self, record):
+        category = getattr(record, "category", CATEGORY_BUSINESS)
+        if self.category is not None:
+            return category == self.category
+        return category not in self.exclude
+

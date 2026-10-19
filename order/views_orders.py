@@ -2,9 +2,12 @@
 
 import json
 from datetime import date
+from io import BytesIO
+
 import pandas as pd
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.models import User
 from django.db.models import (
     Count,
     DateField,
@@ -63,7 +66,11 @@ from .models import (
     notify_all_staff,
     notify_user,
 )
-from .order_excel import export_orders_dataframe
+from .order_excel import (
+    export_orders_dataframe,
+    export_orders_grouped_dataframe,
+    write_dataframe_to_sheet,
+)
 from .order_filters import filter_orders_queryset
 from .statement import generate_bulk_statement, generate_order_statement
 from .tc import generate_bulk_tc
@@ -202,6 +209,7 @@ class OrderListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
                 "supplier",
                 "supplier_paid",
                 "order_status",
+                "created_by",
                 "start_date",
                 "end_date",
             ]
@@ -216,6 +224,7 @@ class OrderListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
                 "overdue_status",
                 "supplier_paid",
                 "order_status",
+                "created_by",
                 "start_date",
                 "end_date",
                 "sort",
@@ -254,6 +263,19 @@ class OrderListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
             badges.append(("供应商付款", paid_label))
         if status := params.get("order_status", "").strip():
             badges.append(("订单状态", _choice_label(ClothOrder.ORDER_STATUS_CHOICES, status)))
+        if created_by := params.get("created_by", "").strip():
+            if created_by in ("none", "null", "unassigned"):
+                badges.append(("创建人", "未分配"))
+            else:
+                creator_label = next(
+                    (
+                        label
+                        for value, label in ctx.get("created_by_choices", [])
+                        if value == created_by
+                    ),
+                    created_by,
+                )
+                badges.append(("创建人", creator_label))
         if start := params.get("start_date", "").strip():
             end = params.get("end_date", "").strip()
             badges.append(("下单日期", f"{start} ~ {end or '今'}"))
@@ -274,6 +296,10 @@ class OrderListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
 
         # 表头筛选下拉的选项
         ctx["order_status_choices"] = ClothOrder.ORDER_STATUS_CHOICES
+        ctx["created_by_choices"] = [
+            (str(user.pk), user.get_full_name() or user.username)
+            for user in User.objects.filter(is_staff=True).order_by("username")
+        ] + [("none", "未分配")]
         ctx["order_type_choices"] = ClothOrder.ORDER_TYPE_CHOICES
         ctx["payment_status_choices"] = ClothOrder.PAYMENT_STATUS_CHOICES
         ctx["overdue_status_choices"] = ClothOrder.OVERDUE_STATUS_CHOICES
@@ -304,10 +330,16 @@ class OrderDetailView(AdminRequiredMixin, LoginRequiredMixin, DetailView):
     template_name = "order/order_detail.html"
     context_object_name = "order"
 
+    def get_queryset(self):
+        return super().get_queryset().select_related("created_by", "supplier")
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         order = self.object
         ctx["edit_mode"] = self.request.GET.get("edit") == "1"
+        ctx["staff_users"] = User.objects.filter(
+            is_staff=True, is_active=True
+        ).order_by("username")
         ctx["form_sections"] = ORDER_FORM_SECTIONS
         ctx["form"] = ClothOrderForm(instance=order)
         ctx["price_form"] = SupplierPriceForm(instance=order)
@@ -391,6 +423,7 @@ class OrderCreateView(AdminRequiredMixin, LoginRequiredMixin, CreateView):
         return ctx
 
     def form_valid(self, form):
+        form.instance.created_by = self.request.user
         response = super().form_valid(form)
         order = self.object
         logger.info(
@@ -503,12 +536,48 @@ def orders_export(request):
     df = export_orders_dataframe()
     filename = f"orders_backup_{now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     logger.info(t("log.export_orders", username=request.user.username))
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        write_dataframe_to_sheet(writer, df, t("label.order_sheet"))
     response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        buffer.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
-    with pd.ExcelWriter(response, engine="openpyxl") as writer:
-        df.to_excel(writer, sheet_name=t("label.order_sheet"), index=False)
+    return response
+
+
+@admin_required
+def orders_export_grouped(request):
+    """按创建人（管理员）分组导出：一个 Excel 多 Sheet，每个管理员一个 Sheet（含未分配）。"""
+    import re
+
+    groups = export_orders_grouped_dataframe()
+    used_names: set[str] = set()
+
+    def _sheet_name(name: str) -> str:
+        cleaned = re.sub(r'[\\/*?:\[\]]', '_', str(name)).strip() or "Sheet"
+        cleaned = cleaned[:31]
+        base = cleaned
+        i = 2
+        while cleaned.lower() in used_names:
+            suffix = f"_{i}"
+            cleaned = f"{base[:31 - len(suffix)]}{suffix}"
+            i += 1
+        used_names.add(cleaned.lower())
+        return cleaned
+
+    filename = f"orders_grouped_by_admin_{now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    logger.info(t("log.export_orders", username=request.user.username) + " [grouped]")
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        for name, group_df in groups.items():
+            write_dataframe_to_sheet(writer, group_df, _sheet_name(name))
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
 
 
@@ -551,6 +620,35 @@ def orders_import_progress(request, task_id):
             "error": task.get("error"),
         }
     )
+
+
+@admin_required
+def order_update_creator(request, pk):
+    """修改订单的创建人（仅限管理员账号）。"""
+    order = get_object_or_404(ClothOrder, pk=pk)
+    if request.method != "POST":
+        return redirect("order_detail", pk=pk)
+
+    raw = (request.POST.get("created_by") or "").strip()
+    if raw:
+        target = User.objects.filter(pk=raw, is_staff=True, is_active=True).first()
+        if not target:
+            messages.error(request, "创建人必须是有效的管理员账号")
+            return redirect("order_detail", pk=pk)
+        order.created_by = target
+    else:
+        order.created_by = None
+    order.save(update_fields=["created_by"])
+
+    creator_name = order.created_by.username if order.created_by else "未记录"
+    logger.info(
+        "[修改创建人] 用户 %s 将订单 #%s 的创建人改为 %s",
+        request.user.username,
+        order.serial_number,
+        creator_name,
+    )
+    messages.success(request, f"已更新订单 #{order.serial_number} 的创建人")
+    return redirect("order_detail", pk=pk)
 
 
 @admin_required

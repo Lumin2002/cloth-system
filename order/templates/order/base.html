@@ -474,15 +474,15 @@
                         </ul>
                    </div>
                     <a class="nav-link" href="{% url 'customer_list' %}"><i class="bi bi-person-badge me-1"></i> 客户管理</a>
+                    <a class="nav-link" href="{% url 'exhibition_list' %}">
+                        <i class="bi bi-people-fill me-1"></i> 展会信息
+                    </a>
                     <a class="nav-link" href="{% url 'supplier_manage_list' %}"><i class="bi bi-people me-1"></i> 供应商管理</a>
                     <a class="nav-link" href="{% url 'cloth_catalog_list' %}">
                         <i class="bi bi-grid me-1"></i> 布种编号
                     </a>
                     <a class="nav-link" href="{% url 'quotation_list' %}">
                         <i class="bi bi-currency-dollar me-1"></i> 面料报价
-                    </a>
-                    <a class="nav-link" href="{% url 'monitor' %}">
-                        <i class="bi bi-activity me-1"></i> 系统监控
                     </a>
                     <!-- Notification Bell -->
                     <div class="nav-item dropdown" id="notification-bell">
@@ -511,6 +511,9 @@
                             <li><a class="dropdown-item" href="{% url 'system_settings' %}">
                                 <i class="bi bi-gear me-1"></i>系统设置
                             </a></li>
+                            <li><a class="dropdown-item" href="{% url 'monitor' %}">
+                                <i class="bi bi-activity me-1"></i>系统监控
+                            </a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{% url 'logout' %}">退出登录</a></li>
                         </ul>
@@ -518,6 +521,7 @@
                 {% else %}
                     <a class="nav-link" href="{% url 'home' %}">首页</a>
                 {% endif %}
+            </div>
             </div>
         </div>
     </nav>
@@ -565,20 +569,43 @@ function fetchNotifList() {
         .then(r => r.json())
         .then(data => {
             var list = document.getElementById("notif-dropdown-list");
+            while (list.firstChild) { list.removeChild(list.firstChild); }
+
             if (data.notifications.length === 0) {
-                list.innerHTML = '<div class="text-center text-muted small py-2">暂无新通知</div>';
+                var empty = document.createElement("div");
+                empty.className = "text-center text-muted small py-2";
+                empty.textContent = "暂无新通知";
+                list.appendChild(empty);
                 return;
             }
-            var html = "";
+
             data.notifications.forEach(function(n) {
-                var link = n.link || "#";
-                html += '<a href="' + link + '" data-id="' + n.id + '" class="dropdown-item text-wrap notif-item" style="white-space:normal;border-bottom:1px solid #f0f0f0;">';
-                html += '<div class="fw-bold small">' + n.title + '</div>';
-                html += '<div class="text-muted" style="font-size:0.75rem;">' + n.message + '</div>';
-                html += '<div class="text-muted" style="font-size:0.65rem;">' + n.created_at + '</div>';
-                html += '</a>';
+                var a = document.createElement("a");
+                a.href = n.link || "#";
+                a.setAttribute("data-id", n.id);
+                a.className = "dropdown-item text-wrap notif-item";
+                a.style.whiteSpace = "normal";
+                a.style.borderBottom = "1px solid #f0f0f0";
+
+                var title = document.createElement("div");
+                title.className = "fw-bold small";
+                title.textContent = n.title || "";
+
+                var message = document.createElement("div");
+                message.className = "text-muted";
+                message.style.fontSize = "0.75rem";
+                message.textContent = n.message || "";
+
+                var createdAt = document.createElement("div");
+                createdAt.className = "text-muted";
+                createdAt.style.fontSize = "0.65rem";
+                createdAt.textContent = n.created_at || "";
+
+                a.appendChild(title);
+                a.appendChild(message);
+                a.appendChild(createdAt);
+                list.appendChild(a);
             });
-            list.innerHTML = html;
             // Attach click handler to mark as read
             list.querySelectorAll("a.notif-item").forEach(function(a) {
                 a.addEventListener("click", function(e) {

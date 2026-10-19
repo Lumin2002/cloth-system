@@ -8,7 +8,7 @@ from datetime import date
 
 import html
 import json
-from .models import ClothOrder, Customer, InventoryItem, Supplier, Shipment
+from .models import ClothOrder, Customer, ExhibitionContact, InventoryItem, Supplier, Shipment
 
 
 # 统一控件样式常量
@@ -61,7 +61,7 @@ class ProgressStepperWidget(forms.Widget):
 class ClothOrderForm(forms.ModelForm):
     class Meta:
         model = ClothOrder
-        exclude = ("created_at", "updated_at", "progress_current", "progress_stages", "finished_product_cost_price", "cost_price_unit", "total_shipment_quantity", "shipment_quantity_unit", "address", "remark")
+        exclude = ("created_at", "updated_at", "created_by", "progress_current", "progress_stages", "finished_product_cost_price", "cost_price_unit", "total_shipment_quantity", "shipment_quantity_unit", "address", "remark")
         widgets = {}
 
     def __init__(self, *args, **kwargs):
@@ -524,3 +524,124 @@ class ShipmentForm(forms.ModelForm):
         # 新增出货时默认当天日期，允许手工改
         if not self.is_bound and not self.instance.pk:
             self.fields['date'].initial = timezone.localdate()
+
+
+class AdminUserForm(forms.ModelForm):
+    class Meta:
+        from django.contrib.auth.models import User as _User
+
+        model = _User
+        fields = ["username", "first_name", "email", "is_active", "is_superuser"]
+        widgets = {
+            "username": forms.TextInput(attrs=FORM_CONTROL),
+            "first_name": forms.TextInput(attrs=FORM_CONTROL),
+            "email": forms.EmailInput(attrs=FORM_CONTROL),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "is_superuser": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+        labels = {
+            "username": "用户名",
+            "first_name": "姓名",
+            "email": "邮箱",
+            "is_active": "启用账号",
+            "is_superuser": "超级管理员",
+        }
+        help_texts = {
+            "username": "登录系统使用的账号名",
+            "first_name": "显示在创建人、操作日志等位置",
+            "is_active": "停用后该账号将无法登录",
+            "is_superuser": "超级管理员可管理其他管理员账号",
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.current_user = kwargs.pop("current_user", None)
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields["password"].help_text = "留空表示不修改密码"
+            self.fields["username"].help_text = "修改后该账号需用新用户名登录"
+        else:
+            self.fields["password"].required = True
+
+    def clean_username(self):
+        from django.contrib.auth.models import User
+
+        username = (self.cleaned_data.get("username") or "").strip()
+        if not username:
+            raise ValidationError("请输入用户名")
+        qs = User.objects.filter(username=username)
+        if self.instance and self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise ValidationError(f"用户名 {username} 已被使用")
+        return username
+
+    def clean_password(self):
+        password = self.cleaned_data.get("password") or ""
+        if password and len(password) < 6:
+            raise ValidationError("密码至少 6 位")
+        return password
+
+    def clean(self):
+        cleaned = super().clean()
+        # 防止把自己降级后无人可管理
+        if (
+            self.current_user
+            and self.instance
+            and self.instance.pk == self.current_user.pk
+            and not cleaned.get("is_superuser")
+        ):
+            raise ValidationError("不能取消自己的超级管理员权限")
+        return cleaned
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        # 业务侧的管理员一律 is_staff，保证可登录管理端
+        user.is_staff = True
+        password = self.cleaned_data.get("password")
+        if password:
+            user.set_password(password)
+        if commit:
+            user.save()
+        return user
+
+
+class ExhibitionContactForm(forms.ModelForm):
+    """展会客户信息表单（所有字段均可留空）。"""
+
+    class Meta:
+        model = ExhibitionContact
+        fields = [
+            "company_name",
+            "contact_name",
+            "email",
+            "owner_name",
+            "whatsapp",
+            "visit_date",
+            "company_address",
+            "remark",
+            "photo",
+        ]
+        widgets = {
+            "company_name": forms.TextInput(attrs=FORM_CONTROL),
+            "contact_name": forms.TextInput(attrs=FORM_CONTROL),
+            "email": forms.TextInput(attrs=FORM_CONTROL),
+            "owner_name": forms.TextInput(attrs=FORM_CONTROL),
+            "whatsapp": forms.TextInput(attrs=FORM_CONTROL),
+            "visit_date": forms.DateInput(attrs=DATE_INPUT, format="%Y-%m-%d"),
+            "company_address": forms.Textarea(attrs=FORM_TEXTAREA),
+            "remark": forms.Textarea(attrs=FORM_TEXTAREA),
+            "photo": forms.ClearableFileInput(
+                attrs={"class": "form-control", "accept": "image/*"}
+            ),
+        }
+        labels = {
+            "company_name": "公司名字",
+            "contact_name": "姓名",
+            "email": "电子邮箱",
+            "owner_name": "负责人名字",
+            "whatsapp": "WhatsApp",
+            "visit_date": "日期",
+            "company_address": "公司地址",
+            "remark": "备注",
+            "photo": "客户合照图片",
+        }

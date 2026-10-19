@@ -60,17 +60,28 @@ def run_import_in_background(task_id: str, file_bytes: bytes) -> None:
     from io import BytesIO
 
     from django.db import close_old_connections
+    from django.contrib.auth.models import User
 
     from .order_excel import import_orders_from_file
 
     close_old_connections()
+
+    task = get_import_task(task_id) or {}
+    try:
+        created_by = User.objects.get(id=task.get("user_id"))
+    except Exception:
+        created_by = None
 
     def on_progress(**kwargs):
         update_import_task(task_id, status='running', **kwargs)
 
     try:
         on_progress(percent=1, message='任务已开始…', phase='read')
-        result = import_orders_from_file(BytesIO(file_bytes), progress_callback=on_progress)
+        result = import_orders_from_file(
+            BytesIO(file_bytes),
+            progress_callback=on_progress,
+            created_by=created_by,
+        )
         update_import_task(
             task_id,
             status='done',

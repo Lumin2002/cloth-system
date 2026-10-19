@@ -1,6 +1,8 @@
 django>=5.2,<6.0
 pandas>=2.0
 openpyxl>=3.0
+xlsxwriter>=3.2
+Pillow>=10.0
 gunicorn>=21.2
 python-dotenv>=1.0
 mysqlclient>=2.2

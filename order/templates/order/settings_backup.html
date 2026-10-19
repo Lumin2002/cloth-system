@@ -10,8 +10,7 @@
     </div>
     <form method="post" action="{% url 'backup_create' %}">
         {% csrf_token %}
-        <button type="submit" class="btn btn-primary btn-sm">
-            <i class="bi bi-hdd me-1"></i> 立即备份
+        <button type="submit" class="btn btn-primary btn-sm"> 立即备份
         </button>
     </form>
 </div>
@@ -36,8 +35,7 @@
                 <input type="number" name="interval_hours" class="form-control form-control-sm"
                        style="width: 10rem;" min="0.1" step="0.5" value="{{ backup_interval_hours }}">
             </div>
-            <button type="submit" class="btn btn-primary btn-sm">
-                <i class="bi bi-check-lg me-1"></i>保存设置
+            <button type="submit" class="btn btn-outline-primary btn-sm">保存设置
             </button>
         </form>
         <div class="small text-muted mt-2">
@@ -85,16 +83,12 @@
                         <td class="small">{{ b.size|filesizeformat }}</td>
                         <td class="small">{{ b.mtime_text }}</td>
                         <td>
-                            <div class="d-flex gap-1">
-                                <a href="{% url 'backup_download' b.name %}" class="btn btn-sm btn-outline-primary py-0 px-1" title="下载">
-                                    <i class="bi bi-download"></i>
-                                </a>
-                                <form method="post" action="{% url 'backup_delete' b.name %}" class="d-inline"
+                            <div class="d-flex flex-nowrap gap-1 justify-content-end">
+                                <a href="{% url 'backup_download' b.name %}" class="btn btn-sm btn-outline-primary">下载</a>
+                                <form method="post" action="{% url 'backup_delete' b.name %}"
                                       onsubmit="return confirm('确定删除备份 {{ b.name }}？此操作不可恢复！')">
                                     {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="删除">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
                                 </form>
                             </div>
                         </td>

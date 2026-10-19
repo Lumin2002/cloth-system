@@ -8,8 +8,7 @@
             <span class="text-muted me-3">未读: <strong>{{ unread_count }}</strong></span>
             <form method="post" action="{% url 'notification_mark_all_read' %}" style="display:inline;">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-sm btn-outline-primary">
-                    <i class="bi bi-check-all me-1"></i>全部标为已读
+                <button type="submit" class="btn btn-sm btn-primary">全部标为已读
                 </button>
             </form>
         </div>

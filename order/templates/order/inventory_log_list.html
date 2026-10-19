@@ -21,13 +21,13 @@
             </div>
             <div class="col-lg-4 mt-3 mt-lg-0">
                 <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
-                    <a href="{% url 'inventory_log_export' %}" class="btn btn-outline-success btn-sm"><i class="bi bi-download me-1"></i> 导出日志</a>
+                    <a href="{% url 'inventory_log_export' %}" class="btn btn-success btn-sm"> 导出日志</a>
                     <form method="post" action="{% url 'inventory_log_delete_all' %}" class="d-inline"
                           onsubmit="return confirm('确定清空全部库存日志吗？此操作不可恢复！')">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1"></i> 清空全部</button>
+                        <button type="submit" class="btn btn-danger btn-sm"> 清空全部</button>
                     </form>
-                    <a href="{% url 'inventory_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-boxes me-1"></i> 返回库存列表</a>
+                    <a href="{% url 'inventory_list' %}" class="btn btn-secondary btn-sm"> 返回库存列表</a>
                 </div>
             </div>
         </div>

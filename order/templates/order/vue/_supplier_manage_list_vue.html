@@ -16,7 +16,7 @@
                 search: '',
                 status: 'all',
                 currentPage: 1,
-                pageSize: 18
+                pageSize: 20
             };
         },
         computed: {
@@ -73,10 +73,10 @@
             <div>
                 <div class="row g-2 mb-3">
                     <div class="col-md-4">
-                        <input v-model="search" type="text" class="form-control" placeholder="搜索公司名称/联系人/登录名...">
+                        <input v-model="search" type="text" class="form-control form-control-sm" placeholder="搜索公司名称/联系人/登录名...">
                     </div>
                     <div class="col-auto">
-                        <select v-model="status" class="form-select">
+                        <select v-model="status" class="form-select form-select-sm">
                             <option value="all">全部状态</option>
                             <option value="active">激活</option>
                             <option value="inactive">禁用</option>
@@ -85,44 +85,45 @@
                     <div class="col-auto text-muted small d-flex align-items-center">显示 [[ filteredSuppliers.length ]] 个账号</div>
                 </div>
 
-                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
-                    <div v-for="supplier in pagedSuppliers" :key="supplier.id" class="col">
-                        <div class="card card-flat h-100 border-0 shadow-sm">
-                            <div class="card-body d-flex flex-column">
-                                <div class="d-flex align-items-start justify-content-between mb-2">
-                                    <div>
-                                        <h6 class="mb-1 fw-bold text-primary">[[ supplier.company_name ]]</h6>
-                                        <div class="small text-muted">登录名：<code>[[ supplier.username ]]</code></div>
-                                    </div>
-                                    <span class="badge" :class="supplier.is_active ? 'bg-success' : 'bg-secondary'">
-                                        [[ supplier.is_active ? '激活' : '禁用' ]]
-                                    </span>
-                                </div>
-
-                                <div class="small mb-3">
-                                    <div v-if="supplier.contact_person"><i class="bi bi-person me-1 text-muted"></i>[[ supplier.contact_person ]]</div>
-                                    <div v-if="supplier.phone"><i class="bi bi-telephone me-1 text-muted"></i>[[ supplier.phone ]]</div>
-                                    <div class="mt-1 text-muted"><i class="bi bi-calendar3 me-1"></i>[[ supplier.created_at ]]</div>
-                                </div>
-
-                                <div class="mt-auto d-flex gap-2">
-                                    <a :href="supplier.edit_url" class="btn btn-sm btn-outline-primary flex-fill">
-                                        <i class="bi bi-pencil me-1"></i>编辑
-                                    </a>
-                                    <a :href="supplier.reset_password_url" class="btn btn-sm btn-outline-warning flex-fill">
-                                        <i class="bi bi-key me-1"></i>重置密码
-                                    </a>
-                                    <a :href="supplier.delete_url" class="btn btn-sm btn-outline-danger flex-fill">
-                                        <i class="bi bi-trash me-1"></i>删除
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div v-if="!pagedSuppliers.length" class="col-12">
-                        <div class="card card-flat border-0 shadow-sm">
-                            <div class="card-body text-center text-muted py-5">暂无供应商账号</div>
-                        </div>
+                <div class="card card-flat">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>公司名称</th>
+                                    <th>登录账号</th>
+                                    <th>联系人</th>
+                                    <th>电话</th>
+                                    <th>状态</th>
+                                    <th>创建时间</th>
+                                    <th class="text-end">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="supplier in pagedSuppliers" :key="supplier.id">
+                                    <td class="fw-semibold text-primary text-nowrap">[[ supplier.company_name ]]</td>
+                                    <td class="small"><code>[[ supplier.username ]]</code></td>
+                                    <td class="small text-nowrap">[[ supplier.contact_person || '-' ]]</td>
+                                    <td class="small text-nowrap">[[ supplier.phone || '-' ]]</td>
+                                    <td>
+                                        <span class="badge" :class="supplier.is_active ? 'bg-success' : 'bg-secondary'">
+                                            [[ supplier.is_active ? '激活' : '禁用' ]]
+                                        </span>
+                                    </td>
+                                    <td class="small text-muted text-nowrap">[[ supplier.created_at ]]</td>
+                                    <td class="text-end">
+                                        <div class="d-flex flex-nowrap gap-1 justify-content-end">
+                                            <a :href="supplier.edit_url" class="btn btn-sm btn-outline-primary">编辑</a>
+                                            <a :href="supplier.reset_password_url" class="btn btn-sm btn-outline-warning">重置密码</a>
+                                            <a :href="supplier.delete_url" class="btn btn-sm btn-outline-danger">删除</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="!pagedSuppliers.length">
+                                    <td colspan="7" class="text-center text-muted py-4">暂无供应商账号</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 

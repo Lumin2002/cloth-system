@@ -16,12 +16,12 @@
       </div>
       <div class="col-lg-4">
         <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
-          <a href="{% url 'cloth_catalog_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i> 新增</a>
-          <a href="{% url 'cloth_catalog_import' %}" class="btn btn-outline-success btn-sm"><i class="bi bi-upload me-1"></i> 导入</a>
+          <a href="{% url 'cloth_catalog_add' %}" class="btn btn-primary btn-sm"> 新增</a>
+          <a href="{% url 'cloth_catalog_import' %}" class="btn btn-success btn-sm"> 导入</a>
           <form method="post" action="{% url 'cloth_catalog_delete_all' %}" class="d-inline"
                 onsubmit="return confirm('确认要删除全部布种编号记录吗？此操作不可撤销！')">
             {% csrf_token %}
-            <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash-fill me-1"></i> 清空</button>
+            <button type="submit" class="btn btn-danger btn-sm"> 清空</button>
           </form>
         </div>
       </div>

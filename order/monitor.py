@@ -18,11 +18,43 @@ except ImportError:  # pragma: no cover - psutil 在 requirements 中
 PROJECT_SIZE_CACHE_KEY = "monitor:project_size:v1"
 PROJECT_SIZE_CACHE_TTL = 60
 
-# 系统监控只展示应用日志（django-info.log / django-error.log 及其轮转备份）
-APP_LOG_RE = re.compile(r"^django-.*\.log(\.\d+)?$")
+# 系统监控只展示应用日志（业务明细 django-*.log，以及操作/登录日志）
+APP_LOG_RE = re.compile(r"^(django-.*|operation|login)\.log(\.\d+)?$")
 
 # 统计项目磁盘占用时跳过的环境/版本库目录
 SKIP_DIRS = {".venv", ".git", "node_modules", "__pycache__", ".idea", ".vscode"}
+
+# 带请求上下文的日志行：时间 级别 logger:行号 [用户:x IP:y] 消息
+_LOG_CONTEXT_RE = re.compile(
+    r"^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?:,\d+)?\s+"
+    r"(?P<level>[A-Z]+)\s+\S+\s+"
+    r"\[用户:(?P<username>.*?) IP:(?P<ip>.*?)\]\s+"
+    r"(?P<message>.*)$"
+)
+
+# 操作日志消息：[操作] POST /orders/add/ -> 302 耗时:128ms
+_OPERATION_MESSAGE_RE = re.compile(
+    r"^\[操作\]\s+(?P<method>[A-Z]+)\s+(?P<path>\S+)\s+->\s+"
+    r"(?P<status>\d+)\s+耗时:(?P<duration_ms>\d+)ms$"
+)
+
+# 登录日志事件：[登录] / [登出] / [登录失败] / [登录受限]
+_LOGIN_EVENT_RE = re.compile(r"^\[(?P<event>[^\]]+)\]")
+LOGIN_EVENT_LABELS = {
+    "登录": ("登录成功", "success"),
+    "登出": ("登出", "secondary"),
+    "登录失败": ("登录失败", "danger"),
+    "登录受限": ("登录受限", "warning"),
+}
+
+
+def format_ms(milliseconds):
+    """把毫秒格式化为可读文本。"""
+    if milliseconds is None:
+        return "-"
+    if milliseconds >= 1000:
+        return f"{milliseconds / 1000:.2f} s"
+    return f"{milliseconds} ms"
 
 
 def human_size(num_bytes):
@@ -249,3 +281,53 @@ def _decode_log_bytes(data):
         except (UnicodeDecodeError, UnicodeError):
             continue
     return data.decode("utf-8", errors="replace")
+
+
+def parse_operation_log(path, limit=200):
+    """把操作日志尾部解析为结构化行（时间/用户/IP/方法/路径/状态/耗时），最新在前。"""
+    rows = []
+    for line in read_log_tail(path, limit):
+        base = _LOG_CONTEXT_RE.match(line)
+        if not base:
+            continue
+        detail = _OPERATION_MESSAGE_RE.match(base.group("message").strip())
+        if not detail:
+            continue
+        duration_ms = int(detail.group("duration_ms"))
+        rows.append({
+            "time": base.group("time"),
+            "level": base.group("level"),
+            "username": base.group("username"),
+            "ip": base.group("ip"),
+            "method": detail.group("method"),
+            "path": detail.group("path"),
+            "status": detail.group("status"),
+            "duration_ms": duration_ms,
+            "duration_text": format_ms(duration_ms),
+        })
+    rows.reverse()
+    return rows
+
+
+def parse_login_log(path, limit=200):
+    """把登录日志尾部解析为结构化行（时间/用户/IP/事件），最新在前。"""
+    rows = []
+    for line in read_log_tail(path, limit):
+        base = _LOG_CONTEXT_RE.match(line)
+        if not base:
+            continue
+        message = base.group("message").strip()
+        matched = _LOGIN_EVENT_RE.match(message)
+        event = matched.group("event") if matched else "其他"
+        label, tone = LOGIN_EVENT_LABELS.get(event, (event, "secondary"))
+        rows.append({
+            "time": base.group("time"),
+            "level": base.group("level"),
+            "username": base.group("username"),
+            "ip": base.group("ip"),
+            "event": label,
+            "event_tone": tone,
+            "message": message,
+        })
+    rows.reverse()
+    return rows

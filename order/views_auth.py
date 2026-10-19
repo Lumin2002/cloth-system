@@ -9,7 +9,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_POST
 from .captcha import clear_captcha, render_captcha_svg, set_captcha, verify_captcha
 from .i18n import t
+from .logging_context import CATEGORY_LOGIN
 from .views_common import logger
+
+# 登录/登出事件统一写入登录日志
+LOGIN_LOG_EXTRA = {"category": CATEGORY_LOGIN}
 
 
 def home_view(request):
@@ -19,7 +23,7 @@ def home_view(request):
         rate_key = f"login_rate:{ip}"
         attempts = cache.get(rate_key, 0)
         if attempts >= 5:
-            logger.warning(t("log.login_rate_limited", ip=ip))
+            logger.warning(t("log.login_rate_limited", ip=ip), extra=LOGIN_LOG_EXTRA)
             messages.error(request, "登录尝试过于频繁，请60秒后再试")
             return redirect("home")
         cache.set(rate_key, attempts + 1, 60)
@@ -40,7 +44,10 @@ def home_view(request):
             login(request, user)
             clear_captcha(request)
             # mark_session_activity(request)  # 会话超时功能已注释停用
-            logger.info(t("log.login", username=request.POST.get("username")))
+            logger.info(
+                t("log.login", username=request.POST.get("username")),
+                extra=LOGIN_LOG_EXTRA,
+            )
             if hasattr(user, "supplier_profile"):
                 return redirect("supplier_dashboard")
             return redirect("dashboard")
@@ -56,7 +63,10 @@ def home_view(request):
         except Exception:
             pass
 
-        logger.warning(t("log.login_failed", username=request.POST.get("username", ""), ip=ip))
+        logger.warning(
+            t("log.login_failed", username=request.POST.get("username", ""), ip=ip),
+            extra=LOGIN_LOG_EXTRA,
+        )
         messages.error(request, t("auth.login_error"))
 
     if request.user.is_authenticated:
@@ -82,11 +92,20 @@ def captcha_image(request):
 
 
 def logout_view(request):
-    logger.info(t("log.logout", username=request.user.username))
+    if request.user.is_authenticated:
+        logger.info(
+            t("log.logout", username=request.user.username),
+            extra=LOGIN_LOG_EXTRA,
+        )
     logout(request)
     return redirect("home")
 
 
 def supplier_logout_view(request):
+    if request.user.is_authenticated:
+        logger.info(
+            t("log.logout", username=request.user.username),
+            extra=LOGIN_LOG_EXTRA,
+        )
     logout(request)
     return redirect("home")

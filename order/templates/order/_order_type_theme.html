@@ -1,5 +1,5 @@
 {% comment %}
-订单相关共享样式：订单类型色板 + 页面底色 + 类型徽章 + 下拉框布局 + 订单导航卡片。
+订单相关共享样式：订单类型色板 + 页面底色 + 类型徽章 + 下拉框布局 + 订单导航卡片 + 按钮换行约束。
 管理端 base.html 与供应商端 supplier_base.html 共用这一份，页面底色与徽章永远同色。
 用法：放在 <style> 块内（纯 CSS 片段），页面 <body> 上挂 order-type-<类型> 类。
 {% endcomment %}
@@ -22,6 +22,9 @@ body.order-type-other { background: linear-gradient(135deg, #f0f2f5 0%, var(--or
 .badge.order-type-badge-bulk_print { background-color: var(--order-tint-bulk_print); color: #5b21a8; }
 .badge.order-type-badge-sample { background-color: var(--order-tint-sample); color: #14663f; }
 .badge.order-type-badge-other { background-color: var(--order-tint-other); color: #41474d; }
+
+/* 按钮文字不换行：Bootstrap 5 的 .btn 没设 nowrap，放进 flex 容器（操作列等）会被压缩成竖排 */
+.btn { white-space: nowrap; }
 
 /* 订单类型下拉框 + 徽章同一行展示 */
 .order-type-field { display: flex; align-items: center; gap: .5rem; }

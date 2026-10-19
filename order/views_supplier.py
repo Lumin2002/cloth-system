@@ -1,6 +1,7 @@
 """视图模块：供应商管理/供应商端/出货（由 views.py 拆分而来）。"""
 
 from decimal import Decimal
+from io import BytesIO
 
 import pandas as pd
 from django.contrib import messages
@@ -380,12 +381,16 @@ def supplier_orders_export(request):
         request.user.username,
         queryset.count(),
     )
+    from .order_excel import write_dataframe_to_sheet
+
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        write_dataframe_to_sheet(writer, dataframe, "供应商订单")
     response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        buffer.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
-    with pd.ExcelWriter(response, engine="openpyxl") as writer:
-        dataframe.to_excel(writer, sheet_name="供应商订单", index=False)
     return response
 
 

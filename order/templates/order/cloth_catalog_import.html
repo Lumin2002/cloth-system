@@ -18,7 +18,7 @@
           <label class="form-label">选择 Excel 文件（.xlsx）</label>
           <input type="file" name="excel_file" class="form-control" accept=".xlsx" required>
         </div>
-        <button type="submit" class="btn btn-primary" id="importBtn"><i class="bi bi-upload me-1"></i>开始导入</button>
+        <button type="submit" class="btn btn-outline-primary btn-sm" id="importBtn">开始导入</button>
       </form>
 
       <div id="progressArea" class="mt-3 d-none">
@@ -74,7 +74,7 @@ function pollProgress(taskId) {
         if (state.status === "done" && state.result) {
           bar.classList.add("bg-success");
           div.innerHTML = '<div class="alert alert-success">导入完成！新增 <strong>' + state.result.imported + '</strong> 条，更新 <strong>' + state.result.updated + '</strong> 条</div>';
-          div.innerHTML += '<a href="{% url "cloth_catalog_list" %}" class="btn btn-sm btn-primary"><i class="bi bi-list-ul me-1"></i>查看列表</a>';
+          div.innerHTML += '<a href="{% url "cloth_catalog_list" %}" class="btn btn-sm btn-outline-primary">查看列表</a>';
         } else if (state.status === "error") {
           bar.classList.add("bg-danger");
           div.innerHTML = '<div class="alert alert-danger">导入失败：' + (state.error || "未知错误") + "</div>";

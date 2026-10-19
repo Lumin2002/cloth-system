@@ -1,10 +1,12 @@
 from django.urls import path
 
+from . import views_accounts
 from . import views_auth
 from . import views_backup
 from . import views_catalog
 from . import views_customer
 from . import views_dashboard
+from . import views_exhibition
 from . import views_inventory
 from . import views_monitor
 from . import views_notifications
@@ -34,6 +36,7 @@ urlpatterns = [
     path('orders/<int:pk>/toggle-supplier-paid/', views_orders.order_toggle_supplier_paid, name='order_toggle_supplier_paid'),
     path('orders/<int:pk>/refresh/', views_orders.order_refresh_calculations, name='order_refresh_calculations'),
     path('orders/<int:pk>/update-progress/', views_orders.order_update_progress, name='order_update_progress'),
+    path('orders/<int:pk>/update-creator/', views_orders.order_update_creator, name='order_update_creator'),
     path("orders/<int:pk>/shipments/add/", views_supplier.order_shipment_create, name="order_shipment_create"),
     path("orders/<int:pk>/shipments/<int:shipment_pk>/edit/", views_supplier.order_shipment_edit, name="order_shipment_edit"),
     path("orders/<int:pk>/shipments/<int:shipment_pk>/delete/", views_supplier.order_shipment_delete, name="order_shipment_delete"),
@@ -41,6 +44,7 @@ urlpatterns = [
     path('orders/import/start/', views_orders.orders_import_start, name='orders_import_start'),
     path('orders/import/progress/<uuid:task_id>/', views_orders.orders_import_progress, name='orders_import_progress'),
     path('orders/export/', views_orders.orders_export, name='orders_export'),
+    path('orders/export/grouped/', views_orders.orders_export_grouped, name='orders_export_grouped'),
     path('orders/delete-all/', views_orders.orders_delete_all, name='orders_delete_all'),
     path('orders/<int:pk>/delete/', views_orders.order_delete, name='order_delete'),
     # 库存
@@ -74,6 +78,13 @@ urlpatterns = [
     path("customers/api/options/", views_customer.customer_options, name="customer_options"),
     path("customers/<int:pk>/edit/", views_customer.CustomerUpdateView.as_view(), name="customer_edit"),
     path("customers/<int:pk>/delete/", views_customer.customer_delete, name="customer_delete"),
+    # 展会信息
+    path("exhibition/", views_exhibition.exhibition_list, name="exhibition_list"),
+    path("exhibition/h5/", views_exhibition.exhibition_h5, name="exhibition_h5"),
+    path("exhibition/export-photos/", views_exhibition.exhibition_export_photos, name="exhibition_export_photos"),
+    path("exhibition/add/", views_exhibition.exhibition_create, name="exhibition_create"),
+    path("exhibition/<int:pk>/edit/", views_exhibition.exhibition_edit, name="exhibition_edit"),
+    path("exhibition/<int:pk>/delete/", views_exhibition.exhibition_delete, name="exhibition_delete"),
     # 供应商账号管理
     path("supplier/manage/", views_supplier.SupplierManageListView.as_view(), name="supplier_manage_list"),
     path("supplier/manage/add/", views_supplier.SupplierManageCreateView.as_view(), name="supplier_manage_add"),
@@ -114,7 +125,11 @@ urlpatterns = [
     path("backup/<str:name>/delete/", views_backup.backup_delete, name="backup_delete"),
 
     # 系统设置
-    path("system/settings/", views_settings.settings_index, name="system_settings"),
+    path("system/settings/", views_accounts.admin_account_list, name="system_settings"),
+    path("system/settings/accounts/add/", views_accounts.admin_account_add, name="admin_account_add"),
+    path("system/settings/accounts/<int:pk>/edit/", views_accounts.admin_account_edit, name="admin_account_edit"),
+    path("system/settings/accounts/<int:pk>/delete/", views_accounts.admin_account_delete, name="admin_account_delete"),
+    path("system/settings/accounts/<int:pk>/reset-password/", views_accounts.admin_account_reset_password, name="admin_account_reset_password"),
     path("system/settings/redis/", views_settings.settings_redis, name="settings_redis"),
     path("system/settings/redis/save/", views_settings.settings_redis_save, name="settings_redis_save"),
     path("system/settings/redis/test/", views_settings.settings_redis_test, name="settings_redis_test"),

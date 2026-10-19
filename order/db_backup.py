@@ -139,7 +139,7 @@ def _dataframe_to_xlsx_bytes(dataframe, sheet_name):
     import pandas as pd
 
     output = BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
     return output.getvalue()
 

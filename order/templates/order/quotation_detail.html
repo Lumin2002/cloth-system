@@ -1,4 +1,4 @@
-﻿{% extends "order/base.html" %}
+{% extends "order/base.html" %}
 {% block title %}报价详情 - {{ item.article_no }}{% endblock %}
 {% block content %}
 <div class="container-fluid main-container">
@@ -17,7 +17,7 @@
         </div>
         <div class="col-lg-4 mt-3 mt-lg-0">
             <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
-                <a href="{% url 'quotation_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> 返回</a>
+                <a href="{% url 'quotation_list' %}" class="btn btn-secondary btn-sm"> 返回</a>
             </div>
         </div>
     </div>
@@ -47,8 +47,8 @@
         <div class="card-body">
           <table class="table table-sm table-borderless mb-0">
             <tr><td class="text-muted" style="width:120px">成分</td><td>{{ item.composition|default:"-" }}</td></tr>
-            <tr><td class="text-muted">克重</td><td>{{ item.weight|default:"-" }}</td></tr>
-            <tr><td class="text-muted">门幅</td><td>{{ item.cuttable_width|default:"-" }}</td></tr>
+            <tr><td class="text-muted">克重</td><td>{{ item.weight_display }}</td></tr>
+            <tr><td class="text-muted">门幅</td><td>{{ item.width_display }}</td></tr>
             <tr><td class="text-muted">纱支</td><td>{{ item.yarn_count|default:"-" }}</td></tr>
             <tr><td class="text-muted">密度/针数</td><td>{{ item.density_gauge|default:"-" }}</td></tr>
             <tr><td class="text-muted">交期</td><td>{{ item.lead_time|default:"-" }}</td></tr>
@@ -66,8 +66,8 @@
         <div class="card-body">
           <table class="table table-sm table-borderless mb-0">
             <tr><td class="text-muted" style="width:120px">原文</td><td class="small">{{ item.price_200m_text|default:"-" }}</td></tr>
-            <tr><td class="text-muted">素色价格</td><td class="fw-semibold">{% if item.price_200m %}{{ item.price_200m }} /{{ item.price_200m_unit }}{% else %}-{% endif %}</td></tr>
-            <tr><td class="text-muted">印花价格</td><td class="fw-semibold">{% if item.price_200m_print %}{{ item.price_200m_print }} /{{ item.price_200m_unit }}{% else %}-{% endif %}</td></tr>
+            <tr><td class="text-muted">素色价格</td><td class="fw-semibold">{{ item.price_200m_display }}</td></tr>
+            <tr><td class="text-muted">印花价格</td><td class="fw-semibold">{{ item.price_200m_print_display }}</td></tr>
           </table>
         </div>
       </div>
@@ -79,8 +79,8 @@
           <table class="table table-sm table-borderless mb-0">
             <tr><td class="text-muted" style="width:120px">常规起订量</td><td>{{ item.regular_mcq|default:"-" }}</td></tr>
             <tr><td class="text-muted">原文</td><td class="small">{{ item.price_regular_text|default:"-" }}</td></tr>
-            <tr><td class="text-muted">素色价格</td><td class="fw-semibold">{% if item.price_regular %}{{ item.price_regular }} /{{ item.price_regular_unit }}{% else %}-{% endif %}</td></tr>
-            <tr><td class="text-muted">印花价格</td><td class="fw-semibold">{% if item.price_regular_print %}{{ item.price_regular_print }} /{{ item.price_regular_unit }}{% else %}-{% endif %}</td></tr>
+            <tr><td class="text-muted">素色价格</td><td class="fw-semibold">{{ item.price_regular_display }}</td></tr>
+            <tr><td class="text-muted">印花价格</td><td class="fw-semibold">{{ item.price_regular_print_display }}</td></tr>
           </table>
         </div>
       </div>

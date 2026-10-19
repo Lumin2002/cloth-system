@@ -28,13 +28,13 @@ class ClothOrderAdmin(admin.ModelAdmin):
         'serial_number', 'customer', 'cloth_type', 'order_date', 
         'order_quantity', 'price', 'finished_product_total_amount',
         'payment_status_display', 'overdue_status_display', 
-        'invoice_status_display', 'custom_actions'
+        'invoice_status_display', 'created_by', 'custom_actions'
     ]
     
     list_filter = [
         'customer', 'order_type', 'payment_status', 'overdue_status',
         'invoice_status', 'certificate_status', 'order_date',
-        'finished_product_supplier'
+        'finished_product_supplier', 'created_by'
     ]
     
     search_fields = [
@@ -107,12 +107,12 @@ class ClothOrderAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('时间戳', {
-            'fields': ('created_at', 'updated_at'),
+            'fields': ('created_by', 'created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
     
-    readonly_fields = ['created_at', 'updated_at']
+    readonly_fields = ['created_by', 'created_at', 'updated_at']
 
     def payment_status_display(self, obj):
         """支付状态显示"""
@@ -176,6 +176,10 @@ class ClothOrderAdmin(admin.ModelAdmin):
 
         # 后台直接改成品成本价格时，也把操作人记进改价历史
         obj._price_changed_by = request.user
+
+        # 新建订单时记录创建人（管理员）
+        if not change and obj.created_by_id is None:
+            obj.created_by = request.user
 
         super().save_model(request, obj, form, change)
     
@@ -241,3 +245,24 @@ class FabricQuotationAdmin(admin.ModelAdmin):
     list_filter = ['supplier_name', 'preferred_material', 'color_card']
     search_fields = ['article_no', 'composition', 'supplier_name']
     ordering = ['-date_sent', 'article_no']
+
+
+from order.models import ExhibitionContact
+
+
+@admin.register(ExhibitionContact)
+class ExhibitionContactAdmin(admin.ModelAdmin):
+    """展会客户信息"""
+
+    list_display = [
+        'company_name', 'contact_name', 'email', 'owner_name',
+        'whatsapp', 'visit_date', 'created_by', 'created_at',
+    ]
+    list_filter = ['visit_date', 'created_by']
+    search_fields = [
+        'company_name', 'contact_name', 'email', 'owner_name',
+        'whatsapp', 'company_address', 'remark',
+    ]
+    readonly_fields = ['created_by', 'created_at', 'updated_at']
+    ordering = ['-visit_date', '-created_at']
+    list_per_page = 50

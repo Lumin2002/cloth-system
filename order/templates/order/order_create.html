@@ -15,8 +15,8 @@
         </div>
         <div class="col-lg-4 mt-3 mt-lg-0">
             <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
-                <a href="{% url 'orders_import' %}" class="btn btn-outline-success btn-sm"><i class="bi bi-upload me-1"></i> 导入订单</a>
-                <a href="{% url 'order_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-lg me-1"></i> 取消</a>
+                <a href="{% url 'orders_import' %}" class="btn btn-success btn-sm"> 导入订单</a>
+                <a href="{% url 'order_list' %}" class="btn btn-secondary btn-sm"> 取消</a>
             </div>
         </div>
     </div>
@@ -76,8 +76,8 @@
 <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
 <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>创建后可进入详情页继续补充</span>
 <div class="d-flex gap-2">
-<a href="{% url 'order_list' %}" class="btn btn-outline-secondary">取消</a>
-<button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i> 创建订单</button>
+<a href="{% url 'order_list' %}" class="btn btn-outline-secondary btn-sm">取消</a>
+<button type="submit" class="btn btn-outline-primary btn-sm"> 创建订单</button>
 </div></div></div>
 </form>
 </div>

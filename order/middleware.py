@@ -1,4 +1,5 @@
 """供应商/超管会话空闲超时中间件。"""
+import logging
 import time
 from urllib.parse import quote
 
@@ -8,7 +9,9 @@ from django.contrib.auth import logout
 from django.http import JsonResponse
 from django.shortcuts import redirect
 
-from .logging_context import clear_request, set_request
+from .logging_context import CATEGORY_OPERATION, clear_request, set_request
+
+logger = logging.getLogger(__name__)
 
 SESSION_LAST_ACTIVITY_KEY = "_session_last_activity"
 
@@ -22,6 +25,17 @@ _BACKGROUND_POLL_PATHS = (
     "/inventory/import/progress/",
     "/cloth-catalog/import/progress/",
 )
+
+# 不写入操作日志的路径：静态资源、后台轮询、登录/登出（登录登出记入登录日志）
+_SKIP_OPERATION_LOG_PREFIXES = _BACKGROUND_POLL_PATHS + (
+    "/static/",
+    "/media/",
+    "/favicon.ico",
+    "/admin/jsi18n/",
+    "/logout/",
+    "/supplier/logout/",
+)
+_SKIP_OPERATION_LOG_EXACT = ("/",)
 
 
 def get_session_timeout_minutes(user):
@@ -47,18 +61,50 @@ def _is_background_poll(request):
     return any(request.path.startswith(prefix) for prefix in _BACKGROUND_POLL_PATHS)
 
 
+def should_log_operation(request):
+    """判断该请求是否写入操作日志（静态资源、后台轮询、登录登出不记）。"""
+    path = request.path
+    if path in _SKIP_OPERATION_LOG_EXACT:
+        return False
+    return not any(path.startswith(prefix) for prefix in _SKIP_OPERATION_LOG_PREFIXES)
+
+
 class RequestLogContextMiddleware:
-    """把当前请求放入线程局部变量，供日志过滤器提取用户名与 IP。"""
+    """把当前请求放入线程局部变量供日志过滤器取用户名与 IP，并在请求结束后写操作日志。"""
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
         set_request(request)
+        started = time.perf_counter()
+        status_code = 500
         try:
-            return self.get_response(request)
+            response = self.get_response(request)
+            status_code = getattr(response, "status_code", 200)
+            return response
         finally:
+            try:
+                self._log_operation(request, status_code, started)
+            except Exception:  # 记日志失败不能影响正常响应
+                logger.exception("[操作日志] 写入失败")
             clear_request()
+
+    @staticmethod
+    def _log_operation(request, status_code, started):
+        if not should_log_operation(request):
+            return
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        logger.info(
+            "[操作] %s %s -> %s",
+            request.method,
+            request.path,
+            status_code,
+            extra={
+                "category": CATEGORY_OPERATION,
+                "duration_ms": duration_ms,
+            },
+        )
 
 
 class SessionTimeoutMiddleware:

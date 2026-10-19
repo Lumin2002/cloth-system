@@ -97,6 +97,12 @@ class ClothOrder(ClothCatalogMixin, ProgressStageMixin, models.Model):
         ('not_invoiced', '未开票'),
     ]
 
+    # 证书开具状态：与开票共用存储值（invoiced/not_invoiced），但显示文案不同
+    CERTIFICATE_STATUS_CHOICES = [
+        ('invoiced', '已开证'),
+        ('not_invoiced', '未开证'),
+    ]
+
     YES_NO_CHOICES = [
         ('yes', '是'),
         ('no', '否'),
@@ -172,7 +178,7 @@ class ClothOrder(ClothCatalogMixin, ProgressStageMixin, models.Model):
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, verbose_name='是否付款', blank=True)
     overdue_status = models.CharField(max_length=20, choices=OVERDUE_STATUS_CHOICES, verbose_name='是否逾期', blank=True)
     invoice_status = models.CharField(max_length=20, choices=INVOICE_STATUS_CHOICES, verbose_name='是否开票', blank=True)
-    certificate_status = models.CharField(max_length=20, choices=INVOICE_STATUS_CHOICES, verbose_name='是否开证', blank=True)
+    certificate_status = models.CharField(max_length=20, choices=CERTIFICATE_STATUS_CHOICES, verbose_name='是否开证', blank=True)
     certificate_type = models.CharField(max_length=20, choices=CERTIFICATE_TYPE_CHOICES, verbose_name='证书类型', blank=True)
     
     # 证书时间
@@ -195,7 +201,7 @@ class ClothOrder(ClothCatalogMixin, ProgressStageMixin, models.Model):
     
     # 供应商财务信息
     supplier_invoice_status = models.CharField(max_length=20, choices=INVOICE_STATUS_CHOICES, verbose_name='供应商是否开票', blank=True)
-    supplier_certificate_status = models.CharField(max_length=20, choices=INVOICE_STATUS_CHOICES, verbose_name='供应商是否开证书', blank=True)
+    supplier_certificate_status = models.CharField(max_length=20, choices=CERTIFICATE_STATUS_CHOICES, verbose_name='供应商是否开证书', blank=True)
     supplier_payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, verbose_name='供应商付款方式', blank=True)
     supplier_reconciliation_date = models.DateField(verbose_name='供应商对账时间', null=True, blank=True)
     supplier_payment_date = models.DateField(verbose_name='供应商货款支付时间', null=True, blank=True)
@@ -234,6 +240,17 @@ class ClothOrder(ClothCatalogMixin, ProgressStageMixin, models.Model):
     supplier_shipped = models.BooleanField(verbose_name='供应商已出货', default=False)
     remark = models.TextField(verbose_name='备注', blank=True, default='')
     supplier_remark = models.TextField(verbose_name='备注给供应商', blank=True, default='')
+
+    # 创建人（管理员账号）
+    created_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_cloth_orders",
+        verbose_name="创建人",
+        db_index=True,
+    )
 
     # 时间戳
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
@@ -672,6 +689,25 @@ class CostPriceHistory(models.Model):
 
 import re
 
+# 单位后缀：导入数据里自带的 cm/gsm（如 200gsm、150cm）在展示前先去掉，避免重复
+_UNIT_SUFFIX_RE = re.compile(r"\s*(cm|gsm)\s*$", re.IGNORECASE)
+
+
+def format_with_unit(value, unit):
+    """统一「值 + 空格 + 单位」；空值返回 '-'。"""
+    text = str(value or "").strip()
+    if not text:
+        return "-"
+    text = _UNIT_SUFFIX_RE.sub("", text).strip()
+    return f"{text} {unit}" if text else "-"
+
+
+def format_price_with_unit(price, unit):
+    """价格统一显示为「值 元/单位」；空值返回 '-'。"""
+    if price is None or price == "":
+        return "-"
+    return f"{price} 元/{unit or 'M'}"
+
 
 class FabricQuotation(models.Model):
     """报价表"""
@@ -714,7 +750,79 @@ class FabricQuotation(models.Model):
             models.Index(fields=['supplier_name']),
         ]
 
+    @property
+    def weight_display(self):
+        """克重：值 + gsm（去掉数据里自带的后缀）"""
+        return format_with_unit(self.weight, "gsm")
+
+    @property
+    def width_display(self):
+        """门幅：值 + cm"""
+        return format_with_unit(self.cuttable_width, "cm")
+
+    @property
+    def price_200m_display(self):
+        return format_price_with_unit(self.price_200m, self.price_200m_unit)
+
+    @property
+    def price_200m_print_display(self):
+        return format_price_with_unit(self.price_200m_print, self.price_200m_unit)
+
+    @property
+    def price_regular_display(self):
+        return format_price_with_unit(self.price_regular, self.price_regular_unit)
+
+    @property
+    def price_regular_print_display(self):
+        return format_price_with_unit(self.price_regular_print, self.price_regular_unit)
+
     def __str__(self):
         return f'{self.article_no or "?"} - {self.supplier_name} ({self.date_sent or "?"})'
+
+
+class ExhibitionContact(models.Model):
+    """展会客户信息 —— 记录展会期间接触的客户。
+
+    按业务约定，所有字段均可留空，仅作字符串记录。
+    """
+
+    company_name = models.CharField(
+        max_length=200, verbose_name="公司名字", blank=True, db_index=True
+    )
+    contact_name = models.CharField(max_length=100, verbose_name="姓名", blank=True)
+    email = models.CharField(max_length=254, verbose_name="电子邮箱", blank=True)
+    owner_name = models.CharField(max_length=100, verbose_name="负责人名字", blank=True)
+    whatsapp = models.CharField(max_length=50, verbose_name="WhatsApp", blank=True)
+    visit_date = models.DateField(verbose_name="日期", null=True, blank=True)
+    company_address = models.TextField(verbose_name="公司地址", blank=True)
+    remark = models.TextField(verbose_name="备注", blank=True)
+    photo = models.ImageField(
+        upload_to="exhibition_photos/%Y/%m/",
+        verbose_name="客户合照图片",
+        blank=True,
+        null=True,
+    )
+    created_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="exhibition_contacts",
+        verbose_name="记录人",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
+
+    class Meta:
+        verbose_name = "展会客户信息"
+        verbose_name_plural = "展会客户信息"
+        ordering = ["-visit_date", "-created_at"]
+        indexes = [
+            models.Index(fields=["company_name"]),
+            models.Index(fields=["visit_date"]),
+        ]
+
+    def __str__(self):
+        return self.company_name or self.contact_name or f"展会记录 {self.pk}"
 
 

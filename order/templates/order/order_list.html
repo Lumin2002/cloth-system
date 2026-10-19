@@ -27,19 +27,22 @@
             <div class="col-lg-4 mt-3 mt-lg-0">
                 <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
                     <a href="{{ request.get_full_path }}" class="btn btn-outline-secondary btn-sm" title="刷新列表（保留当前筛选）">
-                        <i class="bi bi-arrow-clockwise me-1"></i> 刷新
+                        <i class="bi bi-arrow-clockwise me-1"></i>刷新
                     </a>
                     <a href="{% url 'order_create' %}" class="btn btn-primary btn-sm">
-                        <i class="bi bi-plus-lg me-1"></i> 新增订单
+                        <i class="bi bi-plus-lg me-1"></i>新增订单
                     </a>
                     <a href="{% url 'orders_import' %}" class="btn btn-outline-success btn-sm">
-                        <i class="bi bi-upload me-1"></i> 导入
+                        <i class="bi bi-upload me-1"></i>导入
                     </a>
                     <a href="{% url 'orders_export' %}" class="btn btn-outline-primary btn-sm">
-                        <i class="bi bi-download me-1"></i> 导出全部备份
+                        <i class="bi bi-download me-1"></i>导出全部备份
+                    </a>
+                    <a href="{% url 'orders_export_grouped' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-people me-1"></i>按管理员分组导出
                     </a>
                     <a href="{% url 'orders_delete_all' %}" class="btn btn-outline-danger btn-sm">
-                        <i class="bi bi-trash me-1"></i> 删除全部订单
+                        <i class="bi bi-trash me-1"></i>删除全部订单
                     </a>
                 </div>
             </div>
@@ -109,12 +112,10 @@
                     </div>
                 </div>
                 <div class="col-auto d-flex flex-wrap gap-2">
-                    <button type="submit" class="btn btn-sm btn-primary">
-                        <i class="bi bi-search me-1"></i>搜索
+                    <button type="submit" class="btn btn-sm btn-outline-primary">搜索
                     </button>
                     {% if request.GET.search %}
-                    <a href="{% url 'order_list' %}" class="btn btn-sm btn-outline-secondary">
-                        <i class="bi bi-x-lg me-1"></i>清空
+                    <a href="{% url 'order_list' %}" class="btn btn-sm btn-outline-secondary">清空
                     </a>
                     {% endif %}
                 </div>
@@ -129,7 +130,7 @@
                     type="button" data-bs-toggle="collapse" data-bs-target="#orderFilterCollapse"
                     aria-expanded="{% if filter_panel_open %}true{% else %}false{% endif %}"
                     aria-controls="orderFilterCollapse">
-                <span><i class="bi bi-funnel me-2 text-primary"></i>筛选条件</span>
+                <span>筛选条件</span>
                 <i class="bi bi-chevron-down"></i>
             </button>
         </div>
@@ -141,8 +142,8 @@
                             <label class="form-label small text-muted mb-1">订单类型</label>
                             <select name="order_type" class="form-select form-select-sm">
                                 <option value="">全部类型</option>
-                                {% for value, label in order_type_choices %}
-                                <option value="{{ value }}" {% if request.GET.order_type == value %}selected{% endif %}>{{ label }}</option>
+                                {% for val, label in order_type_choices %}
+                                <option value="{{ val }}" {% if request.GET.order_type == val %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -150,8 +151,8 @@
                             <label class="form-label small text-muted mb-1">客户付款</label>
                             <select name="payment_status" class="form-select form-select-sm">
                                 <option value="">全部</option>
-                                {% for value, label in payment_status_choices %}
-                                <option value="{{ value }}" {% if request.GET.payment_status == value %}selected{% endif %}>{{ label }}</option>
+                                {% for val, label in payment_status_choices %}
+                                <option value="{{ val }}" {% if request.GET.payment_status == val %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -159,8 +160,8 @@
                             <label class="form-label small text-muted mb-1">是否逾期</label>
                             <select name="overdue_status" class="form-select form-select-sm">
                                 <option value="">全部</option>
-                                {% for value, label in overdue_status_choices %}
-                                <option value="{{ value }}" {% if request.GET.overdue_status == value %}selected{% endif %}>{{ label }}</option>
+                                {% for val, label in overdue_status_choices %}
+                                <option value="{{ val }}" {% if request.GET.overdue_status == val %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -168,8 +169,8 @@
                             <label class="form-label small text-muted mb-1">供应商付款</label>
                             <select name="supplier_paid" class="form-select form-select-sm">
                                 <option value="">全部</option>
-                                {% for value, label in supplier_paid_choices %}
-                                <option value="{{ value }}" {% if request.GET.supplier_paid == value %}selected{% endif %}>{{ label }}</option>
+                                {% for val, label in supplier_paid_choices %}
+                                <option value="{{ val }}" {% if request.GET.supplier_paid == val %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -177,8 +178,17 @@
                             <label class="form-label small text-muted mb-1">订单状态</label>
                             <select name="order_status" class="form-select form-select-sm">
                                 <option value="">全部状态</option>
-                                {% for value, label in order_status_choices %}
-                                <option value="{{ value }}" {% if request.GET.order_status == value %}selected{% endif %}>{{ label }}</option>
+                                {% for val, label in order_status_choices %}
+                                <option value="{{ val }}" {% if request.GET.order_status == val %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-lg-2 col-md-4">
+                            <label class="form-label small text-muted mb-1">创建人</label>
+                            <select name="created_by" class="form-select form-select-sm">
+                                <option value="">全部创建人</option>
+                                {% for val, label in created_by_choices %}
+                                <option value="{{ val }}" {% if request.GET.created_by == val %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -203,11 +213,9 @@
                             </select>
                         </div>
                         <div class="col-12 d-flex flex-wrap gap-2 pt-1">
-                            <button type="submit" class="btn btn-primary btn-sm">
-                                <i class="bi bi-filter me-1"></i> 应用筛选
+                            <button type="submit" class="btn btn-outline-primary btn-sm"> 应用筛选
                             </button>
-                            <a href="{% url 'order_list' %}" class="btn btn-outline-secondary btn-sm">
-                                <i class="bi bi-x-lg me-1"></i> 清空
+                            <a href="{% url 'order_list' %}" class="btn btn-outline-secondary btn-sm"> 清空
                             </a>
                         </div>
                     </div>
@@ -251,14 +259,11 @@
                         </optgroup>
                         <option value="delete" class="text-danger">删除所选订单</option>
                     </select>
-                    <button type="button" class="btn btn-sm btn-success" id="statementBtn" onclick="doStatement()">
-                        <i class="bi bi-file-earmark-excel me-1"></i> 生成对账单
+                    <button type="button" class="btn btn-sm btn-outline-success" id="statementBtn" onclick="doStatement()"> 生成对账单
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-success" id="tcBtn" onclick="doTC()">
-                        <i class="bi bi-file-earmark-spreadsheet me-1"></i> 生成TC表
+                    <button type="button" class="btn btn-sm btn-outline-success" id="tcBtn" onclick="doTC()"> 生成TC表
                     </button>
-                    <button type="submit" class="btn btn-sm btn-primary" id="bulk-submit" disabled>
-                        <i class="bi bi-lightning me-1"></i> 执行
+                    <button type="submit" class="btn btn-sm btn-outline-primary" id="bulk-submit" disabled> 执行
                     </button>
                 </div>
             </div>
@@ -275,8 +280,7 @@
                         <span class="small text-muted">本页 {{ page_obj|length }} 条</span>
                         {% endif %}
                         {% if active_filters %}
-                        <a href="{% url 'order_list' %}" class="btn btn-sm btn-outline-secondary">
-                            <i class="bi bi-x-lg me-1"></i>清空筛选
+                        <a href="{% url 'order_list' %}" class="btn btn-sm btn-outline-secondary">清空筛选
                         </a>
                         {% endif %}
                     </div>
@@ -409,7 +413,7 @@
                                     </div>
                                     {% else %}
                                     <div class="mt-3">
-                                        <a href="{% url 'order_create' %}" class="btn btn-sm btn-primary me-1">添加订单</a>
+                                        <a href="{% url 'order_create' %}" class="btn btn-sm btn-outline-primary me-1">添加订单</a>
                                         <a href="{% url 'orders_import' %}" class="btn btn-sm btn-outline-success">Excel 导入</a>
                                     </div>
                                     {% endif %}
@@ -476,18 +480,32 @@ tr.row-selected { background-color: rgba(67, 97, 238, 0.06) !important; }
 
 <script>
 
+/**
+ * 站内跳转：通过临时 <a> 元素触发导航。
+ * 目标均为服务端模板生成的站内相对路径，避免直接给 window.location 赋值。
+ */
+function navigateTo(url) {
+    if (!url) return;
+    var link = document.createElement('a');
+    link.href = url;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
+
 function doStatement() {
     const selectedBoxes = Array.from(document.querySelectorAll('.order-checkbox:checked'));
     if (selectedBoxes.length === 0) { alert('请先勾选订单'); return; }
     var ids = selectedBoxes.map(function(cb) { return cb.value; }).join(',');
-    window.location.href = '/orders/statement/bulk/?ids=' + ids;
+    navigateTo('/orders/statement/bulk/?ids=' + encodeURIComponent(ids));
 }
 
 function doTC() {
     const selectedBoxes = Array.from(document.querySelectorAll('.order-checkbox:checked'));
     if (selectedBoxes.length === 0) { alert('请先勾选订单'); return; }
     var ids = selectedBoxes.map(function(cb) { return cb.value; }).join(',');
-    window.location.href = '/orders/tc/bulk/?ids=' + ids;
+    navigateTo('/orders/tc/bulk/?ids=' + encodeURIComponent(ids));
 }
 
 (function () {
@@ -633,7 +651,7 @@ function doTC() {
 document.addEventListener("click", function(e){
     var row = e.target.closest(".clickable-row");
     if(row && e.target.type !== "checkbox" && !e.target.closest('a') && !e.target.closest('button')){
-        window.location.href = row.dataset.href;
+        navigateTo(row.dataset.href);
     }
 });
 </script>

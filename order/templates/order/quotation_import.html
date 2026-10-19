@@ -19,7 +19,7 @@
           <p class="text-muted small">格式须与 GFG Fabric Quotation Chart 一致：第1行为表头，第3行为填写说明（自动跳过），H列为面料编号，L/N列为价格</p>
           <input type="file" name="excel_file" class="form-control" accept=".xlsx" required>
         </div>
-        <button type="submit" class="btn btn-primary" id="importBtn"><i class="bi bi-upload me-1"></i>开始导入</button>
+        <button type="submit" class="btn btn-outline-primary btn-sm" id="importBtn">开始导入</button>
         <a href="{% url 'quotation_list' %}" class="btn btn-outline-secondary btn-sm">取消</a>
       </form>
     </div>

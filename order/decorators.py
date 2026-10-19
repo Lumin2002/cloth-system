@@ -24,6 +24,29 @@ def admin_required(view_func):
     return login_required(_wrapped_view)
 
 
+def superuser_required(view_func):
+    """
+    组合装饰器：@login_required + 超级管理员校验。
+    用于管理员账号管理等高风险操作，普通管理员无权访问。
+    """
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            from django.contrib.auth.views import redirect_to_login
+
+            return redirect_to_login(request.get_full_path())
+
+        if not request.user.is_superuser:
+            from django.contrib import messages
+
+            messages.warning(request, '仅超级管理员可管理管理员账号')
+            return redirect('dashboard')
+
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped_view
+
+
 def validate_ids(view_func):
     """
     验证ID列表的通用装饰器

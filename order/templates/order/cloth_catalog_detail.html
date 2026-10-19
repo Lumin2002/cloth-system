@@ -17,7 +17,7 @@
         </div>
         <div class="col-lg-4 mt-3 mt-lg-0">
             <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
-                <a href="{% url 'cloth_catalog_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> 返回</a>
+                <a href="{% url 'cloth_catalog_list' %}" class="btn btn-secondary btn-sm"> 返回</a>
             </div>
         </div>
     </div>
@@ -47,8 +47,8 @@
           <table class="table table-sm table-borderless mb-0">
             <tr><td class="text-muted" style="width:120px">成份（中文）</td><td>{{ item.composition_cn|default:"-" }}</td></tr>
             <tr><td class="text-muted">成份（英文）</td><td>{{ item.composition_en|default:"-" }}</td></tr>
-            <tr><td class="text-muted">可裁门幅</td><td>{{ item.width|default:"-" }}</td></tr>
-            <tr><td class="text-muted">克重GSM</td><td>{{ item.weight|default:"-" }}</td></tr>
+            <tr><td class="text-muted">可裁门幅</td><td>{{ item.width|default:"-" }}{% if item.width %} cm{% endif %}</td></tr>
+            <tr><td class="text-muted">克重GSM</td><td>{{ item.weight|default:"-" }}{% if item.weight %} gsm{% endif %}</td></tr>
             <tr><td class="text-muted">规格</td><td>{{ item.specification|default:"-" }}</td></tr>
             <tr><td class="text-muted">密度</td><td>{{ item.density|default:"-" }}</td></tr>
           </table>

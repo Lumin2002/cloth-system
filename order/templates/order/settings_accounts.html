@@ -1,22 +1,88 @@
 {% extends 'order/settings_base.html' %}
 
-{% block title %}管理员账号设置 - 系统设置{% endblock %}
+{% block title %}管理员账号管理 - 系统设置{% endblock %}
 
 {% block settings_content %}
-<h5 class="fw-bold mb-1"><i class="bi bi-person-gear me-2 text-primary"></i>管理员账号设置</h5>
-<p class="text-muted small mb-3">管理后台登录账号、密码修改与权限分配。</p>
-
-<div class="alert alert-light border small">
-    <i class="bi bi-info-circle me-1 text-primary"></i>
-    账号、密码与权限管理使用 Django 管理后台完成：可创建管理员、修改密码、分配超级用户/普通管理员权限。
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+        <h5 class="fw-bold mb-1"><i class="bi bi-person-gear me-2 text-primary"></i>管理员账号管理</h5>
+        <p class="text-muted small mb-0">
+            共 {{ total }} 个管理员 · 超级管理员 {{ superuser_count }} 个 · 启用 {{ active_count }} 个
+        </p>
+    </div>
+    <a href="{% url 'admin_account_add' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>新增管理员
+    </a>
 </div>
 
-<div class="d-flex flex-wrap gap-2">
-    <a href="/admin/auth/user/" class="btn btn-primary btn-sm">
-        <i class="bi bi-people me-1"></i>管理用户账号
-    </a>
-    <a href="/admin/" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-gear-wide-connected me-1"></i>管理后台首页
-    </a>
+<div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+            <tr>
+                <th>用户名</th>
+                <th>姓名</th>
+                <th>邮箱</th>
+                <th>角色</th>
+                <th>状态</th>
+                <th class="text-end">创建订单</th>
+                <th>最后登录</th>
+                <th class="text-end">操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in accounts %}
+            <tr>
+                <td>
+                    <strong>{{ item.user.username }}</strong>
+                    {% if item.is_self %}<span class="badge bg-info ms-1">当前登录</span>{% endif %}
+                </td>
+                <td>{{ item.user.first_name|default:"-" }}</td>
+                <td>{{ item.user.email|default:"-" }}</td>
+                <td>
+                    {% if item.user.is_superuser %}
+                    <span class="badge bg-danger">超级管理员</span>
+                    {% else %}
+                    <span class="badge bg-primary">管理员</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.user.is_active %}
+                    <span class="badge bg-success">启用</span>
+                    {% else %}
+                    <span class="badge bg-secondary">停用</span>
+                    {% endif %}
+                </td>
+                <td class="text-end">{{ item.order_count }}</td>
+                <td class="text-muted small">{{ item.user.last_login|date:"Y-m-d H:i"|default:"从未登录" }}</td>
+                <td class="text-end">
+                    <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
+                        <a href="{% url 'admin_account_edit' item.user.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
+                        <a href="{% url 'admin_account_reset_password' item.user.pk %}" class="btn btn-sm btn-outline-warning">重置密码</a>
+                        {% if not item.is_self %}
+                        <form method="post" action="{% url 'admin_account_delete' item.user.pk %}" class="d-inline" onsubmit="return confirm('确定删除管理员 {{ item.user.username }} 吗？其创建的订单将归入「未分配」。')">
+                            {% csrf_token %}
+                            {% if item.is_last_superuser %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger" disabled title="不能删除最后一个超级管理员">删除</button>
+                            {% else %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
+                            {% endif %}
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" class="text-center text-muted py-4">暂无管理员账号</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-light border small mt-3 mb-0">
+    <i class="bi bi-info-circle me-1 text-primary"></i>
+    管理员可登录管理端并创建订单；超级管理员可管理其他管理员账号。
+    删除管理员后，其创建的订单会归入「未分配」，可在订单详情页重新指定创建人。
 </div>
 {% endblock %}

@@ -1,5 +1,7 @@
 """视图模块：库存（由 views.py 拆分而来）。"""
 
+from io import BytesIO
+
 import pandas as pd
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -301,12 +303,16 @@ def inventory_log_export(request):
     } for log in qs]
     df = pd.DataFrame(rows)
     filename = f"inventory_logs_{now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    from .order_excel import write_dataframe_to_sheet
+
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        write_dataframe_to_sheet(writer, df, "库存日志")
     response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        buffer.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
-    with pd.ExcelWriter(response, engine="openpyxl") as writer:
-        df.to_excel(writer, sheet_name="库存日志", index=False)
     return response
 
 

@@ -1,4 +1,6 @@
 import re
+import unicodedata
+from decimal import Decimal
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -118,33 +120,65 @@ IMPORT_DEFAULTS = {
     'order_status': 'active',
 }
 
-EXPORT_COLUMNS: list[tuple[str, str]] = [
-    ('序号', 'serial_number'),
-    ('订单状态', 'order_status'),
-    ('*下单日期', 'order_date'),
-    ('*客户', 'customer'),
-    ('跟单员', 'order_follower'),
-    ('*订单类型', 'order_type'),
-    ('订单号', 'order_number'),
-    ('款号', 'style_number'),
-    ('布种', 'cloth_type'),
-    ('颜色', 'color'),
-    ('*订单数量', 'order_quantity'),
-    ('单位', 'quantity_unit'),
-    ('*价格', 'price'),
-    ('单位.1', 'price_unit'),
-    ('*成品出货对账总金额', 'finished_product_total_amount'),
-    ('已付款给供应商', 'supplier_paid'),
-    ('*总金额', 'total_amount'),
-    ('*是否付款', 'payment_status'),
-    ('*是否逾期', 'overdue_status'),
-    ('*成品供应商', 'finished_product_supplier'),
-    ('*付款方式（货前、货后）', 'payment_method'),
-    ('*对账时间', 'reconciliation_date'),
-    ('*货款支付时间', 'payment_date'),
-    ('备注', 'remark'),
-    ('地址', 'address'),
-    ('供应商已出货', 'supplier_shipped'),
+# 导出列定义：(Excel 表头, 模型字段)；模型字段为 None 时输出空列。
+# 顺序与客户端汇总表保持一致，未在下列的字段不导出。
+EXPORT_COLUMNS: list[tuple[str, Optional[str]]] = [
+    ("序号", "serial_number"),
+    ("*下单日期", "order_date"),
+    ("*客户", "customer"),
+    ("跟单员", "order_follower"),
+    ("*订单类似", "order_type"),
+    ("订单号", "order_number"),
+    ("款号", "style_number"),
+    ("规格", "specification"),
+    ("布种", "cloth_type"),
+    ("纺织类型", "textile_type"),
+    ("颜色", "color"),
+    ("色号", "color_code"),
+    ("成份", "composition"),
+    ("门幅", "width"),
+    ("克重", "weight"),
+    ("加工别", "processing_type"),
+    ("*订单数量", "order_quantity"),
+    ("单位", "quantity_unit"),
+    ("*价格", "price"),
+    ("单位", "price_unit"),
+    ("大货进度跟踪", "bulk_progress_tracking"),
+    ("*成品出货对账总金额", "finished_product_total_amount"),
+    ("*付款方式\n（货前、货后）", "payment_method"),
+    ("*账期/天", "payment_period"),
+    ("*对账时间", "reconciliation_date"),
+    ("*货款支付时间", "payment_date"),
+    ("*是否付款", "payment_status"),
+    ("*是否逾期", "overdue_status"),
+    ("*是否开票", "invoice_status"),
+    ("*是否开证", "certificate_status"),
+    ("*证书类型", "certificate_type"),
+    ("最迟开证时间", "latest_certificate_date"),
+    ("实际操作时间", "actual_operation_date"),
+    ("实际开证时间", "actual_certificate_date"),
+    ("*成品供应商", "finished_product_supplier"),
+    ("档口", "booth"),
+    ("编号", "supplier_code"),
+    ("对账时间", "supplier_reconciliation_date"),
+    ("货款支付时间", "supplier_payment_date"),
+    ("*已付款", "supplier_paid"),
+    ("*总金额", "total_amount"),
+    ("*成品成本价格", "finished_product_cost_price"),
+    ("单位", "cost_price_unit"),
+    ("*出货总数量", "total_shipment_quantity"),
+    ("单位", "shipment_quantity_unit"),
+    ("*针织布出货公斤数", None),
+    ("*成品出货时间", "finished_product_shipment_date_1"),
+    ("*成品出货数量", "finished_product_shipment_quantity_1"),
+    ("成品出货时间", "finished_product_shipment_date_2"),
+    ("成品出货数量", "finished_product_shipment_quantity_2"),
+    ("成品出货时间", "finished_product_shipment_date_3"),
+    ("成品出货数量", "finished_product_shipment_quantity_3"),
+    ("成品出货时间", "finished_product_shipment_date_4"),
+    ("成品出货数量", "finished_product_shipment_quantity_4"),
+    ("成品出货时间", "finished_product_shipment_date_5"),
+    ("成品出货数量", "finished_product_shipment_quantity_5"),
 ]
 
 SUPPLIER_EXPORT_COLUMNS: list[tuple[str, str]] = [
@@ -613,10 +647,12 @@ def _report_progress(
 def import_orders_from_file(
     file_obj,
     progress_callback: Optional[Callable[..., None]] = None,
+    created_by=None,
 ) -> ImportResult:
     """
     从 Excel 导入/更新订单（按序号 upsert）。
     带删除线的行标记为 order_status=cancelled，否则为 active。
+    created_by：新导入订单的创建人（auth.User 实例）；已有订单不改变原创建人。
     """
     df, cancelled_flags = read_bulk_sheet_with_status(file_obj, progress_callback=progress_callback)
     df = map_dataframe_columns(df)
@@ -680,7 +716,10 @@ def import_orders_from_file(
                     elif not is_cancelled and was_cancelled:
                         result.reactivated += 1
                 else:
-                    new_order = ClothOrder.objects.create(**row_data)
+                    create_kwargs = dict(row_data)
+                    if created_by is not None:
+                        create_kwargs["created_by"] = created_by
+                    new_order = ClothOrder.objects.create(**create_kwargs)
                     _sync_shipments_from_order(new_order)
                     _match_supplier(new_order)
                     result.imported += 1
@@ -742,78 +781,134 @@ def _display_value(order: ClothOrder, field_name: str):
     value = getattr(order, field_name, None)
     if value is None:
         return None
-    if field_name == 'order_status':
-        return order.get_order_status_display()
-    if field_name == 'order_type':
-        return order.get_order_type_display()
-    if field_name == 'payment_status':
-        return order.get_payment_status_display()
-    if field_name == 'overdue_status':
-        return order.get_overdue_status_display()
-    if field_name == 'payment_method':
-        return order.get_payment_method_display()
-    if field_name == 'paid_amount':
-        if value == 'yes':
-            return '是'
-        if value == 'no':
-            return '否'
-        return None
-    if hasattr(value, 'isoformat'):
+
+    # 所有 choices 字段统一取中文显示名（如 invoiced -> 已开票）
+    display = getattr(order, f"get_{field_name}_display", None)
+    if callable(display):
+        return display()
+
+    # 布尔字段显示为是/否
+    if field_name in ("supplier_paid", "supplier_shipped"):
+        return "是" if value else "否"
+
+    if hasattr(value, "isoformat"):
         return value
+    if isinstance(value, bool):
+        return "是" if value else "否"
     if isinstance(value, (int, float)):
         return value
+    if isinstance(value, Decimal):
+        return float(value)
     return str(value)
 
 
 def export_orders_dataframe(queryset=None) -> pd.DataFrame:
-    """将订单 queryset 转为与汇总表一致的 DataFrame。"""
+    """将订单 queryset 转为导出 DataFrame（列顺序严格按 EXPORT_COLUMNS）。"""
     if queryset is None:
-        queryset = ClothOrder.objects.all().order_by('-order_date', '-serial_number')
+        queryset = ClothOrder.objects.all().order_by(
+            '-serial_number', '-order_date', '-created_at'
+        )
 
+    rows = [
+        [
+            None if model_field is None else _display_value(order, model_field)
+            for _excel_col, model_field in EXPORT_COLUMNS
+        ]
+        for order in queryset
+    ]
+
+    columns = [excel_col for excel_col, _ in EXPORT_COLUMNS]
+    return pd.DataFrame(rows, columns=columns)
+
+
+def export_orders_grouped_dataframe() -> dict[str, pd.DataFrame]:
+    """按创建人（管理员）分组，返回 {分组名: DataFrame}，用于一个 Excel 多 Sheet 导出。"""
     from collections import defaultdict
-    from .models import Shipment
 
-    shipment_rows = (
-        Shipment.objects
-        .filter(order__in=queryset, is_deleted=False)
-        .order_by('order_id', 'batch_number')
-        .values_list('order_id', 'batch_number', 'date', 'quantity')
+    groups: dict[str, list[ClothOrder]] = defaultdict(list)
+    orders = (
+        ClothOrder.objects
+        .select_related("created_by")
+        .order_by("-order_date", "-serial_number")
     )
-    shipments_by_order = defaultdict(list)
-    max_shipment_count = 0
-    for order_id, batch_number, ship_date, quantity in shipment_rows:
-        shipments_by_order[order_id].append({
-            'batch_number': batch_number,
-            'date': ship_date,
-            'quantity': quantity,
-        })
-        max_shipment_count = max(max_shipment_count, len(shipments_by_order[order_id]))
+    for order in orders:
+        name = order.created_by.username if order.created_by else "未分配"
+        groups[name].append(order)
 
-    rows = []
-    for order in queryset:
-        row = {
-            excel_col: _display_value(order, model_field)
-            for excel_col, model_field in EXPORT_COLUMNS
-        }
-        shipments = shipments_by_order.get(order.pk, [])
+    return {name: export_orders_dataframe(group) for name, group in sorted(groups.items())}
 
-        summary_parts = []
-        for shipment in shipments:
-            date_text = shipment['date'].strftime('%Y-%m-%d') if shipment['date'] else ''
-            quantity_text = float(shipment['quantity']) if shipment['quantity'] is not None else 0
-            summary_parts.append(
-                f"批次{shipment['batch_number']}:{date_text} 数量{quantity_text}"
-            )
-        row['出货记录'] = ' | '.join(summary_parts)
 
-        for index in range(max_shipment_count):
-            shipment = shipments[index] if index < len(shipments) else None
-            row[f'出货批次{index + 1}'] = shipment['batch_number'] if shipment else ''
-            row[f'出货日期{index + 1}'] = shipment['date'].strftime('%Y-%m-%d') if shipment and shipment['date'] else ''
-            row[f'出货数量{index + 1}'] = float(shipment['quantity']) if shipment and shipment['quantity'] is not None else ''
+# ---------------------------------------------------------------------------
+# Excel 导出样式：表头底色、边框、冻结首行、自适应列宽
 
-        rows.append(row)
-    return pd.DataFrame(rows)
+# xlsxwriter 使用 #RRGGBB 普通色值，写入标准 solid fill，并生成 sharedStrings.xml。
+# 注：openpyxl 3.1+ 会把字符串写成 inlineStr 且不再生成 sharedStrings.xml，
+# 微信 / 部分移动端预览器无法解析，导致表头等文本显示为空，因此导出统一改用 xlsxwriter。
+# 表头样式：仅加粗（无背景色），兼容性最好。
+BORDER_COLOR = "#D0D7DE"
+HEADER_ROW_HEIGHT = 36
+MIN_COL_WIDTH = 8
+MAX_COL_WIDTH = 60
+WIDTH_SAMPLE_ROWS = 500
+
+
+def _visual_width(value: Any) -> int:
+    """估算文本显示宽度：中文/全角字符按 2，其余按 1；多行取最长行。"""
+    text = "" if value is None else str(value)
+    if not text:
+        return 0
+    return max(
+        sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in line)
+        for line in text.splitlines()
+    )
+
+
+def write_dataframe_to_sheet(writer, df: pd.DataFrame, sheet_name: str):
+    """把 DataFrame 写入指定 Sheet（xlsxwriter 引擎），统一表头样式、边框与列宽。"""
+    df.to_excel(writer, sheet_name=sheet_name, index=False)
+    ws = writer.sheets[sheet_name]
+
+    if len(df.columns) == 0:
+        return ws
+
+    workbook = writer.book
+    header_format = workbook.add_format({
+        "bold": True,
+        "align": "center",
+        "valign": "vcenter",
+        "text_wrap": True,
+        "border": 1,
+        "border_color": BORDER_COLOR,
+    })
+    data_format = workbook.add_format({
+        "valign": "vcenter",
+        "border": 1,
+        "border_color": BORDER_COLOR,
+    })
+
+    # 表头行：格式 + 行高（行格式优先级高于列默认格式）
+    ws.set_row(0, HEADER_ROW_HEIGHT, header_format)
+
+    # 自适应列宽，并为数据列设置边框/垂直居中
+    sample = df.head(WIDTH_SAMPLE_ROWS)
+    for col_idx, column_name in enumerate(df.columns):
+        width = _visual_width(column_name)
+        if col_idx < sample.shape[1]:
+            for value in sample.iloc[:, col_idx].tolist():
+                width = max(width, _visual_width(value))
+        ws.set_column(
+            col_idx,
+            col_idx,
+            min(max(width + 4, MIN_COL_WIDTH), MAX_COL_WIDTH),
+            data_format,
+        )
+
+    # 冻结首行 + 自动筛选
+    ws.freeze_panes(1, 0)
+    if len(df) > 0:
+        ws.autofilter(0, 0, len(df), len(df.columns) - 1)
+
+    return ws
 
 
 def export_supplier_orders_dataframe(queryset=None) -> pd.DataFrame:

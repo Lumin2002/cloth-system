@@ -84,14 +84,14 @@
                                         <td>[[ item.cloth_type || '-' ]]</td>
                                         <td>[[ item.customer || '-' ]]</td>
                                         <td class="small">[[ item.composition_cn || '-' ]]</td>
-                                        <td>[[ item.width || '-' ]]</td>
-                                        <td>[[ item.weight || '-' ]]</td>
+                                        <td>[[ item.width || '-' ]][[ item.width ? ' cm' : '' ]]</td>
+                                        <td>[[ item.weight || '-' ]][[ item.weight ? ' gsm' : '' ]]</td>
                                         <td class="small">[[ item.specification || '-' ]]</td>
                                         <td>
                                             <form method="post" :action="item.delete_url"
                                                   onsubmit="return confirm('确定删除该布种？')">
                                                 {% csrf_token %}
-                                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1"><i class="bi bi-trash"></i></button>
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
                                             </form>
                                         </td>
                                     </tr>

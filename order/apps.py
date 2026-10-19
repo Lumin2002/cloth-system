@@ -16,3 +16,35 @@ class OrderConfig(AppConfig):
             import logging
 
             logging.getLogger(__name__).exception("自动备份调度器启动失败")
+
+        # 订单 → 本地 Excel 单向同步（只写不读）
+        try:
+            from django.db.models.signals import post_delete, post_save
+
+            from . import orders_sync
+            from .models import ClothOrder, Shipment
+
+            post_save.connect(
+                orders_sync.on_order_changed,
+                sender=ClothOrder,
+                dispatch_uid="order_excel_sync_order_save",
+            )
+            post_delete.connect(
+                orders_sync.on_order_changed,
+                sender=ClothOrder,
+                dispatch_uid="order_excel_sync_order_delete",
+            )
+            post_save.connect(
+                orders_sync.on_order_changed,
+                sender=Shipment,
+                dispatch_uid="order_excel_sync_shipment_save",
+            )
+            post_delete.connect(
+                orders_sync.on_order_changed,
+                sender=Shipment,
+                dispatch_uid="order_excel_sync_shipment_delete",
+            )
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception("订单 Excel 同步信号注册失败")

@@ -79,17 +79,17 @@
                                         <td>[[ item.supplier_name || '-' ]]</td>
                                         <td class="small">[[ item.date_sent || '-' ]]</td>
                                         <td class="small">[[ item.composition || '-' ]]</td>
-                                        <td>[[ item.weight || '-' ]]</td>
-                                        <td>[[ item.cuttable_width || '-' ]]</td>
-                                        <td>[[ item.price_200m ? item.price_200m + '/' + item.price_200m_unit : '-' ]]</td>
-                                        <td>[[ item.price_200m_print ? item.price_200m_print + '/' + item.price_200m_unit : '-' ]]</td>
-                                        <td>[[ item.price_regular ? item.price_regular + '/' + item.price_regular_unit : '-' ]]</td>
+                                        <td>[[ item.weight ]]</td>
+                                        <td>[[ item.cuttable_width ]]</td>
+                                        <td>[[ item.price_200m ]]</td>
+                                        <td>[[ item.price_200m_print ]]</td>
+                                        <td>[[ item.price_regular ]]</td>
                                         <td>[[ item.preferred_material || '-' ]]</td>
                                         <td>
                                             <form method="post" :action="item.delete_url"
                                                   onsubmit="return confirm('确认删除该报价？')">
                                                 {% csrf_token %}
-                                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1"><i class="bi bi-trash"></i></button>
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
                                             </form>
                                         </td>
                                     </tr>

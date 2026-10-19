@@ -17,7 +17,24 @@ from django.views.decorators.http import require_GET, require_POST
 from .db_backup import get_db_info
 from .decorators import admin_required
 from .i18n import t
-from .monitor import get_log_files
+from .monitor import (
+    get_log_files,
+    parse_login_log,
+    parse_operation_log,
+    resolve_log_file,
+)
+
+# 日志管理页每类最多展示的日志条数
+LOG_ROWS_LIMIT = 200
+
+# 日志管理页的下拉视图：操作日志 / 登录日志 / 日志文件
+LOG_VIEW_OPTIONS = (
+    ("operation", "操作日志"),
+    ("login", "登录日志"),
+    ("files", "日志文件"),
+)
+LOG_VIEW_OPTIONS_DICT = dict(LOG_VIEW_OPTIONS)
+DEFAULT_LOG_VIEW = "operation"
 
 logger = logging.getLogger(__name__)
 ENV_PATH = Path(settings.BASE_DIR) / ".env"
@@ -100,12 +117,6 @@ def _log_files_with_text():
             datetime.fromtimestamp(f["mtime"], tz=std_timezone.utc)
         ).strftime("%Y-%m-%d %H:%M:%S")
     return files
-
-
-@admin_required
-@require_GET
-def settings_index(request):
-    return render(request, "order/settings_accounts.html")
 
 
 @admin_required
@@ -296,7 +307,31 @@ def settings_nginx_save(request):
 @admin_required
 @require_GET
 def settings_logs(request):
-    return render(request, "order/settings_logs.html", {"log_files": _log_files_with_text()})
+    """日志管理：用下拉切换操作日志 / 登录日志 / 日志文件。"""
+    view = request.GET.get("view", DEFAULT_LOG_VIEW)
+    if view not in LOG_VIEW_OPTIONS_DICT:
+        view = DEFAULT_LOG_VIEW
+
+    context = {
+        "log_view_options": LOG_VIEW_OPTIONS,
+        "current_view": view,
+        "operation_rows": [],
+        "login_rows": [],
+        "log_files": [],
+        "log_rows_limit": LOG_ROWS_LIMIT,
+        "log_file_total": len(get_log_files()),
+    }
+    if view == "operation":
+        context["operation_rows"] = parse_operation_log(
+            resolve_log_file("operation.log"), LOG_ROWS_LIMIT
+        )
+    elif view == "login":
+        context["login_rows"] = parse_login_log(
+            resolve_log_file("login.log"), LOG_ROWS_LIMIT
+        )
+    else:
+        context["log_files"] = _log_files_with_text()
+    return render(request, "order/settings_logs.html", context)
 
 
 @admin_required

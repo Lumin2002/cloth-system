@@ -25,20 +25,16 @@
             </div>
             <div class="col-lg-4 mt-3 mt-lg-0">
                 <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
-                    <a href="{% url 'order_create' %}" class="btn btn-primary btn-sm">
-                        <i class="bi bi-plus-lg me-1"></i> 添加订单
+                    <a href="{% url 'order_create' %}" class="btn btn-primary btn-sm"> 添加订单
                     </a>
-                    <a href="{% url 'order_list' %}" class="btn btn-outline-primary btn-sm">
-                        <i class="bi bi-list-ul me-1"></i> 订单列表
+                    <a href="{% url 'order_list' %}" class="btn btn-primary btn-sm"> 订单列表
                     </a>
-					<a href="{% url 'inventory_list' %}" class="btn btn-outline-primary btn-sm">
-                        <i class="bi bi-list-ul me-1"></i> 库存列表
+					<a href="{% url 'inventory_list' %}" class="btn btn-primary btn-sm"> 库存列表
                     </a>
-                    <a href="{% url 'inventory_log_list' %}" class="btn btn-outline-primary btn-sm">
-                        <i class="bi bi-list-ul me-1"></i> 库存更改日志
+                    <a href="{% url 'inventory_log_list' %}" class="btn btn-primary btn-sm"> 库存更改日志
                     </a>
-                    <a href="{% url 'logout' %}" class="btn btn-outline-secondary btn-sm" title="退出">
-                        <i class="bi bi-box-arrow-right"></i>
+                    <a href="{% url 'logout' %}" class="btn btn-secondary btn-sm">
+                        退出
                     </a>
                 </div>
             </div>
@@ -90,7 +86,7 @@
                     type="button" data-bs-toggle="collapse" data-bs-target="#monthlyStatsCollapse"
                     aria-expanded="false" aria-controls="monthlyStatsCollapse">
                 <span class="d-flex align-items-center">
-                    <i class="bi bi-table me-2 text-primary"></i>按月统计明细
+                    按月统计明细
                 </span>
                 <span class="d-flex align-items-center gap-2 small text-muted fw-normal">
                     按下单日期汇总
@@ -308,7 +304,7 @@
                     <div class="text-center py-5 px-3">
                         <i class="bi bi-inbox display-4 text-muted opacity-50"></i>
                         <p class="text-muted mt-3 mb-3">还没有订单数据</p>
-                        <a href="{% url 'order_create' %}" class="btn btn-primary btn-sm me-1">添加订单</a>
+                        <a href="{% url 'order_create' %}" class="btn btn-outline-primary btn-sm me-1">添加订单</a>
                         <a href="{% url 'orders_import' %}" class="btn btn-outline-success btn-sm">Excel 导入</a>
                     </div>
                     {% endif %}

@@ -1,0 +1,153 @@
+{% extends 'order/base.html' %}
+
+{% block title %}展会信息{% endblock %}
+
+{% block content %}
+<div class="container-fluid main-container px-2 px-lg-3">
+    <div class="page-hero mb-4">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h2 class="fw-bold mb-1"><i class="bi bi-people-fill text-primary me-2"></i>展会信息</h2>
+                <p class="text-muted mb-0">记录展会期间接触的客户，共 {{ total }} 条</p>
+            </div>
+            <div class="col-lg-4 mt-3 mt-lg-0">
+                <div class="d-flex flex-wrap gap-2 justify-content-lg-end align-items-center">
+                    <span class="text-muted small" id="selected-count">已选 0 条</span>
+                    <button type="button" class="btn btn-success btn-sm" onclick="exportSelected()">
+                        <i class="bi bi-download me-1"></i>批量导出合照
+                    </button>
+                    <a href="{% url 'exhibition_h5' %}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">
+                        <i class="bi bi-phone me-1"></i>H5 录入
+                    </a>
+                    <a href="{% url 'exhibition_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>新增展会客户</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="get" class="card card-flat mb-3">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label small text-muted mb-1">关键字</label>
+                    <input type="text" name="search" class="form-control form-control-sm" value="{{ keyword }}" placeholder="公司 / 姓名 / 邮箱 / WhatsApp / 地址">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1">日期从</label>
+                    <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1">日期至</label>
+                    <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">筛选</button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="card card-flat">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle mb-0" style="min-width:1480px">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:36px"><input type="checkbox" class="form-check-input" id="select-all" aria-label="全选"></th>
+                        <th style="width:64px">合照</th>
+                        <th style="min-width:150px">公司名字</th>
+                        <th style="min-width:90px">姓名</th>
+                        <th style="min-width:180px">电子邮箱</th>
+                        <th style="min-width:100px">负责人</th>
+                        <th style="min-width:130px">WhatsApp</th>
+                        <th style="min-width:100px">日期</th>
+                        <th style="min-width:220px">公司地址</th>
+                        <th style="min-width:220px">备注</th>
+                        <th style="min-width:90px">记录人</th>
+                        <th style="width:150px" class="text-end">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for c in contacts %}
+                    <tr>
+                        <td><input type="checkbox" class="form-check-input row-checkbox" name="ids" value="{{ c.pk }}" aria-label="选择"></td>
+                        <td>
+                            {% if c.photo %}
+                            <a href="{{ c.photo.url }}" target="_blank" rel="noopener">
+                                <img src="{{ c.photo.url }}" alt="客户合照" style="width:56px;height:56px;object-fit:cover;border-radius:6px;">
+                            </a>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td class="fw-semibold">{{ c.company_name|default:"-" }}</td>
+                        <td>{{ c.contact_name|default:"-" }}</td>
+                        <td>{{ c.email|default:"-" }}</td>
+                        <td>{{ c.owner_name|default:"-" }}</td>
+                        <td>{{ c.whatsapp|default:"-" }}</td>
+                        <td>{{ c.visit_date|date:"Y-m-d"|default:"-" }}</td>
+                        <td class="text-truncate" style="max-width:280px" title="{{ c.company_address }}">{{ c.company_address|default:"-" }}</td>
+                        <td class="text-truncate" style="max-width:280px" title="{{ c.remark }}">{{ c.remark|default:"-" }}</td>
+                        <td class="text-muted small">{{ c.created_by.username|default:"-" }}</td>
+                        <td class="text-end">
+                            <div class="d-inline-flex gap-1">
+                                <a href="{% url 'exhibition_edit' c.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
+                                <form method="post" action="{% url 'exhibition_delete' c.pk %}" class="d-inline" onsubmit="return confirm('确定删除这条展会客户记录吗？')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="12" class="text-center text-muted py-4">暂无展会客户记录</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <form method="post" action="{% url 'exhibition_export_photos' %}" id="bulk-export-form" class="d-none">{% csrf_token %}</form>
+</div>
+
+<script>
+(function () {
+    var selectAll = document.getElementById("select-all");
+    var boxes = Array.prototype.slice.call(document.querySelectorAll(".row-checkbox"));
+    var countEl = document.getElementById("selected-count");
+
+    function updateCount() {
+        var n = boxes.filter(function (cb) { return cb.checked; }).length;
+        if (countEl) { countEl.textContent = "已选 " + n + " 条"; }
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener("change", function () {
+            boxes.forEach(function (cb) { cb.checked = selectAll.checked; });
+            updateCount();
+        });
+    }
+
+    boxes.forEach(function (cb) {
+        cb.addEventListener("change", function () {
+            var allChecked = boxes.length > 0 && boxes.every(function (item) { return item.checked; });
+            if (selectAll) { selectAll.checked = allChecked; }
+            updateCount();
+        });
+    });
+
+    window.exportSelected = function () {
+        var ids = boxes.filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.value; });
+        if (!ids.length) { alert("请先勾选要导出的记录"); return; }
+
+        var form = document.getElementById("bulk-export-form");
+        Array.prototype.slice.call(form.querySelectorAll('input[name="ids"]')).forEach(function (el) { el.remove(); });
+        ids.forEach(function (id) {
+            var input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "ids";
+            input.value = id;
+            form.appendChild(input);
+        });
+        form.submit();
+    };
+})();
+</script>
+{% endblock %}
