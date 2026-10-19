@@ -126,6 +126,7 @@ urlpatterns = [
 
     # 系统设置
     path("system/settings/", views_accounts.admin_account_list, name="system_settings"),
+    path("system/settings/sync-excel/", views_accounts.order_sync_excel, name="order_sync_excel"),
     path("system/settings/accounts/add/", views_accounts.admin_account_add, name="admin_account_add"),
     path("system/settings/accounts/<int:pk>/edit/", views_accounts.admin_account_edit, name="admin_account_edit"),
     path("system/settings/accounts/<int:pk>/delete/", views_accounts.admin_account_delete, name="admin_account_delete"),

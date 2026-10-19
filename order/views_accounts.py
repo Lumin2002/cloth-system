@@ -16,6 +16,7 @@ from django.views.decorators.http import require_GET, require_POST
 from .decorators import superuser_required
 from .forms import AdminUserForm
 from .models import ClothOrder
+from .orders_sync import export_sync_file, get_sync_file_path
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +56,27 @@ def admin_account_list(request):
             "total": len(accounts),
             "superuser_count": sum(1 for a in accounts if a["user"].is_superuser),
             "active_count": sum(1 for a in accounts if a["user"].is_active),
+            "sync_file_path": str(get_sync_file_path()),
         },
     )
+
+
+@superuser_required
+@require_POST
+def order_sync_excel(request):
+    """手动把全部订单同步到本地 Excel 汇总表（单向只写）。"""
+    try:
+        path = export_sync_file()
+        messages.success(request, f"已同步到本地汇总表：{path}")
+        logger.info("[Excel同步] %s 手动同步成功 -> %s", request.user.username, path)
+    except PermissionError as exc:
+        messages.error(request, "同步失败：文件被占用，请关闭正在打开该文件的 Excel/WPS 后重试")
+        logger.warning("[Excel同步] %s 手动同步时文件被占用：%s", request.user.username, exc)
+    except Exception as exc:
+        messages.error(request, f"同步失败：{exc}")
+        logger.exception("[Excel同步] %s 手动同步失败", request.user.username)
+
+    return redirect("system_settings")
 
 
 @superuser_required

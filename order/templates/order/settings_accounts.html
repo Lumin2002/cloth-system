@@ -10,9 +10,20 @@
             共 {{ total }} 个管理员 · 超级管理员 {{ superuser_count }} 个 · 启用 {{ active_count }} 个
         </p>
     </div>
-    <a href="{% url 'admin_account_add' %}" class="btn btn-primary btn-sm">
-        <i class="bi bi-plus-lg me-1"></i>新增管理员
-    </a>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <a href="{% url 'admin:index' %}" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm" title="打开 Django 管理后台">
+            <i class="bi bi-shield-lock me-1"></i>Django 管理后台
+        </a>
+        <form method="post" action="{% url 'order_sync_excel' %}" onsubmit="return confirm('立即把全部订单写入本地 Excel 汇总表？');" class="d-inline-flex">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-success btn-sm" title="写入 {{ sync_file_path }}">
+                <i class="bi bi-file-earmark-excel me-1"></i>同步本地汇总表
+            </button>
+        </form>
+        <a href="{% url 'admin_account_add' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>新增管理员
+        </a>
+    </div>
 </div>
 
 <div class="table-responsive">
@@ -84,5 +95,8 @@
     <i class="bi bi-info-circle me-1 text-primary"></i>
     管理员可登录管理端并创建订单；超级管理员可管理其他管理员账号。
     删除管理员后，其创建的订单会归入「未分配」，可在订单详情页重新指定创建人。
+    <br>
+    <i class="bi bi-file-earmark-excel me-1 text-success"></i>
+    本地订单汇总表：<code>{{ sync_file_path }}</code>（点右上角「同步本地汇总表」可立即重建）
 </div>
 {% endblock %}
