@@ -3,7 +3,25 @@
 """
 from functools import wraps
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import redirect
+
+# 这些接口由前端 fetch 调用，任何异常都必须返回 JSON，不能回 HTML
+JSON_ONLY_PATH_PREFIXES = (
+    '/orders/import/start/',
+    '/orders/import/progress/',
+    '/inventory/import/start/',
+    '/inventory/import/progress/',
+    '/cloth-catalog/import/start/',
+    '/cloth-catalog/import/progress/',
+)
+
+
+def wants_json_response(request):
+    """判断本次请求是否应返回 JSON（前端 fetch 调用 / 导入接口）。"""
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return True
+    return request.path.startswith(JSON_ONLY_PATH_PREFIXES)
 
 
 def admin_required(view_func):
@@ -13,8 +31,21 @@ def admin_required(view_func):
     """
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
+        # 未登录：普通页面跳登录页，AJAX/导入接口返回 JSON，避免前端解析 HTML 崩溃
+        if not request.user.is_authenticated:
+            if wants_json_response(request):
+                from django.http import JsonResponse
+                return JsonResponse(
+                    {'error': '登录状态已失效，请重新登录后再操作', 'code': '401'},
+                    status=401,
+                )
+            return redirect_to_login(request.get_full_path())
+
         # 检查是否是供应商账号且不是管理员
-        if request.user.is_authenticated and hasattr(request.user, 'supplier_profile') and not request.user.is_staff:
+        if hasattr(request.user, 'supplier_profile') and not request.user.is_staff:
+            if wants_json_response(request):
+                from django.http import JsonResponse
+                return JsonResponse({'error': '无权访问管理面板', 'code': '403'}, status=403)
             from django.contrib import messages
             messages.warning(request, '无权访问管理面板')
             return redirect('supplier_dashboard')
@@ -32,8 +63,12 @@ def superuser_required(view_func):
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
         if not request.user.is_authenticated:
-            from django.contrib.auth.views import redirect_to_login
-
+            if wants_json_response(request):
+                from django.http import JsonResponse
+                return JsonResponse(
+                    {'error': '登录状态已失效，请重新登录后再操作', 'code': '401'},
+                    status=401,
+                )
             return redirect_to_login(request.get_full_path())
 
         if not request.user.is_superuser:
@@ -82,7 +117,11 @@ def validate_file_upload(view_func):
     def _wrapped_view(request, *args, **kwargs):
         from django.http import JsonResponse
         import logging
-        
+
+        # 只接受 POST 上传，避免 GET 直接打接口拿不到文件
+        if request.method != 'POST':
+            return JsonResponse({'error': '请使用 POST 方法上传 Excel 文件'}, status=405)
+
         logger = logging.getLogger(__name__)
         upload = request.FILES.get('excel_file')
         

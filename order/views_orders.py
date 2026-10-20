@@ -31,7 +31,7 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.timezone import now
 from django.views.generic import CreateView, DetailView, ListView
-from .decorators import admin_required
+from .decorators import admin_required, validate_file_upload
 from .forms import (
     CREATE_DEFAULTS,
     ORDER_CREATE_PRIMARY_COUNT,
@@ -67,6 +67,9 @@ from .models import (
     notify_user,
 )
 from .order_excel import (
+    GROUPED_EXPORT_COLUMNS,
+    export_finance_dataframe,
+    export_full_backup_dataframe,
     export_orders_dataframe,
     export_orders_grouped_dataframe,
     write_dataframe_to_sheet,
@@ -538,12 +541,37 @@ def orders_delete_all(request):
 
 @admin_required
 def orders_export(request):
-    df = export_orders_dataframe()
-    filename = f"orders_backup_{now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    logger.info(t("log.export_orders", username=request.user.username))
+    """导出财务对账表格（不含订单状态、创建人、创建时间）。支持 ?ids=1,2 导出指定订单。"""
+    ids = [pk for pk in request.GET.get("ids", "").split(",") if pk.strip().isdigit()]
+    queryset = ClothOrder.objects.filter(pk__in=ids) if ids else None
+    df = export_finance_dataframe(queryset)
+    filename = f"orders_finance_{now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    logger.info(t("log.export_orders", username=request.user.username) + " [finance]")
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-        write_dataframe_to_sheet(writer, df, t("label.order_sheet"))
+        write_dataframe_to_sheet(writer, df, "财务对账")
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+@admin_required
+def orders_export_full(request):
+    """完整备份导出：订单数据 + 出货记录 + 订单进度 + 创建人/时间 + 供应商账号。
+
+    支持 ?ids=1,2 只导出指定订单。
+    """
+    ids = [pk for pk in request.GET.get("ids", "").split(",") if pk.strip().isdigit()]
+    queryset = ClothOrder.objects.select_related("created_by", "supplier__user").filter(pk__in=ids) if ids else None
+    df = export_full_backup_dataframe(queryset)
+    filename = f"orders_full_backup_{now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    logger.info(t("log.export_orders", username=request.user.username) + " [full]")
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        write_dataframe_to_sheet(writer, df, "订单完整备份")
     response = HttpResponse(
         buffer.getvalue(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -554,10 +582,10 @@ def orders_export(request):
 
 @admin_required
 def orders_export_grouped(request):
-    """按创建人（管理员）分组导出：一个 Excel 多 Sheet，每个管理员一个 Sheet（含未分配）。"""
+    """按创建人（管理员）分组导出：财务对账样式 + 创建人和创建时间，一个 Sheet 一个创建人。"""
     import re
 
-    groups = export_orders_grouped_dataframe()
+    groups = export_orders_grouped_dataframe(columns=GROUPED_EXPORT_COLUMNS)
     used_names: set[str] = set()
 
     def _sheet_name(name: str) -> str:
@@ -572,7 +600,7 @@ def orders_export_grouped(request):
         used_names.add(cleaned.lower())
         return cleaned
 
-    filename = f"orders_grouped_by_admin_{now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"orders_grouped_by_creator_{now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     logger.info(t("log.export_orders", username=request.user.username) + " [grouped]")
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
@@ -592,16 +620,25 @@ def orders_import_page(request):
 
 
 @admin_required
+@validate_file_upload
 def orders_import_start(request):
-    task_id = create_import_task(request.user.id)
-    logger.info(t("log.import_orders_start", username=request.user.username))
-    start_import_task(task_id, request.upload_file_bytes)
+    try:
+        task_id = create_import_task(request.user.id)
+        logger.info(t("log.import_orders_start", username=request.user.username))
+        start_import_task(task_id, request.upload_file_bytes)
+    except Exception as exc:
+        logger.exception("启动订单导入失败")
+        return JsonResponse({"error": f"启动导入失败：{exc}"}, status=500)
     return JsonResponse({"task_id": task_id})
 
 
 @admin_required
 def orders_import_progress(request, task_id):
-    task = get_import_task(str(task_id), request.user.id)
+    try:
+        task = get_import_task(str(task_id), request.user.id)
+    except Exception as exc:
+        logger.exception("读取订单导入进度失败")
+        return JsonResponse({"error": f"读取导入进度失败：{exc}", "status": "error"}, status=500)
     if not task:
         return JsonResponse(
             {

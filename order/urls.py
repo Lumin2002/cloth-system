@@ -44,6 +44,7 @@ urlpatterns = [
     path('orders/import/start/', views_orders.orders_import_start, name='orders_import_start'),
     path('orders/import/progress/<uuid:task_id>/', views_orders.orders_import_progress, name='orders_import_progress'),
     path('orders/export/', views_orders.orders_export, name='orders_export'),
+    path('orders/export/full/', views_orders.orders_export_full, name='orders_export_full'),
     path('orders/export/grouped/', views_orders.orders_export_grouped, name='orders_export_grouped'),
     path('orders/delete-all/', views_orders.orders_delete_all, name='orders_delete_all'),
     path('orders/<int:pk>/delete/', views_orders.order_delete, name='order_delete'),

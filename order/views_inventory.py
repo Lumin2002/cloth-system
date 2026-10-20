@@ -26,7 +26,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils.timezone import now
 from django.views.generic import DetailView, ListView, UpdateView
-from .decorators import admin_required
+from .decorators import admin_required, validate_file_upload
 from .forms import (
     CREATE_DEFAULTS,
     ORDER_CREATE_PRIMARY_COUNT,
@@ -70,16 +70,25 @@ def inventory_import_page(request):
 
 
 @admin_required
+@validate_file_upload
 def inventory_import_start(request):
-    task_id = create_inventory_task(request.user.id)
-    logger.info(t("log.import_inventory_start", username=request.user.username))
-    start_inventory_task(task_id, request.upload_file_bytes)
+    try:
+        task_id = create_inventory_task(request.user.id)
+        logger.info(t("log.import_inventory_start", username=request.user.username))
+        start_inventory_task(task_id, request.upload_file_bytes)
+    except Exception as exc:
+        logger.exception("启动库存导入失败")
+        return JsonResponse({"error": f"启动导入失败：{exc}"}, status=500)
     return JsonResponse({"task_id": task_id})
 
 
 @admin_required
 def inventory_import_progress(request, task_id):
-    task = get_inventory_task(str(task_id), request.user.id)
+    try:
+        task = get_inventory_task(str(task_id), request.user.id)
+    except Exception as exc:
+        logger.exception("读取库存导入进度失败")
+        return JsonResponse({"error": f"读取导入进度失败：{exc}", "status": "error"}, status=500)
     if not task:
         return JsonResponse(
             {

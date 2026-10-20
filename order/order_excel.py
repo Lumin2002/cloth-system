@@ -2,7 +2,7 @@ import re
 import unicodedata
 from decimal import Decimal
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from io import BytesIO
 from typing import Any, Callable, Optional
 
@@ -12,6 +12,10 @@ import logging
 logger = logging.getLogger(__name__)
 from openpyxl import load_workbook
 
+# 本模块大量使用 pandas 动态索引与 Django ORM 描述符，静态类型检查误报居高；
+# 关闭对应的推断类检查，保留语法/未定义名检查。
+# pyright: reportArgumentType=false, reportOperatorIssue=false, reportAttributeAccessIssue=false, reportCallIssue=false, reportGeneralTypeIssues=false, reportOptionalMemberAccess=false
+
 from .models import ClothOrder, Customer, Supplier
 from .constants import DEFAULT_STAGES_MAP
 
@@ -20,6 +24,9 @@ SHEET_BULK = '大货'
 # Excel 原始表头 -> 模型字段（与「大货」工作表一致）
 EXCEL_COLUMN_MAP: dict[str, str] = {
     '序号': 'serial_number',
+    '订单状态': 'order_status',
+    '创建人': 'created_by',
+    '创建时间': 'created_at',
     '*下单日期': 'order_date',
     '*客户': 'customer',
     '跟单员': 'order_follower',
@@ -84,14 +91,25 @@ EXCEL_COLUMN_MAP: dict[str, str] = {
     '成品出货数量.3': 'finished_product_shipment_quantity_5',
     '备注': 'remark',
     '地址': 'address',
+    # —— 供应商订单表（供应商界面导出/备份）列名别名 ——
+    '数量单位': 'quantity_unit',
+    '档口编号': 'supplier_code',
+    '昇奕隆编号': 'cloth_type',
+    '供应商已出货': 'supplier_shipped',
+    '出货数量单位': 'shipment_quantity_unit',
+    '给供应商备注': 'supplier_remark',
+    '供应商备注': 'remark',
 }
+
+# 出货记录列（供应商订单表固定 7 组，兼容更多批次）
+SHIPMENT_COLUMN_PATTERN = re.compile(r'^出货(批次|日期|数量)(\d+)$')
 
 DATE_FIELDS = {
     f for f in EXCEL_COLUMN_MAP.values()
     if f.endswith('_date') or 'date' in f
 }
 YES_NO_FIELDS = set()
-BOOL_FIELDS = {'supplier_paid'}
+BOOL_FIELDS = {'supplier_paid', 'supplier_shipped'}
 
 DECIMAL_FIELDS = {
     'order_quantity', 'price', 'small_vat_fee', 'width', 'weight',
@@ -124,6 +142,7 @@ IMPORT_DEFAULTS = {
 # 顺序与客户端汇总表保持一致，未在下列的字段不导出。
 EXPORT_COLUMNS: list[tuple[str, Optional[str]]] = [
     ("序号", "serial_number"),
+    ("订单状态", "order_status"),
     ("*下单日期", "order_date"),
     ("*客户", "customer"),
     ("跟单员", "order_follower"),
@@ -179,7 +198,39 @@ EXPORT_COLUMNS: list[tuple[str, Optional[str]]] = [
     ("成品出货数量", "finished_product_shipment_quantity_4"),
     ("成品出货时间", "finished_product_shipment_date_5"),
     ("成品出货数量", "finished_product_shipment_quantity_5"),
+    ("创建人", "created_by"),
+    ("创建时间", "created_at"),
 ]
+
+# 财务对账表格：不需要订单状态，也不需要创建人 / 创建时间
+FINANCE_EXPORT_COLUMNS: list[tuple[str, Optional[str]]] = [
+    column for column in EXPORT_COLUMNS
+    if column[1] not in ("order_status", "created_by", "created_at")
+]
+
+# 按创建人分组导出：财务对账字段 + 创建人 / 创建时间
+GROUPED_EXPORT_COLUMNS: list[tuple[str, Optional[str]]] = [
+    *FINANCE_EXPORT_COLUMNS,
+    ("创建人", "created_by"),
+    ("创建时间", "created_at"),
+]
+
+# 完整备份：订单数据（含订单状态）+ 出货记录 + 订单进度 + 创建人/时间 + 供应商账号
+FULL_BACKUP_ORDER_COLUMNS: list[tuple[str, Optional[str]]] = [
+    column for column in EXPORT_COLUMNS
+    if column[1] not in ("created_by", "created_at")
+]
+FULL_BACKUP_TAIL_COLUMNS: list[tuple[str, Optional[str]]] = [
+    ("当前进度阶段", None),
+    ("进度百分比", None),
+    ("进度明细", None),
+    ("创建人", "created_by"),
+    ("创建时间", "created_at"),
+    ("供应商公司", None),
+    ("供应商账号", None),
+]
+# 批次列最少保留 5 组，与旧版固定 5 个批次字段保持一致
+MIN_BACKUP_BATCH_COLUMNS = 5
 
 SUPPLIER_EXPORT_COLUMNS: list[tuple[str, str]] = [
     ('序号', 'serial_number'),
@@ -453,6 +504,75 @@ def _parse_int(value: Any) -> Optional[int]:
     return int(num)
 
 
+def _parse_datetime(value: Any):
+    """解析 Excel 单元格里的日期时间（支持纯日期、Excel 序列号、时间字符串）。"""
+    value = _scalar(value)
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    result = None
+    if isinstance(value, pd.Timestamp):
+        result = value.to_pydatetime()
+    elif isinstance(value, datetime):
+        result = value
+    elif isinstance(value, date):
+        result = datetime(value.year, value.month, value.day)
+    else:
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            result = datetime(1899, 12, 30) + timedelta(days=float(text))
+        except ValueError:
+            try:
+                parsed = pd.to_datetime(text, errors='coerce')
+            except (TypeError, ValueError):
+                return None
+            if pd.isna(parsed):
+                return None
+            result = parsed.to_pydatetime()
+    return _aware(result)
+
+
+def _aware(value):
+    """按当前时区为 naive datetime 补上 tzinfo，避免 Django 时区告警与时间偏差。"""
+    if value is None:
+        return None
+    from django.utils import timezone
+
+    if timezone.is_naive(value):
+        try:
+            return timezone.make_aware(value, timezone.get_current_timezone())
+        except Exception:
+            return value
+    return value
+
+
+_USER_CACHE: dict[str, Any] = {}
+
+
+def _resolve_user(name: Any):
+    """根据 Excel 「创建人」列匹配 auth.User，匹配不到返回 None（回退到当前登录用户）。"""
+    text = str(_scalar(name) or '').strip()
+    if not text:
+        return None
+    if text in _USER_CACHE:
+        return _USER_CACHE[text]
+    from django.contrib.auth.models import User
+
+    user = (
+        User.objects.filter(username=text).first()
+        or User.objects.filter(first_name=text).first()
+        or User.objects.filter(last_name=text).first()
+    )
+    _USER_CACHE[text] = user
+    return user
+
+
 def _parse_yes_no(value: Any) -> Optional[str]:
     text = str(_scalar(value) or '').strip().lower()
     if text in {'是', 'yes', 'true', 'y', '1', '已付款', '已付'}:
@@ -509,9 +629,12 @@ def _parse_choice_field(field_name: str, value: Any) -> Any:
             return 'bulk_print'
         if '大货订单' in text:
             return 'bulk'
-        if '样板单' in text:
+        # 「样品订单」「样板单」都归为样品单（汇总表实际写作「样品订单」）
+        if '样' in text:
             return 'sample'
         return 'other'
+    if field_name == 'order_status':
+        return 'cancelled' if '取消' in text else 'active'
     if field_name in ('payment_method', 'supplier_payment_method'):
         if '货后' in text:
             return 'after_delivery'
@@ -532,9 +655,51 @@ def _parse_choice_field(field_name: str, value: Any) -> Any:
     return text
 
 
+def _extract_shipments(row: pd.Series) -> list[dict[str, Any]]:
+    """
+    从「出货批次N / 出货日期N / 出货数量N」三列提取出货记录。
+    批次列可缺失（此时按列序号编号）；日期和数量都为空的组视为无效。
+    """
+    batches: dict[int, dict[str, Any]] = {}
+    for col in row.index:
+        match = SHIPMENT_COLUMN_PATTERN.match(str(col).strip())
+        if not match:
+            continue
+        kind, index_text = match.groups()
+        position = int(index_text)
+        raw = row[col]
+        if kind == '批次':
+            value = _parse_int(raw)
+            if value is not None:
+                batches.setdefault(position, {})['batch_number'] = value
+        elif kind == '日期':
+            value = _parse_date(raw)
+            if value is not None:
+                batches.setdefault(position, {})['date'] = value
+        else:
+            value = _parse_decimal(raw)
+            if value is not None:
+                batches.setdefault(position, {})['quantity'] = value
+
+    shipments = []
+    for position in sorted(batches):
+        item = batches[position]
+        if item.get('date') is None and item.get('quantity') is None:
+            continue
+        shipments.append({
+            'batch_number': item.get('batch_number') or position,
+            'date': item.get('date'),
+            'quantity': item.get('quantity'),
+        })
+    return shipments
+
+
 def parse_row(row: pd.Series) -> dict[str, Any]:
     """将一行 DataFrame 数据解析为模型字段字典。"""
     data: dict[str, Any] = {}
+    shipments = _extract_shipments(row)
+    if shipments:
+        data['_shipments'] = shipments
     for col in row.index:
         if col not in MODEL_FIELD_NAMES:
             continue
@@ -561,8 +726,16 @@ def parse_row(row: pd.Series) -> dict[str, Any]:
             parsed = _parse_int(raw)
             if parsed is not None:
                 data[col] = parsed
+        elif col == 'created_by':
+            user = _resolve_user(raw)
+            if user is not None:
+                data[col] = user
+        elif col == 'created_at':
+            parsed = _parse_datetime(raw)
+            if parsed is not None:
+                data[col] = parsed
         elif col in (
-            'order_type', 'payment_method', 'supplier_payment_method',
+            'order_type', 'order_status', 'payment_method', 'supplier_payment_method',
             'certificate_type', 'payment_status', 'overdue_status',
             'invoice_status', 'certificate_status',
             'supplier_invoice_status', 'supplier_certificate_status',
@@ -652,7 +825,8 @@ def import_orders_from_file(
     """
     从 Excel 导入/更新订单（按序号 upsert）。
     带删除线的行标记为 order_status=cancelled，否则为 active。
-    created_by：新导入订单的创建人（auth.User 实例）；已有订单不改变原创建人。
+    created_by：默认创建人（auth.User 实例）。Excel 「创建人」列有值且能匹配到用户时以 Excel 为准，
+    匹配不到则回退到该默认值；Excel 「创建时间」列有值时按该时间写入。
     """
     df, cancelled_flags = read_bulk_sheet_with_status(file_obj, progress_callback=progress_callback)
     df = map_dataframe_columns(df)
@@ -680,6 +854,10 @@ def import_orders_from_file(
                 )
             try:
                 row_data = parse_row(row)
+                # created_at 是 auto_now_add，不能随 create/setattr 直接写入，单独取出后回写
+                created_at_value = row_data.pop('created_at', None)
+                # 出货批次列不写进订单字段，导入后写入 Shipment 表
+                shipments = row_data.pop('_shipments', None)
                 serial_number = row_data.get('serial_number')
                 if serial_number is None:
                     result.skipped += 1
@@ -694,7 +872,10 @@ def import_orders_from_file(
                     row_data['supplier_shipped'] = True
 
                 is_cancelled = cancelled_flags[i] if i < len(cancelled_flags) else False
-                row_data['order_status'] = 'cancelled' if is_cancelled else 'active'
+                if 'order_status' not in row_data:
+                    row_data['order_status'] = 'cancelled' if is_cancelled else 'active'
+                else:
+                    is_cancelled = (row_data['order_status'] == 'cancelled')
 
                 for key, default in IMPORT_DEFAULTS.items():
                     if key != 'order_status':
@@ -707,8 +888,14 @@ def import_orders_from_file(
                     for key, value in row_data.items():
                         if value is not None and key != 'serial_number':
                             setattr(existing, key, value)
+                    # Excel 带了创建时间就按 Excel 的（更新时 auto_now_add 不再覆盖）
+                    if created_at_value is not None:
+                        existing.created_at = created_at_value
                     existing.save()
-                    _sync_shipments_from_order(existing)
+                    if shipments:
+                        _write_shipments(existing, shipments, created_by)
+                    else:
+                        _sync_shipments_from_order(existing)
                     _match_supplier(existing)
                     result.updated += 1
                     if is_cancelled and not was_cancelled:
@@ -717,10 +904,18 @@ def import_orders_from_file(
                         result.reactivated += 1
                 else:
                     create_kwargs = dict(row_data)
+                    # Excel 没提供创建人时，默认当前登录用户
                     if created_by is not None:
-                        create_kwargs["created_by"] = created_by
+                        create_kwargs.setdefault("created_by", created_by)
                     new_order = ClothOrder.objects.create(**create_kwargs)
-                    _sync_shipments_from_order(new_order)
+                    # 创建后回写创建时间，绕过 auto_now_add
+                    if created_at_value is not None:
+                        ClothOrder.objects.filter(pk=new_order.pk).update(created_at=created_at_value)
+                        new_order.created_at = created_at_value
+                    if shipments:
+                        _write_shipments(new_order, shipments, created_by)
+                    else:
+                        _sync_shipments_from_order(new_order)
                     _match_supplier(new_order)
                     result.imported += 1
                     if is_cancelled:
@@ -758,15 +953,55 @@ def _ensure_customer(name):
 def _sync_shipments_from_order(order):
     """从订单的旧批次字段同步出货记录到 Shipment 表"""
     from .models import Shipment
+
     for i in range(1, 6):
         date = getattr(order, f'finished_product_shipment_date_{i}', None)
         qty = getattr(order, f'finished_product_shipment_quantity_{i}', None)
         if date or qty:
-            Shipment.objects.get_or_create(
+            Shipment.objects.update_or_create(
                 order=order,
                 batch_number=i,
+                is_deleted=False,
                 defaults={"date": date, "quantity": qty},
             )
+
+
+def _write_shipments(order, shipments, created_by=None):
+    """
+    按批次号写入/更新订单出货记录，并同步「出货总数量」。
+    shipments：_extract_shipments 解析出的列表，元素含 batch_number/date/quantity。
+    """
+    from .models import Shipment
+
+    existing = {
+        item.batch_number: item
+        for item in Shipment.objects.filter(order=order, is_deleted=False)
+    }
+    for shipment in shipments:
+        batch_number = shipment['batch_number']
+        current = existing.get(batch_number)
+        if current is None:
+            Shipment.objects.create(
+                order=order,
+                batch_number=batch_number,
+                date=shipment['date'],
+                quantity=shipment['quantity'],
+                created_by=created_by,
+            )
+            continue
+        changed_fields = []
+        if shipment['date'] is not None and current.date != shipment['date']:
+            current.date = shipment['date']
+            changed_fields.append('date')
+        if shipment['quantity'] is not None and current.quantity != shipment['quantity']:
+            current.quantity = shipment['quantity']
+            changed_fields.append('quantity')
+        if changed_fields:
+            current.save(update_fields=changed_fields)
+
+    total = order.total_shipment_from_shipments()
+    order.total_shipment_quantity = total
+    order.save(update_fields=['total_shipment_quantity'])
 
 
 def fix_imported_progress_stages():
@@ -791,7 +1026,16 @@ def _display_value(order: ClothOrder, field_name: str):
     if field_name in ("supplier_paid", "supplier_shipped"):
         return "是" if value else "否"
 
+    # 创建人显示用户名
+    if field_name == "created_by":
+        return value.username if value is not None else None
+
     if hasattr(value, "isoformat"):
+        # 带时区的时间转为本地时区（Asia/Shanghai）后再导出，避免早 8 小时
+        if isinstance(value, datetime):
+            from django.utils.timezone import is_aware, localtime
+            if is_aware(value):
+                return localtime(value).replace(tzinfo=None)
         return value
     if isinstance(value, bool):
         return "是" if value else "否"
@@ -802,29 +1046,183 @@ def _display_value(order: ClothOrder, field_name: str):
     return str(value)
 
 
-def export_orders_dataframe(queryset=None) -> pd.DataFrame:
-    """将订单 queryset 转为导出 DataFrame（列顺序严格按 EXPORT_COLUMNS）。"""
+_SHIPMENT_DATE_RE = re.compile(r'^finished_product_shipment_date_(\d+)$')
+_SHIPMENT_QUANTITY_RE = re.compile(r'^finished_product_shipment_quantity_(\d+)$')
+
+
+def _load_shipments_by_order(order_ids):
+    """批量预取出货记录：{order_id: {batch_number: {date, quantity}}}。"""
+    from collections import defaultdict
+    from .models import Shipment
+
+    result: dict[int, dict[int, dict[str, Any]]] = defaultdict(dict)
+    order_ids = [pk for pk in order_ids if pk is not None]
+    if not order_ids:
+        return result
+    rows = (
+        Shipment.objects
+        .filter(order_id__in=order_ids, is_deleted=False)
+        .values('batch_number', 'date', 'quantity', 'order_id')
+    )
+    for row in rows:
+        result[row['order_id']][row['batch_number']] = row
+    return result
+
+
+def _order_shipment_value(model_field, shipments):
+    """出货相关列从 Shipment 表取数；返回 None 时由调用方回退模型字段。"""
+    if not shipments or not model_field:
+        return None
+    match = _SHIPMENT_DATE_RE.match(model_field)
+    if match:
+        shipment = shipments.get(int(match.group(1)))
+        if shipment and shipment.get('date') is not None:
+            return shipment['date']
+        return None
+    match = _SHIPMENT_QUANTITY_RE.match(model_field)
+    if match:
+        shipment = shipments.get(int(match.group(1)))
+        if shipment and shipment.get('quantity') is not None:
+            return float(shipment['quantity'])
+        return None
+    if model_field == 'total_shipment_quantity':
+        total = sum(float(item.get('quantity') or 0) for item in shipments.values())
+        if total:
+            return total
+    return None
+
+
+def _export_cell(order, model_field, shipments):
+    """单列取值：出货列优先取 Shipment 表，取不到再回退模型字段的显示值。"""
+    if not model_field:
+        return None
+    value = _order_shipment_value(model_field, shipments)
+    if value is None:
+        value = _display_value(order, model_field)
+    return value
+
+
+def _build_export_dataframe(orders, columns, shipments_map) -> pd.DataFrame:
+    rows = [
+        [_export_cell(order, model_field, shipments_map.get(order.pk, {}))
+         for _excel_col, model_field in columns]
+        for order in orders
+    ]
+    return pd.DataFrame(rows, columns=[excel_col for excel_col, _ in columns])
+
+
+def export_orders_dataframe(queryset=None, columns=None) -> pd.DataFrame:
+    """将订单 queryset 转为导出 DataFrame（默认列顺序严格按 EXPORT_COLUMNS）。
+
+    出货时间/数量列优先取 Shipment 表（界面维护的出货记录），
+    旧的分批次字段仅作为兜底，避免导出时出货记录全部空白。
+    """
+    columns = columns or EXPORT_COLUMNS
     if queryset is None:
-        queryset = ClothOrder.objects.all().order_by(
-            '-serial_number', '-order_date', '-created_at'
+        queryset = (
+            ClothOrder.objects.select_related("created_by").order_by(
+                '-serial_number', '-order_date', '-created_at'
+            )
         )
 
-    rows = [
-        [
-            None if model_field is None else _display_value(order, model_field)
-            for _excel_col, model_field in EXPORT_COLUMNS
+    orders = list(queryset)
+    shipments_map = _load_shipments_by_order([order.pk for order in orders])
+    return _build_export_dataframe(orders, columns, shipments_map)
+
+
+def export_finance_dataframe(queryset=None) -> pd.DataFrame:
+    """财务对账表格：不含订单状态、创建人、创建时间。"""
+    return export_orders_dataframe(queryset, columns=FINANCE_EXPORT_COLUMNS)
+
+
+def _shipment_summary(shipments):
+    """返回（汇总文本, 按批次号排序的批次列表）。"""
+    batches = sorted(shipments.values(), key=lambda item: item.get('batch_number') or 0)
+    parts = []
+    for batch in batches:
+        date_text = batch['date'].strftime('%Y-%m-%d') if batch.get('date') else ''
+        quantity = float(batch['quantity']) if batch.get('quantity') is not None else 0
+        parts.append(f"批次{batch.get('batch_number')}:{date_text} 数量{quantity}")
+    return ' | '.join(parts), batches
+
+
+def _order_progress_text(order):
+    """订单进度三元组：（当前阶段, 百分比, 全部阶段明细）。"""
+    try:
+        stages = order.stage_list()
+    except Exception:
+        stages = []
+    try:
+        current = order.current_stage_name
+    except Exception:
+        current = ''
+    try:
+        percent = order.progress_percent
+    except Exception:
+        percent = ''
+    return current or '', percent, ' → '.join(str(stage) for stage in stages)
+
+
+def export_full_backup_dataframe(queryset=None) -> pd.DataFrame:
+    """完整备份：订单数据 + 出货记录 + 订单进度 + 创建人/时间 + 供应商账号。"""
+    if queryset is None:
+        queryset = (
+            ClothOrder.objects.select_related("created_by", "supplier__user").order_by(
+                '-serial_number', '-order_date', '-created_at'
+            )
+        )
+
+    orders = list(queryset)
+    shipments_map = _load_shipments_by_order([order.pk for order in orders])
+    max_batches = max(
+        [MIN_BACKUP_BATCH_COLUMNS] + [len(shipments) for shipments in shipments_map.values()]
+    )
+
+    columns = [*FULL_BACKUP_ORDER_COLUMNS, ("出货记录", None)]
+    for index in range(max_batches):
+        columns.extend([
+            (f"出货批次{index + 1}", None),
+            (f"出货日期{index + 1}", None),
+            (f"出货数量{index + 1}", None),
+        ])
+    columns.extend(FULL_BACKUP_TAIL_COLUMNS)
+
+    rows = []
+    for order in orders:
+        shipments = shipments_map.get(order.pk, {})
+        summary, batches = _shipment_summary(shipments)
+        row = [
+            _export_cell(order, model_field, shipments)
+            for _excel_col, model_field in FULL_BACKUP_ORDER_COLUMNS
         ]
-        for order in queryset
-    ]
+        row.append(summary)
+        for index in range(max_batches):
+            batch = batches[index] if index < len(batches) else None
+            row.append(batch.get('batch_number') if batch else '')
+            row.append(batch['date'].strftime('%Y-%m-%d') if batch and batch.get('date') else '')
+            row.append(float(batch['quantity']) if batch and batch.get('quantity') is not None else '')
 
-    columns = [excel_col for excel_col, _ in EXPORT_COLUMNS]
-    return pd.DataFrame(rows, columns=columns)
+        current_stage, percent, stage_text = _order_progress_text(order)
+        supplier = getattr(order, 'supplier', None)
+        row.extend([
+            current_stage,
+            percent,
+            stage_text,
+            _display_value(order, 'created_by'),
+            _display_value(order, 'created_at'),
+            supplier.company_name if supplier else '',
+            supplier.user.username if supplier and supplier.user_id else '',
+        ])
+        rows.append(row)
+
+    return pd.DataFrame(rows, columns=[excel_col for excel_col, _ in columns])
 
 
-def export_orders_grouped_dataframe() -> dict[str, pd.DataFrame]:
+def export_orders_grouped_dataframe(columns=None) -> dict[str, pd.DataFrame]:
     """按创建人（管理员）分组，返回 {分组名: DataFrame}，用于一个 Excel 多 Sheet 导出。"""
     from collections import defaultdict
 
+    columns = columns or EXPORT_COLUMNS
     groups: dict[str, list[ClothOrder]] = defaultdict(list)
     orders = (
         ClothOrder.objects
@@ -835,7 +1233,10 @@ def export_orders_grouped_dataframe() -> dict[str, pd.DataFrame]:
         name = order.created_by.username if order.created_by else "未分配"
         groups[name].append(order)
 
-    return {name: export_orders_dataframe(group) for name, group in sorted(groups.items())}
+    return {
+        name: export_orders_dataframe(group, columns=columns)
+        for name, group in sorted(groups.items())
+    }
 
 
 # ---------------------------------------------------------------------------

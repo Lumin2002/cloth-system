@@ -4,7 +4,7 @@
 <div class="container-fluid main-container">
   <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb mb-0">
-      <li class="breadcrumb-item"><a href="{% url "cloth_catalog_list" %}">布种编号表</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'cloth_catalog_list' %}">布种编号表</a></li>
       <li class="breadcrumb-item active">导入Excel</li>
     </ol>
   </nav>
@@ -36,17 +36,53 @@
   </div>
 </div>
 <script>
+function readJson(resp) {
+  return resp.text().then(function (text) {
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      var hint = (resp.redirected || resp.status === 401 || resp.status === 403)
+        ? "登录状态或安全令牌已失效，请刷新页面后重试"
+        : "服务器返回异常（HTTP " + resp.status + "），请稍后重试";
+      throw new Error(hint);
+    }
+  });
+}
+
+// 用 DOM + textContent 构造提示，避免直接把后端消息当 HTML 插入
+function showAlert(message, type) {
+  var box = document.getElementById("importResult");
+  box.classList.remove("d-none");
+  box.textContent = "";
+  var div = document.createElement("div");
+  div.className = "alert alert-" + (type || "danger");
+  div.textContent = message;
+  box.appendChild(div);
+  return box;
+}
+
 document.getElementById("importForm").addEventListener("submit", async function(e) {
   e.preventDefault();
   const btn = document.getElementById("importBtn");
-  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>上传中...';
+  btn.disabled = true; btn.textContent = "上传中...";
 
-  const resp = await fetch("{% url "cloth_catalog_import_start" %}", { method: "POST", body: new FormData(this) });
-  const data = await resp.json();
+  let data;
+  try {
+    const resp = await fetch("{% url "cloth_catalog_import_start" %}", {
+      method: "POST",
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+      body: new FormData(this),
+    });
+    data = await readJson(resp);
+    if (!resp.ok && !data.error) throw new Error("启动导入失败（HTTP " + resp.status + "）");
+  } catch (err) {
+    showAlert(err.message || "启动导入失败");
+    btn.disabled = false; btn.textContent = "开始导入";
+    return;
+  }
   if (data.error) {
-    document.getElementById("importResult").innerHTML = '<div class="alert alert-danger">' + data.error + "</div>";
-    document.getElementById("importResult").classList.remove("d-none");
-    btn.disabled = false; btn.innerHTML = '<i class="bi bi-upload me-1"></i>开始导入';
+    showAlert(data.error);
+    btn.disabled = false; btn.textContent = "开始导入";
     return;
   }
 
@@ -58,9 +94,13 @@ document.getElementById("importForm").addEventListener("submit", async function(
 });
 
 function pollProgress(taskId) {
-  fetch("/cloth-catalog/import/progress/" + taskId + "/")
-    .then(function(r) { return r.json(); })
+  fetch("/cloth-catalog/import/progress/" + taskId + "/", { headers: { "X-Requested-With": "XMLHttpRequest" } })
+    .then(readJson)
     .then(function(state) {
+      if (state.error && !state.status) {
+        showAlert(state.error);
+        return;
+      }
       var pct = state.percent || 0;
       var bar = document.getElementById("progressBar");
       bar.style.width = pct + "%";
@@ -70,19 +110,25 @@ function pollProgress(taskId) {
 
       if (state.status === "done" || state.status === "error") {
         bar.classList.remove("progress-bar-animated");
-        var div = document.getElementById("importResult"); div.classList.remove("d-none");
         if (state.status === "done" && state.result) {
           bar.classList.add("bg-success");
-          div.innerHTML = '<div class="alert alert-success">导入完成！新增 <strong>' + state.result.imported + '</strong> 条，更新 <strong>' + state.result.updated + '</strong> 条</div>';
-          div.innerHTML += '<a href="{% url "cloth_catalog_list" %}" class="btn btn-sm btn-outline-primary">查看列表</a>';
+          var box = showAlert("导入完成！新增 " + state.result.imported + " 条，更新 " + state.result.updated + " 条", "success");
+          var link = document.createElement("a");
+          link.href = "{% url "cloth_catalog_list" %}";
+          link.className = "btn btn-sm btn-outline-primary";
+          link.textContent = "查看列表";
+          box.appendChild(link);
         } else if (state.status === "error") {
           bar.classList.add("bg-danger");
-          div.innerHTML = '<div class="alert alert-danger">导入失败：' + (state.error || "未知错误") + "</div>";
+          showAlert("导入失败：" + (state.error || "未知错误"));
         }
         return;
       }
 
       setTimeout(function() { pollProgress(taskId); }, 500);
+    })
+    .catch(function(err) {
+      showAlert(err.message || "无法获取导入进度，请刷新页面后重试");
     });
 }
 </script>

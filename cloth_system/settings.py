@@ -70,6 +70,9 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'cloth_system.urls'
 
+# CSRF 校验失败时，导入等 AJAX 接口返回 JSON（避免前端解析 403 HTML 崩溃）
+CSRF_FAILURE_VIEW = 'order.views_common.csrf_failure_view'
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

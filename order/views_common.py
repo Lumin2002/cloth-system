@@ -6,6 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect
 
 from .i18n import t
+from .decorators import wants_json_response
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class AdminRequiredMixin:
         if request.user.is_authenticated and hasattr(request.user, "supplier_profile") and not request.user.is_staff:
             messages.warning(request, t("auth.no_access"))
             return redirect("supplier_dashboard")
-        return super().dispatch(request, *args, **kwargs)
+        return super().dispatch(request, *args, **kwargs)  # type: ignore[misc]
 
 
 class SupplierRequiredMixin(LoginRequiredMixin):
@@ -54,6 +55,20 @@ def _error_response(request, status, code, title, message):
         "supplier": request.user.supplier_profile if is_supplier else None,
     }
     return render(request, "order/error_page.html", context, status=status)
+
+
+def csrf_failure_view(request, reason=""):
+    """CSRF 校验失败：导入等 AJAX 接口返回 JSON，其余使用 Django 默认 403 页。"""
+    from django.http import JsonResponse
+    from django.views.csrf import csrf_failure
+
+    if wants_json_response(request):
+        logger.warning("CSRF 校验失败：%s %s（%s）", request.method, request.path, reason)
+        return JsonResponse(
+            {"code": "403", "error": "安全令牌已失效，请刷新页面后重新导入"},
+            status=403,
+        )
+    return csrf_failure(request, reason=reason)
 
 
 def handler400(request, exception=None):

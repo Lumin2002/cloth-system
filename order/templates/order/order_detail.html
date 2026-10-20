@@ -26,7 +26,7 @@
             <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
                 <a href="{% url 'order_list' %}" class="btn btn-secondary btn-sm"> 返回列表</a>
                 <form method="post" action="{% url 'order_refresh_calculations' order.pk %}" style="display:inline">{% csrf_token %}<button type="submit" class="btn btn-info btn-sm"> 刷新</button></form>
-                <a href="{% url 'orders_export' %}?ids={{ order.pk }}" class="btn btn-primary btn-sm"> 导出</a>
+                <a href="{% url 'orders_export_full' %}?ids={{ order.pk }}" class="btn btn-primary btn-sm"> 导出</a>
                 <a href="{% url 'order_statement' order.pk %}" class="btn btn-success btn-sm"> 对账单</a>
                 <form method="post" action="{% url 'order_delete' order.pk %}" style="display:inline" onsubmit="return confirm('确定要删除订单 {{ order.serial_number }} 吗？此操作不可撤销！')">{% csrf_token %}<button type="submit" class="btn btn-danger btn-sm"> 删除</button></form>
                 <a href="?edit=1" class="btn btn-warning btn-sm"> 编辑订单</a>

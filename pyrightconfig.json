@@ -1,0 +1,15 @@
+{
+  "include": ["order", "cloth_system", "manage.py"],
+  "exclude": [
+    "**/migrations/**",
+    "**/.venv/**",
+    "staticfiles",
+    "backups",
+    "media",
+    "**/__pycache__/**"
+  ],
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "reportAttributeAccessIssue": "none",
+  "reportMissingModuleSource": "none"
+}

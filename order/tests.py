@@ -909,7 +909,7 @@ class DatabaseBackupExcelTests(TestCase):
             supplier=None,
         )
 
-    def test_backup_zip_contains_database_and_both_order_excel_files(self):
+    def test_backup_zip_contains_sql_json_and_full_data_excel_files(self):
         from order import db_backup
 
         def fake_dumpdata(*args, **kwargs):
@@ -921,25 +921,33 @@ class DatabaseBackupExcelTests(TestCase):
                 with patch.object(db_backup.subprocess, "run", side_effect=fake_dumpdata):
                     path, method = db_backup.create_backup()
 
-            self.assertEqual(method, "dumpdata JSON + 订单 Excel 压缩包")
-            # 压缩包内同时含 JSON 与两份 Excel，故用 .zip 命名、不带 .json 后缀
+            self.assertEqual(method, "SQL + JSON + 全部数据 Excel 压缩包")
+            # 压缩包内同时含 SQL / JSON / 全部数据 Excel，故用 .zip 命名、不带 .json 后缀
             self.assertRegex(path.name, r"^db_backup_\d{8}_\d{6}\.zip$")
             with zipfile.ZipFile(path) as archive:
                 names = set(archive.namelist())
                 timestamp = path.name.removeprefix("db_backup_").removesuffix(".zip")
-                expected_excel_sheets = {
-                    f"orders_backup_{timestamp}.xlsx": "订单数据",
-                    f"supplier_orders_backup_{timestamp}.xlsx": "供应商订单",
-                }
-                self.assertEqual(
-                    names,
-                    {
-                        path.name.removesuffix(".zip"),
-                        *expected_excel_sheets,
-                    },
-                )
-                for excel_name, sheet_name in expected_excel_sheets.items():
-                    workbook = load_workbook(BytesIO(archive.read(excel_name)), read_only=True)
+                json_name = f"db_backup_{timestamp}.json"
+                sql_name = f"db_backup_{timestamp}.sql"
+                excel_name = f"all_data_backup_{timestamp}.xlsx"
+                self.assertEqual(names, {json_name, sql_name, excel_name})
+
+                self.assertEqual(archive.read(json_name).decode("utf-8").strip(), "[]")
+
+                # SQL 备份非空，且是一份可读的注释/语句文本
+                sql_content = archive.read(sql_name).decode("utf-8")
+                self.assertTrue(sql_content.strip())
+                self.assertTrue(sql_content.lstrip().startswith("--"))
+
+                workbook = load_workbook(BytesIO(archive.read(excel_name)), read_only=True)
+                for sheet_name in (
+                    "订单数据",
+                    "供应商订单",
+                    "出货记录",
+                    "客户",
+                    "供应商账号",
+                    "用户",
+                ):
                     self.assertIn(sheet_name, workbook.sheetnames)
 
 

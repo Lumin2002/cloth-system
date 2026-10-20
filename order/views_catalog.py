@@ -22,7 +22,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.generic import CreateView, DetailView, ListView
-from .decorators import admin_required
+from .decorators import admin_required, validate_file_upload
 from .i18n import t
 from .import_progress import (
     create_catalog_task,
@@ -57,11 +57,11 @@ class ClothCatalogListView(AdminRequiredMixin, LoginRequiredMixin, ListView):
     paginate_by = None
 
     def get_queryset(self):
-        return ClothCatalog.objects.all()
+        return ClothCatalog.objects.all()  # type: ignore[attr-defined]
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        items = list(ClothCatalog.objects.all().order_by("cloth_code"))
+        items = list(ClothCatalog.objects.all().order_by("cloth_code"))  # type: ignore[attr-defined]
         ctx["total"] = len(items)
         ctx["items_json"] = [
             {
@@ -118,12 +118,13 @@ class ClothCatalogCreateView(AdminRequiredMixin, LoginRequiredMixin, CreateView)
 
     def form_valid(self, form):
         response = super().form_valid(form)
+        obj = getattr(self, "object", None)
         logger.info(
             t(
                 "log.catalog_create",
                 username=self.request.user.username,
-                code=self.object.cloth_code,
-                name=self.object.cloth_name or "-",
+                code=obj.cloth_code if obj else "-",
+                name=(obj.cloth_name or "-") if obj else "-",
             )
         )
         return response
@@ -135,10 +136,15 @@ def cloth_catalog_import(request):
 
 
 @admin_required
+@validate_file_upload
 def cloth_catalog_import_start(request):
-    task_id = create_catalog_task(request.user.id)
-    logger.info(t("log.catalog_task", task_id=task_id, user_id=request.user.id))
-    start_catalog_task(task_id, request.upload_file_bytes)
+    try:
+        task_id = create_catalog_task(request.user.id)
+        logger.info(t("log.catalog_task", task_id=task_id, user_id=request.user.id))
+        start_catalog_task(task_id, request.upload_file_bytes)
+    except Exception as exc:
+        logger.exception("启动布种导入失败")
+        return JsonResponse({"error": f"启动导入失败：{exc}"}, status=500)
     return JsonResponse({"task_id": task_id})
 
 
@@ -199,7 +205,7 @@ def cloth_catalog_delete(request, pk):
 
 @admin_required
 def cloth_catalog_delete_all(request):
-    count = ClothCatalog.objects.all().delete()[0]
+    count = ClothCatalog.objects.all().delete()[0]  # type: ignore[attr-defined]
     logger.info(t("log.catalog_delete_all", username=request.user.username, count=count))
     messages.success(request, t("msg.all_catalog_cleared", count=count))
     return redirect("cloth_catalog_list")
@@ -210,7 +216,7 @@ def cloth_catalog_autocomplete(request):
     q = request.GET.get("q", "").strip()
     if len(q) < 1:
         return JsonResponse([], safe=False)
-    qs = ClothCatalog.objects.filter(
+    qs = ClothCatalog.objects.filter(  # type: ignore[attr-defined]
         Q(cloth_code__icontains=q) | Q(cloth_name__icontains=q)
     ).values(
         "id",

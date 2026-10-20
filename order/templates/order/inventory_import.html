@@ -34,6 +34,7 @@
                     <div class="card card-flat h-100">
                         <div class="card-body">
                             <div id="upload-zone" class="upload-zone">
+                                {% csrf_token %}
                                 <input type="file" id="excel_file" accept=".xlsx" class="d-none">
                                 <div class="upload-zone-inner text-center py-5 px-3">
                                     <i class="bi bi-cloud-arrow-up display-4 text-primary mb-3"></i>
@@ -166,6 +167,19 @@
         return m ? m.pop() : '';
     }
 
+    // 后端异常/登录失效时可能返回 HTML，统一兜底，避免 r.json() 直接抛 SyntaxError
+    async function readJson(resp) {
+        const text = await resp.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            const hint = (resp.redirected || resp.status === 401 || resp.status === 403)
+                ? '登录状态或安全令牌已失效，请刷新页面后重试'
+                : '服务器返回异常（HTTP ' + resp.status + '），请稍后重试';
+            throw new Error(hint);
+        }
+    }
+
     function setFile(file) {
         if (!file) return;
         if (!file.name.toLowerCase().endsWith('.xlsx')) {
@@ -237,7 +251,7 @@
             '00000000-0000-0000-0000-000000000000', taskId
         );
         fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(r => r.json())
+            .then(readJson)
             .then(data => {
                 if (data.error) { clearInterval(pollTimer); alert(data.error); btnStart.disabled = false; return; }
                 updateProgress(data);
@@ -254,7 +268,7 @@
                     btnStart.disabled = false;
                 }
             })
-            .catch(() => { clearInterval(pollTimer); alert('无法获取导入进度，请检查网络后重试'); btnStart.disabled = false; });
+            .catch(err => { clearInterval(pollTimer); alert(err.message || '无法获取导入进度，请检查网络后重试'); btnStart.disabled = false; });
     }
 
     btnStart.addEventListener('click', () => {
@@ -271,10 +285,10 @@
 
         fetch('{% url "inventory_import_start" %}', {
             method: 'POST',
-            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
             body: formData,
         })
-            .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
+            .then(async r => ({ ok: r.ok, body: await readJson(r) }))
             .then(({ ok, body }) => {
                 if (!ok || body.error) throw new Error(body.error || '启动导入失败');
                 progressTitle.textContent = '正在导入…';
